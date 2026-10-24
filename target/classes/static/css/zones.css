@@ -1,0 +1,46 @@
+/*
+ * zones.css — THE FILE TO EDIT TO CUSTOMIZE THE LOOK of zones, walls and badges.
+ * Every class here comes from a Java enum's cssClass (CommonAreaType, UnitStatus, EdgeType, LeaseState, DueStatus).
+ * Each grid cell also gets --zone-color (the enum's defaultColor), so a class you leave empty
+ * still shows its default color. Add textures or icons to override it, e.g.
+ *   .zone-grass { background: url(/images/zones/grass.png); }
+ *   .zone-bathroom::before { content: "🚿"; }
+ */
+.zone { background: var(--zone-color); }
+
+/* Common areas (CommonAreaType) */
+.zone-walkway { }
+.zone-grass { }
+.zone-bathroom { }
+.zone-kitchen { }
+.zone-laundry { }
+.zone-lobby { }
+.zone-parking { }
+.zone-stairs { }
+
+/* Units (UnitStatus) - grid cells and status badges */
+.status-available { }
+.status-occupied { }
+.status-under-maintenance { }
+.status-archived { }
+
+/* Walls, doors, windows (EdgeType) */
+.edge-wall { }
+.edge-door { }
+.edge-window { }
+.edge-open { }
+
+/* Lease state badges (LeaseState) */
+.state-upcoming { }
+.state-active { }
+.state-expiring-soon { }
+.state-expired { }
+.state-ended { }
+.state-terminated { }
+.state-renewed { }
+
+/* Rent statement badges (DueStatus) */
+.due-upcoming { }
+.due-due { }
+.due-overdue { }
+.due-paid { }

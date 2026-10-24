@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    
+    <!--
+        Spring Boot parent: manages the versions of every Spring library, the MySQL driver,
+        Jackson and the Maven plugins, so most dependencies below need no <version>.
+        4.1.x is the current release line (supported until July 2027).
+    -->
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>4.1.1</version>
+        <relativePath/>
+    </parent>
+    
+    <groupId>com.techhub</groupId>
+    <artifactId>SpaceGridApplication</artifactId>
+    <version>1.0-SNAPSHOT</version>
+    <packaging>jar</packaging>
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <java.version>17</java.version>
+        <start-class>com.techhub.spacegridapplication.SpaceGridApplication</start-class>
+        <exec.mainClass>com.techhub.spacegridhtml.SpaceGridApplication</exec.mainClass>
+    </properties>
+     <dependencies>
+        <!-- Web layer: @RestController, embedded Tomcat, serves the HTML/CSS/JS in src/main/resources/static,
+             and Jackson for JSON (java.time types like LocalDate/YearMonth are supported out of the box).
+             In Spring Boot 4 this starter replaces the old spring-boot-starter-web. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webmvc</artifactId>
+        </dependency>
+ 
+        <!-- Database layer: JdbcTemplate, @Transactional, and the HikariCP connection pool
+             (replaces the old DatabaseConnection class). -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-jdbc</artifactId>
+        </dependency>
+ 
+        <!-- JDBC driver for MySQL; also works with XAMPP's MariaDB. Version managed by Spring Boot. -->
+        <dependency>
+            <groupId>com.mysql</groupId>
+            <artifactId>mysql-connector-j</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+ 
+        <!-- Password hashing, used by BCryptPasswordHasher (same library as your Swing version). -->
+        <dependency>
+            <groupId>org.mindrot</groupId>
+            <artifactId>jbcrypt</artifactId>
+            <version>0.4</version>
+        </dependency>
+ 
+        <!-- Development only: restarts the app automatically when you save a Java file,
+             and reloads the browser when HTML/CSS/JS change. Not included in the final JAR. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-devtools</artifactId>
+            <scope>runtime</scope>
+            <optional>true</optional>
+        </dependency>
+ 
+        <!-- Testing: JUnit 5, AssertJ, Mockito and Spring's test support (src/test/java). -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+    <build>
+        <plugins>
+            <!-- Adds "mvn spring-boot:run" and packages the app as one runnable JAR
+                 (java -jar target/spacegrid-1.0-SNAPSHOT.jar). -->
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+    <name>SpaceGridApplication</name>
+</project>
