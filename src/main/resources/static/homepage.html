@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SpaceGrid - Interactive Discovery Homepage</title>
+<!-- Tailwind CSS CDN -->
+<script src="https://cdn.tailwindcss.com"></script>
+<!-- Font Awesome for UI icons -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+body { font-family: 'Plus Jakarta Sans', sans-serif; }
+</style>
+</head>
+<body class="bg-[#f8fafc] text-slate-900 min-h-screen flex flex-col">
+<!-- ================= TOP NAVIGATION BAR ================= -->
+<header class="bg-white border-b border-slate-200 sticky top-0 z-30">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between gap-6">
+<!-- Brand Logo -->
+<div class="flex items-center gap-2 cursor-pointer flex-shrink-0" onclick="window.location.reload()">
+<span class="text-2xl font-black tracking-tight text-slate-900">Space<span class="text-indigo-600">Grid</span></span>
+</div>
+<!-- Search Bar -->
+<div class="flex-1 max-w-2xl mx-auto">
+<div class="relative flex items-center">
+<i class="fa-solid fa-magnifying-glass absolute left-4 text-slate-400 text-sm"></i>
+<input id="searchInput" type="text" placeholder="Search by property name, location, or owner..." class="w-full pl-11 pr-24 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition" >
+<button id="searchBtn" class="absolute right-1.5 px-4 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-semibold rounded-lg transition"> Search </button>
+</div>
+</div>
+<!-- Right User Actions -->
+<div class="flex items-center gap-4 flex-shrink-0 relative">
+<button id="switchModeBtn" class="hidden md:flex items-center gap-2 px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl text-xs font-semibold transition">
+<i class="fa-solid fa-repeat text-indigo-500"></i>
+<span id="modeText">Switch to Landowner</span>
+</button>
+<div id="profileDropdownBtn" class="flex items-center gap-2.5 pl-2 border-l border-slate-200 cursor-pointer select-none">
+<div class="w-9 h-9 rounded-full bg-slate-800 text-white flex items-center justify-center font-bold text-xs ring-2 ring-indigo-600/10"> MS </div>
+<span class="text-sm font-semibold text-slate-800 hidden sm:inline">Maria S.</span>
+<i class="fa-solid fa-chevron-down text-xs text-slate-400"></i>
+</div>
+<!-- Profile Dropdown Menu -->
+<div id="profileMenu" class="hidden absolute right-0 top-14 w-48 bg-white border border-slate-200 rounded-xl shadow-lg py-2 z-50">
+<a href="#" class="block px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">My Reservations</a>
+<a href="#" class="block px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">Saved Spaces</a>
+<a href="#" class="block px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">Account Settings</a>
+<div class="border-t border-slate-100 my-1"></div>
+<a href="#" class="block px-4 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50">Log Out</a>
+</div>
+</div>
+</div>
+</header>
+<!-- ================= MAIN CONTAINER ================= -->
+<main class="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 flex flex-col md:flex-row gap-8">
+<!-- ========== LEFT SIDEBAR: FILTERS ========== -->
+<aside class="w-full md:w-72 flex-shrink-0">
+<div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm sticky top-28 space-y-6">
+<!-- Header -->
+<div class="flex items-center justify-between pb-4 border-b border-slate-100">
+<h2 class="text-xs font-bold tracking-wider text-slate-900 uppercase">Filter & Sort</h2>
+<button id="resetFiltersBtn" class="text-xs font-semibold text-indigo-600 hover:text-indigo-700 transition">Reset All</button>
+</div>
+<!-- Sort By Dropdown -->
+<div>
+<label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Sort By</label>
+<div class="relative">
+<select id="sortSelect" class="w-full appearance-none bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm font-medium text-slate-800 focus:outline-none focus:border-indigo-600 pr-9 cursor-pointer">
+<option value="recommended">Recommended</option>
+<option value="price-low">Price: Low to High</option>
+<option value="price-high">Price: High to Low</option>
+<option value="availability">Availability</option>
+<option value="newest">Newest</option>
+</select>
+<i class="fa-solid fa-chevron-down absolute right-3.5 top-3.5 text-xs text-slate-400 pointer-events-none"></i>
+</div>
+</div>
+<!-- Space Type Checkboxes -->
+<div class="pt-2">
+<label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3">Space Type</label>
+<div class="space-y-2.5">
+<label class="flex items-center justify-between group cursor-pointer">
+<div class="flex items-center gap-2.5">
+<input type="checkbox" value="Commercial Lot" checked class="filter-type w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300">
+<span class="text-sm text-slate-700 font-medium">Commercial Lot</span>
+</div>
+<span id="count-commercial" class="text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full font-semibold">6</span>
+</label>
+<label class="flex items-center justify-between group cursor-pointer">
+<div class="flex items-center gap-2.5">
+<input type="checkbox" value="Night Market" checked class="filter-type w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300">
+<span class="text-sm text-slate-700 font-medium">Night Market</span>
+</div>
+<span id="count-night" class="text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full font-semibold">4</span>
+</label>
+<label class="flex items-center justify-between group cursor-pointer">
+<div class="flex items-center gap-2.5">
+<input type="checkbox" value="Building Unit" class="filter-type w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300">
+<span class="text-sm text-slate-700 font-medium">Building / Complex</span>
+</div>
+<span id="count-building" class="text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full font-semibold">4</span>
+</label>
+<label class="flex items-center justify-between group cursor-pointer">
+<div class="flex items-center gap-2.5">
+<input type="checkbox" value="Open Space" class="filter-type w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300">
+<span class="text-sm text-slate-700 font-medium">Open Space / Plaza</span>
+</div>
+<span id="count-openspace" class="text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full font-semibold">4</span>
+</label>
+</div>
+</div>
+<!-- Available Blocks Slider -->
+<div class="pt-2">
+<div class="flex items-center justify-between mb-2">
+<label class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Min. Avail Blocks</label>
+<span id="sliderValueBadge" class="text-xs font-bold text-indigo-600 bg-indigo-50 px-2.5 py-0.5 rounded-md">45 / 100</span>
+</div>
+<input id="blocksSlider" type="range" min="0" max="100" value="45" class="w-full accent-indigo-600 cursor-pointer">
+<div class="flex justify-between text-[11px] text-slate-400 font-medium mt-1">
+<span>0 blocks</span>
+<span>50</span>
+<span>100 blocks</span>
+</div>
+</div>
+<!-- Commercial Ready Toggle -->
+<div class="pt-2 flex items-center justify-between">
+<div>
+<div class="text-xs font-bold text-slate-800 uppercase tracking-wide">Commercial Ready</div>
+<p class="text-[11px] text-slate-400">Equipped with permits & power</p>
+</div>
+<label class="relative inline-flex items-center cursor-pointer">
+<input id="commercialToggle" type="checkbox" checked class="sr-only peer">
+<div class="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+</label>
+</div>
+<!-- CTA Button -->
+<button id="applyFiltersBtn" class="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold shadow-sm shadow-indigo-200 transition"> Apply Filters </button>
+</div>
+</aside>
+<!-- ========== RIGHT MAIN CONTENT: LISTINGS ========== -->
+<section class="flex-1 min-w-0 flex flex-col justify-between">
+<div>
+<!-- Section Header & Filter Badges -->
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+<div>
+<h1 class="text-2xl font-extrabold text-slate-900 tracking-tight">Available properties</h1>
+<p class="text-sm text-slate-500 mt-0.5"> matching your criteria • <strong id="totalSpacesHeader" class="text-slate-800 font-semibold">10 spaces ready for reservation</strong> </p>
+</div>
+<div id="filterPillsContainer" class="flex items-center gap-2 flex-wrap">
+<span class="text-xs font-medium text-slate-600 bg-white border border-slate-200 px-3 py-1.5 rounded-lg shadow-sm"> Type: Commercial & Night Market </span>
+<span class="text-xs font-medium text-slate-600 bg-white border border-slate-200 px-3 py-1.5 rounded-lg shadow-sm"> Blocks: ≥ 45 </span>
+</div>
+</div>
+<!-- Grid for Property Cards -->
+<div id="propertiesGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+<!-- Dynamically populated via JavaScript -->
+</div>
+<!-- Empty state placeholder -->
+<div id="emptyState" class="hidden py-16 text-center bg-white border border-slate-200 rounded-2xl p-8">
+<i class="fa-solid fa-store-slash text-4xl text-slate-300 mb-3"></i>
+<h3 class="text-base font-bold text-slate-800">No properties match your criteria</h3>
+<p class="text-xs text-slate-500 mt-1 max-w-sm mx-auto">Try lowering the minimum blocks slider, clearing search terms, or checking additional space categories.</p>
+<button onclick="resetAllFilters()" class="mt-4 px-4 py-2 bg-indigo-600 text-white text-xs font-semibold rounded-xl">Reset Filters</button>
+</div>
+</div>
+<!-- Footer Pagination -->
+<div id="paginationContainer" class="mt-10 pt-6 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-4">
+<p class="text-xs text-slate-500 font-medium"> Showing <span id="showingStart" class="font-bold text-slate-800">1</span> to <span id="showingEnd" class="font-bold text-slate-800">6</span> of <span id="showingTotal" class="font-bold text-slate-800">10</span> properties </p>
+<div id="paginationButtons" class="flex items-center gap-1">
+<!-- Pagination buttons generated by JavaScript -->
+</div>
+</div>
+</section>
+</main>
+<!-- ================= PROPERTY DETAILS MODAL ================= -->
+<div id="detailsModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+<div class="bg-white rounded-2xl max-w-lg w-full border border-slate-200 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+<div class="h-44 bg-black relative p-6 flex flex-col justify-between">
+<div class="flex items-center justify-between">
+<span id="modalTypeBadge" class="bg-white text-slate-900 font-bold text-xs px-3 py-1 rounded-md shadow-sm">Night Market</span>
+<button onclick="closeDetailsModal()" class="w-8 h-8 rounded-full bg-white/20 hover:bg-white/40 text-white flex items-center justify-center text-sm transition">
+<i class="fa-solid fa-xmark"></i>
+</button>
+</div>
+<div>
+<span id="modalStatusBadge" class="inline-flex items-center gap-1.5 bg-emerald-500 text-white font-semibold text-xs px-2.5 py-1 rounded-md shadow-sm">
+<span class="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></span> Open for Reservation </span>
+</div>
+</div>
+<div class="p-6 space-y-4">
+<div>
+<h2 id="modalTitle" class="text-xl font-extrabold text-slate-900">Property Title</h2>
+<p id="modalLocation" class="text-xs text-slate-500 mt-0.5"><i class="fa-solid fa-location-dot text-slate-400 mr-1"></i>Location</p>
+</div>
+<div class="grid grid-cols-2 gap-3 bg-slate-50 p-4 rounded-xl border border-slate-100">
+<div>
+<p class="text-[11px] font-bold text-slate-400 uppercase">Daily Rent</p>
+<p id="modalPrice" class="text-sm font-extrabold text-slate-900">₱90 – ₱150 / sq.m</p>
+</div>
+<div>
+<p class="text-[11px] font-bold text-slate-400 uppercase">Available Inventory</p>
+<p id="modalBlocks" class="text-sm font-extrabold text-emerald-600">48 Blocks</p>
+</div>
+<div>
+<p class="text-[11px] font-bold text-slate-400 uppercase">Permit Status</p>
+<p id="modalPermit" class="text-sm font-semibold text-slate-700">Commercial Ready (Approved)</p>
+</div>
+<div>
+<p class="text-[11px] font-bold text-slate-400 uppercase">Owner / Manager</p>
+<p id="modalOwner" class="text-sm font-semibold text-slate-700">Metro Lands Corp.</p>
+</div>
+</div>
+<div class="pt-2 flex items-center gap-3">
+<button onclick="alert('Reservation request initiated for this property!'); closeDetailsModal();" class="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition shadow-sm shadow-indigo-200"> Book Blocks Now </button>
+<button onclick="closeDetailsModal()" class="px-5 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition"> Close </button>
+</div>
+</div>
+</div>
+</div>
+<!-- ================= JAVASCRIPT LOGIC ================= -->
+<script>
+// 1. Data Store containing real dataset for multi-page demonstration
+const ALL_PROPERTIES = [
+{ id: 1, type: "Night Market", title: "Roxas Night Market – Section C", location: "Metro Commercial Zone, District 4", owner: "Davao City Markets", blocks: 48, minPrice: 90, maxPrice: 150, status: "Open", statusColor: "emerald", commercialReady: true, dateAdded: 20240401 },
+{ id: 2, type: "Commercial Lot", title: "Metro Commercial Plaza – Wing B", location: "Ortigas Center, Pasig City", owner: "Ortigas Land Dev", blocks: 65, minPrice: 110, maxPrice: 180, status: "Open", statusColor: "emerald", commercialReady: true, dateAdded: 20240405 },
+{ id: 3, type: "Night Market", title: "Ayala Central Hub – Ground Food Hall", location: "Makati Commercial Corridor", owner: "Ayala Property Group", blocks: 46, minPrice: 95, maxPrice: 140, status: "Few Left", statusColor: "amber", commercialReady: true, dateAdded: 20240410 },
+{ id: 4, type: "Commercial Lot", title: "Poblacion Outdoor Bazaar", location: "Poblacion, Makati City", owner: "Heritage Urban Spaces", blocks: 52, minPrice: 90, maxPrice: 130, status: "Open", statusColor: "emerald", commercialReady: true, dateAdded: 20240402 },
+{ id: 5, type: "Building Unit", title: "Northgate Tech Park Center", location: "Filinvest City, Alabang", owner: "Filinvest Alabang", blocks: 80, minPrice: 120, maxPrice: 190, status: "Open", statusColor: "emerald", commercialReady: true, dateAdded: 20240412 },
+{ id: 6, type: "Commercial Lot", title: "Greenhills Annex Commercial", location: "Greenhills, San Juan City", owner: "San Juan Corp", blocks: 50, minPrice: 90, maxPrice: 150, status: "Open", statusColor: "emerald", commercialReady: true, dateAdded: 20240408 },
+{ id: 7, type: "Night Market", title: "Cebu IT Park Courtyard Bazaar", location: "Lahug, Cebu City", owner: "Cebu IT Holdings", blocks: 72, minPrice: 85, maxPrice: 125, status: "Open", statusColor: "emerald", commercialReady: true, dateAdded: 20240328 },
+{ id: 8, type: "Open Space", title: "Bonifacio High Street Open Kiosk", location: "BGC, Taguig City", owner: "Fort Bonifacio Dev Corp", blocks: 60, minPrice: 150, maxPrice: 240, status: "Few Left", statusColor: "amber", commercialReady: true, dateAdded: 20240415 },
+{ id: 9, type: "Building Unit", title: "Eastwood Citywalk Retail Unit 4", location: "Eastwood, Quezon City", owner: "Megaworld Prime", blocks: 55, minPrice: 100, maxPrice: 160, status: "Open", statusColor: "emerald", commercialReady: true, dateAdded: 20240403 },
+{ id: 10, type: "Commercial Lot", title: "SM Aura Premier Front Lot", location: "Taguig, Metro Manila", owner: "SM Prime Holdings", blocks: 90, minPrice: 160, maxPrice: 220, status: "Open", statusColor: "emerald", commercialReady: true, dateAdded: 20240414 },
+{ id: 11, type: "Open Space", title: "Salcedo Community Plaza", location: "Salcedo Village, Makati", owner: "Makati Parking & Space", blocks: 45, minPrice: 95, maxPrice: 135, status: "Open", statusColor: "emerald", commercialReady: false, dateAdded: 20240315 },
+{ id: 12, type: "Night Market", title: "Il Corso Seaside Sunset Market", location: "South Road Properties, Cebu", owner: "SRP Waterfront", blocks: 58, minPrice: 80, maxPrice: 120, status: "Open", statusColor: "emerald", commercialReady: true, dateAdded: 20240409 },
+{ id: 13, type: "Building Unit", title: "Araneta Cyberpark Arcade", location: "Cubao, Quezon City", owner: "ACI Inc.", blocks: 68, minPrice: 105, maxPrice: 155, status: "Open", statusColor: "emerald", commercialReady: true, dateAdded: 20240406 },
+{ id: 14, type: "Open Space", title: "Clark Global Gateway Grounds", location: "Clark Freeport, Pampanga", owner: "Clark Development Corp", blocks: 95, minPrice: 70, maxPrice: 110, status: "Open", statusColor: "emerald", commercialReady: false, dateAdded: 20240320 }
+];
+// State Variables
+let currentPage = 1;
+const itemsPerPage = 6;
+let filteredList = [...ALL_PROPERTIES];
+// DOM References
+const propertiesGrid = document.getElementById('propertiesGrid');
+const emptyState = document.getElementById('emptyState');
+const paginationContainer = document.getElementById('paginationContainer');
+const paginationButtons = document.getElementById('paginationButtons');
+const showingStart = document.getElementById('showingStart');
+const showingEnd = document.getElementById('showingEnd');
+const showingTotal = document.getElementById('showingTotal');
+const totalSpacesHeader = document.getElementById('totalSpacesHeader');
+const blocksSlider = document.getElementById('blocksSlider');
+const sliderValueBadge = document.getElementById('sliderValueBadge');
+const commercialToggle = document.getElementById('commercialToggle');
+const sortSelect = document.getElementById('sortSelect');
+const searchInput = document.getElementById('searchInput');
+const searchBtn = document.getElementById('searchBtn');
+const resetFiltersBtn = document.getElementById('resetFiltersBtn');
+const applyFiltersBtn = document.getElementById('applyFiltersBtn');
+const switchModeBtn = document.getElementById('switchModeBtn');
+const modeText = document.getElementById('modeText');
+const profileDropdownBtn = document.getElementById('profileDropdownBtn');
+const profileMenu = document.getElementById('profileMenu');
+// Update Category Counts in Sidebar
+function updateCategoryBadges() {
+const counts = { "Commercial Lot": 0, "Night Market": 0, "Building Unit": 0, "Open Space": 0 };
+ALL_PROPERTIES.forEach(p => { if (counts[p.type] !== undefined) counts[p.type]++; });
+document.getElementById('count-commercial').textContent = counts["Commercial Lot"];
+document.getElementById('count-night').textContent = counts["Night Market"];
+document.getElementById('count-building').textContent = counts["Building Unit"];
+document.getElementById('count-openspace').textContent = counts["Open Space"];
+}
+// Apply Filter & Sort Logic
+function applyFilters() {
+const selectedTypes = Array.from(document.querySelectorAll('.filter-type:checked')).map(cb => cb.value);
+const minBlocks = parseInt(blocksSlider.value, 10);
+const isCommercialOnly = commercialToggle.checked;
+const searchQuery = searchInput.value.trim().toLowerCase();
+const sortOption = sortSelect.value;
+filteredList = ALL_PROPERTIES.filter(prop => {
+// Space type match
+if (selectedTypes.length > 0 && !selectedTypes.includes(prop.type)) return false;
+// Blocks minimum match
+if (prop.blocks < minBlocks) return false;
+// Commercial ready match
+if (isCommercialOnly && !prop.commercialReady) return false;
+// Search query match
+if (searchQuery) {
+const matchTitle = prop.title.toLowerCase().includes(searchQuery);
+const matchLoc = prop.location.toLowerCase().includes(searchQuery);
+const matchOwner = prop.owner.toLowerCase().includes(searchQuery);
+if (!matchTitle && !matchLoc && !matchOwner) return false;
+}
+return true;
+});
+// Sorting
+if (sortOption === "price-low") {
+filteredList.sort((a, b) => a.minPrice - b.minPrice);
+} else if (sortOption === "price-high") {
+filteredList.sort((a, b) => b.maxPrice - a.maxPrice);
+} else if (sortOption === "availability") {
+filteredList.sort((a, b) => b.blocks - a.blocks);
+} else if (sortOption === "newest") {
+filteredList.sort((a, b) => b.dateAdded - a.dateAdded);
+}
+currentPage = 1;
+renderProperties();
+}
+// Render Grid and Pagination
+function renderProperties() {
+const totalItems = filteredList.length;
+totalSpacesHeader.textContent = `${totalItems} spaces ready for reservation`;
+if (totalItems === 0) {
+propertiesGrid.innerHTML = "";
+emptyState.classList.remove('hidden');
+paginationContainer.classList.add('hidden');
+return;
+}
+emptyState.classList.add('hidden');
+paginationContainer.classList.remove('hidden');
+const totalPages = Math.ceil(totalItems / itemsPerPage);
+if (currentPage > totalPages) currentPage = totalPages;
+const startIndex = (currentPage - 1) * itemsPerPage;
+const endIndex = Math.min(startIndex + itemsPerPage, totalItems);
+const currentCards = filteredList.slice(startIndex, endIndex);
+// Render Cards (with sleek solid black placeholders)
+propertiesGrid.innerHTML = currentCards.map(item => {
+const isAmber = item.statusColor === 'amber';
+const badgeBg = isAmber ? 'bg-amber-500' : 'bg-emerald-500';
+const textDot = isAmber ? 'text-amber-600' : 'text-emerald-600';
+const dotBg = isAmber ? 'bg-amber-500' : 'bg-emerald-500';
+return `
+<div class="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition flex flex-col">
+<!-- Solid Black Image Area -->
+<div class="relative h-48 w-full bg-black overflow-hidden flex items-center justify-center">
+<span class="absolute top-3 left-3 bg-white text-slate-900 font-bold text-[11px] px-2.5 py-1 rounded-md shadow-sm">
+${item.type}
+</span>
+<span class="absolute top-3 right-3 ${badgeBg} text-white font-semibold text-[11px] px-2.5 py-1 rounded-md flex items-center gap-1 shadow-sm">
+<span class="w-1.5 h-1.5 rounded-full bg-white ${item.status === 'Open' ? 'animate-pulse' : ''}"></span>
+${item.status}
+</span>
+</div>
+<!-- Card Details -->
+<div class="p-5 flex-1 flex flex-col justify-between">
+<div>
+<div class="flex items-center gap-1.5 text-xs font-bold ${textDot} mb-1">
+<span class="w-2 h-2 rounded-full ${dotBg}"></span>
+${item.blocks} Blocks Available
+</div>
+<h3 class="text-base font-bold text-slate-900 truncate" title="${item.title}">${item.title}</h3>
+<p class="text-xs text-slate-500 mt-1">${item.location}</p>
+<div class="mt-3 text-base font-extrabold text-slate-900">
+₱${item.minPrice} – ₱${item.maxPrice}
+<span class="text-xs font-normal text-slate-500">/ sq.m daily</span>
+</div>
+</div>
+<button onclick="openDetailsModal(${item.id})" class="mt-4 w-full py-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-800 text-xs font-bold rounded-xl transition">
+View Space Details
+</button>
+</div>
+</div>
+`;
+}).join('');
+// Update Showing Texts
+showingStart.textContent = startIndex + 1;
+showingEnd.textContent = endIndex;
+showingTotal.textContent = totalItems;
+// Render Pagination Buttons
+renderPaginationControls(totalPages);
+}
+function renderPaginationControls(totalPages) {
+let buttonsHtml = `
+<button onclick="changePage(${currentPage - 1})" class="px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 transition ${currentPage === 1 ? 'text-slate-300 pointer-events-none' : 'text-slate-600 hover:bg-white'}">
+Previous
+</button>
+`;
+for (let i = 1; i <= totalPages; i++) {
+if (i === currentPage) {
+buttonsHtml += `<button class="w-8 h-8 flex items-center justify-center text-xs font-bold bg-indigo-600 text-white rounded-lg shadow-sm">${i}</button>`;
+} else {
+buttonsHtml += `<button onclick="changePage(${i})" class="w-8 h-8 flex items-center justify-center text-xs font-semibold text-slate-600 hover:bg-white rounded-lg border border-transparent hover:border-slate-200 transition">${i}</button>`;
+}
+}
+buttonsHtml += `
+<button onclick="changePage(${currentPage + 1})" class="px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 transition ${currentPage === totalPages ? 'text-slate-300 pointer-events-none' : 'text-slate-600 hover:bg-white'}">
+Next
+</button>
+`;
+paginationButtons.innerHTML = buttonsHtml;
+}
+function changePage(page) {
+const totalPages = Math.ceil(filteredList.length / itemsPerPage);
+if (page >= 1 && page <= totalPages) {
+currentPage = page;
+renderProperties();
+window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+}
+function resetAllFilters() {
+document.querySelectorAll('.filter-type').forEach(cb => {
+cb.checked = (cb.value === "Commercial Lot" || cb.value === "Night Market");
+});
+blocksSlider.value = 45;
+sliderValueBadge.textContent = "45 / 100";
+commercialToggle.checked = true;
+searchInput.value = "";
+sortSelect.value = "recommended";
+applyFilters();
+}
+// Modal Interaction
+function openDetailsModal(id) {
+const property = ALL_PROPERTIES.find(p => p.id === id);
+if (!property) return;
+document.getElementById('modalTitle').textContent = property.title;
+document.getElementById('modalLocation').innerHTML = `<i class="fa-solid fa-location-dot text-slate-400 mr-1"></i>${property.location}`;
+document.getElementById('modalTypeBadge').textContent = property.type;
+document.getElementById('modalPrice').textContent = `₱${property.minPrice} – ₱${property.maxPrice} / sq.m daily`;
+document.getElementById('modalBlocks').textContent = `${property.blocks} Blocks Available`;
+document.getElementById('modalOwner').textContent = property.owner;
+document.getElementById('modalPermit').textContent = property.commercialReady ? 'Commercial Ready (Power & Permits Installed)' : 'Standard Commercial Permit Needed';
+const statusBadge = document.getElementById('modalStatusBadge');
+if (property.statusColor === 'amber') {
+statusBadge.className = 'inline-flex items-center gap-1.5 bg-amber-500 text-white font-semibold text-xs px-2.5 py-1 rounded-md shadow-sm';
+statusBadge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-white"></span> ${property.status}`;
+} else {
+statusBadge.className = 'inline-flex items-center gap-1.5 bg-emerald-500 text-white font-semibold text-xs px-2.5 py-1 rounded-md shadow-sm';
+statusBadge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></span> ${property.status} for Reservation`;
+}
+document.getElementById('detailsModal').classList.remove('hidden');
+}
+function closeDetailsModal() {
+document.getElementById('detailsModal').classList.add('hidden');
+}
+// Event Listeners
+blocksSlider.addEventListener('input', (e) => {
+sliderValueBadge.textContent = `${e.target.value} / 100`;
+});
+blocksSlider.addEventListener('change', applyFilters);
+document.querySelectorAll('.filter-type').forEach(cb => cb.addEventListener('change', applyFilters));
+commercialToggle.addEventListener('change', applyFilters);
+sortSelect.addEventListener('change', applyFilters);
+resetFiltersBtn.addEventListener('click', resetAllFilters);
+applyFiltersBtn.addEventListener('click', applyFilters);
+searchInput.addEventListener('input', applyFilters);
+searchBtn.addEventListener('click', applyFilters);
+searchInput.addEventListener('keypress', (e) => {
+if (e.key === 'Enter') applyFilters();
+});
+// Header User Controls
+let isLandowner = false;
+switchModeBtn.addEventListener('click', () => {
+isLandowner = !isLandowner;
+modeText.textContent = isLandowner ? 'Switch to Renter' : 'Switch to Landowner';
+switchModeBtn.classList.toggle('bg-indigo-600', isLandowner);
+switchModeBtn.classList.toggle('text-white', isLandowner);
+switchModeBtn.classList.toggle('bg-indigo-50', !isLandowner);
+switchModeBtn.classList.toggle('text-indigo-600', !isLandowner);
+});
+profileDropdownBtn.addEventListener('click', (e) => {
+e.stopPropagation();
+profileMenu.classList.toggle('hidden');
+});
+document.addEventListener('click', () => {
+profileMenu.classList.add('hidden');
+});
+// Close modal on escape key
+document.addEventListener('keydown', (e) => {
+if (e.key === 'Escape') closeDetailsModal();
+});
+// Initial load
+updateCategoryBadges();
+applyFilters();
+</script>
+</body>
+</html>
