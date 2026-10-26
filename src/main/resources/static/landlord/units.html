@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="/css/base.css">
   <link rel="stylesheet" href="/css/zones.css">
 </head>
-<body>
+<body class="dashboard-page">
   <!--
     UNITS  (/landlord/units.html?propertyId=5)
       GET    /api/properties/{propertyId}/units      list
@@ -19,8 +19,117 @@
     Build: units table, add/edit form, "Archived" filter (status ARCHIVED).
     Script: js/pages/units.js
   -->
-  <main>
-    <!-- TODO: units table and form -->
+  <header class="topbar">
+    <a href="/landlord/dashboard.html" class="back-link">← Dashboard</a>
+    <div class="titles">
+      <h1 id="propertyName">Units Management</h1>
+      <p class="subtitle">View and configure property rental units</p>
+    </div>
+    <div class="topbar-actions">
+      <button id="btnLogout" class="btn" type="button">Log out</button>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="toolbar">
+      <div class="filters">
+        <label class="check">
+          <input type="checkbox" id="chkShowArchived"> Show Archived Units
+        </label>
+      </div>
+      <button id="btnNewUnit" class="btn btn-primary" type="button">+ New Unit</button>
+    </section>
+
+    <!-- UNITS TABLE -->
+    <section class="card">
+      <h2>Property Units</h2>
+      <div class="table-responsive">
+        <table id="unitsTable" class="table">
+          <thead>
+            <tr>
+              <th>Unit Name</th>
+              <th>Monthly Rate</th>
+              <th>Area</th>
+              <th>Inclusions</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- Sample Rows for Live Preview & User Manual Screenshots -->
+            <tr>
+              <td><strong>Unit 101</strong></td>
+              <td>₱8,500.00</td>
+              <td>25.00 sqm</td>
+              <td>Water, Electricity</td>
+              <td><span class="badge badge-active">VACANT</span></td>
+              <td class="table-actions">
+                <button class="btn btn-sm" type="button">Edit</button>
+                <button class="btn btn-sm" type="button">Maintenance</button>
+                <button class="btn btn-sm btn-danger" type="button">Archive</button>
+              </td>
+            </tr>
+            <tr>
+              <td><strong>Unit 102</strong></td>
+              <td>₱10,000.00</td>
+              <td>32.00 sqm</td>
+              <td>Water</td>
+              <td><span class="badge">OCCUPIED</span></td>
+              <td class="table-actions">
+                <button class="btn btn-sm" type="button">Edit</button>
+                <button class="btn btn-sm" type="button">Maintenance</button>
+                <button class="btn btn-sm btn-danger" type="button">Archive</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ADD / EDIT UNIT FORM -->
+    <section id="unitFormContainer" class="card" style="margin-top: 2rem;">
+      <h2 id="formTitle">Add / Edit Unit</h2>
+      <form id="unitForm" novalidate>
+        <input type="hidden" name="id" id="unitId">
+
+        <label class="field">
+          <span>Unit Name</span>
+          <input name="name" id="name" placeholder="e.g. Unit 105" required>
+        </label>
+
+        <label class="field">
+          <span>Monthly Rental Rate (₱)</span>
+          <input name="rentalRate" id="rentalRate" type="number" min="0" step="0.01" placeholder="8500.00" required>
+        </label>
+
+        <label class="field">
+          <span>Area in sqm</span>
+          <input name="areaSqm" id="areaSqm" type="number" min="0" step="0.01" placeholder="25.00">
+        </label>
+
+        <label class="field">
+          <span>Size Description</span>
+          <input name="sizeDescription" id="sizeDescription" placeholder="e.g. Studio with balcony">
+        </label>
+
+        <label class="check">
+          <input name="exactSize" id="exactSize" type="checkbox"> Exact measurement confirmed
+        </label>
+
+        <label class="check">
+          <input name="electricity" id="electricity" type="checkbox"> Includes Electricity
+        </label>
+
+        <label class="check">
+          <input name="water" id="water" type="checkbox"> Includes Water
+        </label>
+
+        <div class="button-group" style="margin-top: 1rem;">
+          <button id="btnSaveUnit" class="btn btn-primary" type="submit">Save Unit</button>
+          <button id="btnCancelUnit" class="btn" type="button">Cancel</button>
+        </div>
+      </form>
+    </section>
   </main>
 
   <script src="/js/common/api.js"></script>
