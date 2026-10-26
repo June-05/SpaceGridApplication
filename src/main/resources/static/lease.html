@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="/css/grid.css">
   <link rel="stylesheet" href="/css/zones.css">
 </head>
-<body>
+<body class="dashboard-page">
   <!--
     LEASE DETAILS  (both roles; open as /lease.html?id=5)
     Controllers: LeaseController, PaymentController, PropertyController
@@ -20,8 +20,111 @@
       Renter: a "Pay" link per payable month → /renter/pay.html?leaseId={id}&month=2026-11
     Script: js/pages/lease.js
   -->
-  <main>
-    <!-- TODO: lease summary, grid, statement table, payment history, role-specific buttons -->
+  <header class="topbar">
+    <a href="javascript:history.back()" id="backLink" class="back-link">← Back</a>
+    <div class="titles">
+      <h1 id="propertyName">Sunset Apartments</h1>
+      <p class="subtitle" id="unitName">Unit 105 Overview</p>
+    </div>
+    <div class="topbar-actions">
+      <button id="btnLogout" class="btn" type="button">Log out</button>
+    </div>
+  </header>
+
+  <main class="container">
+    <!-- LEASE SUMMARY CARD -->
+    <section class="card">
+      <div class="lease-header">
+        <h2>Lease Summary</h2>
+        <span id="currentState" class="badge badge-active">ACTIVE</span>
+      </div>
+
+      <div class="details-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; margin-top: 1rem;">
+        <div>
+          <p><strong>Property Name:</strong> <span id="valProperty">Sunset Apartments</span></p>
+          <p><strong>Unit Name:</strong> <span id="valUnit">Unit 105</span></p>
+        </div>
+        <div>
+          <p><strong>Renter Name:</strong> <span id="valRenter">John Doe</span></p>
+          <p><strong>Days Remaining:</strong> <span id="daysRemaining">180 days</span></p>
+        </div>
+      </div>
+
+      <!-- LANDLORD ACTION BUTTONS -->
+      <div id="landlordActions" class="button-group" style="margin-top: 1.5rem;">
+        <a id="btnRenew" href="/landlord/lease-form.html?renew=1" class="btn btn-primary">Renew Lease</a>
+        <button id="btnEnd" class="btn" type="button">End Lease</button>
+        <button id="btnTerminate" class="btn btn-danger" type="button">Terminate Lease</button>
+      </div>
+    </section>
+
+    <!-- PROPERTY GRID / UNIT LOCATION -->
+    <section class="card" style="margin-top: 2rem;">
+      <h2>Unit Location</h2>
+      <div id="gridHost" class="grid-host" style="margin-top: 1rem;"></div>
+    </section>
+
+    <!-- MONTH-BY-MONTH STATEMENT TABLE -->
+    <section class="card" style="margin-top: 2rem;">
+      <h2>Month-by-Month Statement</h2>
+      <div class="table-responsive">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Billing Month</th>
+              <th>Amount Due</th>
+              <th>Status</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="statementTable">
+            <!-- Sample Rows for Live Server & User Manual Screenshots -->
+            <tr>
+              <td>2026-11</td>
+              <td>₱8,500.00</td>
+              <td><span class="badge badge-warning">DUE</span></td>
+              <td>
+                <a href="/renter/pay.html?leaseId=1&month=2026-11" class="btn btn-sm btn-primary">Pay Rent</a>
+              </td>
+            </tr>
+            <tr>
+              <td>2026-10</td>
+              <td>₱8,500.00</td>
+              <td><span class="badge badge-active">PAID</span></td>
+              <td><span class="text-muted">Cleared</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- PAYMENT HISTORY TABLE -->
+    <section class="card" style="margin-top: 2rem;">
+      <h2>Payment History</h2>
+      <div class="table-responsive">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Payment Date</th>
+              <th>Billing Month</th>
+              <th>Method</th>
+              <th>Amount Paid</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="paymentHistoryTable">
+            <!-- Sample Row for Screenshots -->
+            <tr>
+              <td>2026-10-02</td>
+              <td>2026-10</td>
+              <td>GCASH</td>
+              <td>₱8,500.00</td>
+              <td><span class="badge badge-active">COMPLETED</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
   </main>
 
   <script src="/js/common/api.js"></script>
