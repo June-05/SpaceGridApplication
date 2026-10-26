@@ -6,15 +6,44 @@
   <title>Register · SpaceGrid</title>
   <link rel="stylesheet" href="/css/base.css">
 </head>
-<body>
+<body class="card-page">
   <!--
     REGISTER  →  AuthController.register   POST /api/auth/register
-    Form fields (names must match the @RequestParam names): username, password, fullName,
-    role (<select name="role"> with LANDLORD / RENTER).
-    Script: js/pages/register.js
+    Form fields: username, password, fullName, role (LANDLORD / RENTER).
   -->
-  <main>
-    <!-- TODO: registration form -->
+  <main class="card">
+    <h1>SpaceGrid</h1>
+    <h2>Create an Account</h2>
+    
+    <form id="registerForm" novalidate>
+      <label class="field">
+        <span>Full Name</span>
+        <input name="fullName" placeholder="e.g. Maria Santos" required>
+      </label>
+
+      <label class="field">
+        <span>Username</span>
+        <input name="username" autocomplete="username" placeholder="Choose a username" required>
+      </label>
+
+      <label class="field">
+        <span>Password</span>
+        <input name="password" type="password" autocomplete="new-password" placeholder="••••••••" required>
+      </label>
+
+      <label class="field">
+        <span>Account Role</span>
+        <select name="role" required>
+          <option value="LANDLORD">Landlord</option>
+          <option value="RENTER">Renter</option>
+        </select>
+      </label>
+
+      <button class="btn btn-primary btn-block" type="submit">Create Account</button>
+      <p id="error" class="error" aria-live="polite"></p>
+    </form>
+
+    <p>Already have an account? <a href="/login.html">Log in</a></p>
   </main>
 
   <script src="/js/common/api.js"></script>
