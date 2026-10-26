@@ -7,16 +7,39 @@
   <link rel="stylesheet" href="/css/base.css">
   <link rel="stylesheet" href="/css/zones.css">
 </head>
-<body>
-  <!--
-    RENTER DASHBOARD  →  LeaseController.list   GET /api/leases   (only the renter's own leases)
-    Show per lease: propertyName, unitName, currentState badge, daysRemaining, next amount due
-    (next due: GET /api/leases/{id}/statement → first item whose status is DUE or OVERDUE).
-    Each lease links to /lease.html?id=
-    Script: js/pages/renter-dashboard.js
-  -->
-  <main>
-    <!-- TODO: lease cards -->
+<body class="dashboard-page">
+  <header class="topbar">
+    <div class="titles">
+      <h1>SpaceGrid</h1>
+      <p class="subtitle">Renter Workspace</p>
+    </div>
+    <div class="topbar-actions">
+      <button id="btnLogout" class="btn" type="button">Log out</button>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="section-header">
+      <h2>My Active Leases</h2>
+    </section>
+
+    <div id="leases" class="card-grid">
+      <!-- Sample Lease Card for User Manual Screenshots -->
+      <article class="card lease-card">
+        <div class="lease-header">
+          <h2>Sunset Apartments</h2>
+          <span class="badge badge-active">ACTIVE</span>
+        </div>
+        <p class="unit-info"><strong>Unit:</strong> Unit 105</p>
+        <p class="due-info"><strong>Next Amount Due:</strong> ₱8,500.00</p>
+        <p class="days-info"><strong>Days Remaining:</strong> 12 days</p>
+
+        <div class="card-actions">
+          <a href="/lease.html?id=1" class="btn btn-primary">View Lease</a>
+          <a href="/renter/pay.html?leaseId=1" class="btn">Pay Statement</a>
+        </div>
+      </article>
+    </div>
   </main>
 
   <script src="/js/common/api.js"></script>
