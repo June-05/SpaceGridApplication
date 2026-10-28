@@ -160,6 +160,13 @@
 .sidebar h2 { margin: 0; font-size: 16px; }
 .sidebar h3 { margin: 14px 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: #64748b; }
 .sidebar-help { margin: 4px 0 10px; color: #64748b; font-size: 13px; }
+.sidebar-steps { margin: 6px 0 8px; padding-left: 20px; color: #334155; font-size: 13px; }
+.sidebar-steps li { margin: 2px 0; }
+.tool-note {
+  margin: 0 0 12px; padding: 6px 10px; border-radius: 8px;
+  background: #eff6ff; color: #1d4ed8; font-size: 13px; font-weight: 600;
+}
+.tool-note.is-none { background: #f1f5f9; color: #64748b; font-weight: 400; }
 .zone-list { display: flex; flex-direction: column; gap: 6px; }
 .zone-item {
   display: flex; align-items: center; gap: 10px; width: 100%;

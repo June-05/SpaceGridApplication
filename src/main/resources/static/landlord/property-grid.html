@@ -65,13 +65,18 @@
 
     <!-- RIGHT: tools -->
     <aside class="sidebar">
+      <p id="toolNote" class="tool-note is-none" aria-live="polite">No tool selected</p>
+
       <!-- Spots mode -->
       <div id="spotTools">
         <h2>Zones</h2>
-        <p class="sidebar-help">Pick a zone, then click or drag across spots to place it.</p>
+        <ol class="sidebar-steps">
+          <li>Pick a zone, or the Eraser.</li>
+          <li>Click or drag on the grid.</li>
+        </ol>
         <div id="zoneList" class="zone-list"></div>
 
-        <details class="add-form" open>
+        <details class="add-form">
           <summary>Add a unit</summary>
           <form id="addUnitForm" novalidate>
             <label class="field"><span>Unit name</span><input name="name" maxlength="100" placeholder="e.g. Unit 105" required></label>
@@ -107,9 +112,13 @@
       <!-- Walls & doors mode -->
       <div id="edgeTools" hidden>
         <h2>Walls &amp; doors</h2>
-        <p class="sidebar-help">Walls appear automatically around units and indoor areas. Pick a tool, then click a line on the grid.</p>
+        <ol class="sidebar-steps">
+          <li>Pick Wall, Door, Window or the Eraser.</li>
+          <li>Click or drag along the lines on the grid.</li>
+        </ol>
+        <p class="sidebar-help">Walls appear on their own around units and rooms. Use the Eraser to open one up (it shows as a dashed grey line), or the Wall to put it back.</p>
         <div id="edgeList" class="zone-list"></div>
-        <button id="btnResetEdges" class="btn btn-block" type="button">Reset all to automatic</button>
+        <button id="btnResetEdges" class="btn btn-block" type="button" title="Undo every wall, door and window edit">Reset all to automatic</button>
       </div>
     </aside>
   </main>

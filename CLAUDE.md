@@ -51,6 +51,7 @@ value objects, with no SQL or web code.
   - One zone per spot. Shrinking the grid drops spots and edges outside it.
   - **Walls are automatic** on a line between different zones when at least one side is enclosed (a unit or indoor area), and on the border next to an enclosed spot.
   - Manual overrides are WALL / DOOR / WINDOW / OPEN. Each line is stored once, as the line above (HORIZONTAL) or left of (VERTICAL) a spot.
+  - The plotter offers Eraser / Wall / Door / Window (`gridRenderer.applyEdgeTool`). Eraser over an automatic wall stores OPEN; Wall over an automatic wall removes the override.
   - Save layout = `PUT /grid`, then `PUT /edges`.
 - **Units:**
   - Status is AVAILABLE / OCCUPIED / UNDER_MAINTENANCE / ARCHIVED.

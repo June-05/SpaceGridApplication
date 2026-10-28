@@ -92,6 +92,30 @@ const gridRenderer = {
   },
 
   /**
+   * Applies one plotter tool to one line and returns true only if something changed.
+   *   'erase'  → the line ends up with no wall, door or window (OPEN over an automatic wall, otherwise no override)
+   *   'WALL'   → a wall (an automatic wall just comes back when the override is removed)
+   *   'DOOR' / 'WINDOW' → that edge
+   */
+  applyEdgeTool(layout, tool, orientation, r, c) {
+    const key = this.edgeKey(orientation, r, c);
+    const current = layout.overrides.get(key);
+    const auto = this.autoWall(layout, orientation, r, c);
+    if (tool === 'erase') {
+      if (auto) {
+        if (current === 'OPEN') return false;
+        layout.overrides.set(key, 'OPEN');
+        return true;
+      }
+      return layout.overrides.delete(key);
+    }
+    if (tool === 'WALL' && auto) return layout.overrides.delete(key);   // back to the automatic wall
+    if (current === tool) return false;
+    layout.overrides.set(key, tool);
+    return true;
+  },
+
+  /**
    * Draws the grid into container.
    * options: { mode: 'view' | 'spots' | 'edges', brushZoneId, highlightZoneId, minCell, maxCell,
    *             cell }   cell = exact cell size in px (zoom); without it the grid is fitted to the container width

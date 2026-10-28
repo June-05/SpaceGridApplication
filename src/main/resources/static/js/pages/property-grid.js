@@ -16,12 +16,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   // zoom = size of one spot in px. 48 px is shown as 100%. 'fit' = the whole grid fits the grid area.
   const CELL_MIN = 6, CELL_MAX = 96, CELL_BASE = 48, CELL_FIT_MAX = 72;
   const ZOOM_KEY = 'spacegrid.gridZoom';
+  // Same idea as the zone list: the Eraser comes first. Its key 'erase' also gives it the red-slash swatch.
   const EDGE_TOOLS = [
-    { type: 'WALL', name: 'Wall', meta: 'Add a wall' },
-    { type: 'DOOR', name: 'Door', meta: 'Doorway between spaces' },
-    { type: 'WINDOW', name: 'Window', meta: 'Wall with a window' },
-    { type: 'OPEN', name: 'No wall', meta: 'Remove an automatic wall' },
-    { type: 'RESET', name: 'Automatic', meta: 'Undo the edit on a line' }
+    { type: ERASER, name: 'Eraser', meta: 'Remove a wall, door or window' },
+    { type: 'WALL', name: 'Wall', meta: 'Draw a wall' },
+    { type: 'DOOR', name: 'Door', meta: 'A gap people walk through' },
+    { type: 'WINDOW', name: 'Window', meta: 'A wall you can see through' }
   ];
 
   const $ = (id) => document.getElementById(id);
@@ -30,12 +30,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     rows: $('inpRows'), cols: $('inpCols'), btnResize: $('btnResize'), btnSave: $('btnSave'),
     saveState: $('saveState'), zoneList: $('zoneList'), edgeList: $('edgeList'),
     spotTools: $('spotTools'), edgeTools: $('edgeTools'), toast: $('toast'),
-    zoomSlider: $('zoomSlider'), zoomLabel: $('zoomLabel'), btnZoomFit: $('btnZoomFit'), fillGroup: $('fillGroup')
+    zoomSlider: $('zoomSlider'), zoomLabel: $('zoomLabel'), btnZoomFit: $('btnZoomFit'), fillGroup: $('fillGroup'),
+    toolNote: $('toolNote')
   };
 
   const propertyId = Number(new URLSearchParams(location.search).get('id'));
   const state = {
-    layout: null, mode: 'spots', brush: null, edgeTool: 'DOOR', dirty: false, painting: false,
+    layout: null, mode: 'spots', brush: null, edgeTool: null, dirty: false, painting: false,
+    edgePainting: false,       // dragging a wall/door/window/eraser tool along lines
+    lastEdgeKey: null,         // the line the drag touched last (so one line is not applied twice in a row)
     zoom: loadZoom(),          // a cell size in px, or 'fit'
     fill: 'brush',             // 'brush' = paint spot by spot · 'rect' = drag a rectangle
     rect: null,                // { r0, c0, r1, c1 } while a rectangle is being dragged
@@ -153,7 +156,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   function hintText() {
     if (state.mode === 'edges') {
       const tool = EDGE_TOOLS.find(t => t.type === state.edgeTool);
-      return `${tool.name}: click a line between spots (or on the outer border).`;
+      if (!tool) return 'Pick Wall, Door, Window or Eraser on the right, then click or drag along the lines between spots.';
+      return `${tool.name}: click or drag along the lines between spots (or on the outer border). Esc to stop.`;
     }
     const how = state.fill === 'rect' ? 'drag a rectangle' : 'click or drag across spots';
     const nav = ' Zoom: Ctrl + wheel. Pan: hold space and drag.';
@@ -220,6 +224,20 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     el.edgeList.replaceChildren(...EDGE_TOOLS.map(t =>
       item({ key: t.type, name: t.name, meta: t.meta, selected: state.edgeTool === t.type })));
+
+    // "Tool: Door" note at the top of the sidebar, so it is clear what a click on the grid will do
+    let current = null;
+    if (state.mode === 'edges') {
+      const tool = EDGE_TOOLS.find(t => t.type === state.edgeTool);
+      current = tool ? tool.name : null;
+    } else if (state.brush === ERASER) {
+      current = 'Eraser';
+    } else if (typeof state.brush === 'number') {
+      const zone = gridRenderer.zoneById(state.layout, state.brush);
+      current = zone ? zone.name : null;
+    }
+    el.toolNote.textContent = current ? `Tool: ${current}` : 'No tool selected';
+    el.toolNote.classList.toggle('is-none', !current);
   }
 
   // ------------------------------------------------------------------ editing
@@ -244,17 +262,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     return true;
   }
 
-  function applyEdge(orientation, r, c) {
+  /** Applies the chosen wall/door/window/eraser tool to one line. The rules live in gridRenderer.applyEdgeTool. */
+  function applyEdge(handle) {
+    const orientation = handle.dataset.orientation, r = Number(handle.dataset.row), c = Number(handle.dataset.col);
     const key = gridRenderer.edgeKey(orientation, r, c);
-    const L = state.layout;
-    if (state.edgeTool === 'RESET') {
-      if (!L.overrides.delete(key)) return;
-    } else if (state.edgeTool === 'WALL' && gridRenderer.autoWall(L, orientation, r, c)) {
-      L.overrides.delete(key);                      // already an automatic wall: no edit needed
-    } else {
-      L.overrides.set(key, state.edgeTool);
+    if (key === state.lastEdgeKey) return;          // still on the same line during a drag
+    state.lastEdgeKey = key;
+    if (gridRenderer.applyEdgeTool(state.layout, state.edgeTool, orientation, r, c)) {
+      setDirty(true);
+      scheduleRender();
     }
-    setDirty(true);
+  }
+
+  function selectEdgeTool(key) {
+    state.edgeTool = state.edgeTool === key ? null : key;
     render();
   }
 
@@ -307,7 +328,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (e.button > 0) return;
     if (state.mode === 'edges') {
       const h = e.target.closest('.edge-handle');
-      if (h) applyEdge(h.dataset.orientation, Number(h.dataset.row), Number(h.dataset.col));
+      if (!h) return;
+      if (state.edgeTool == null) { toast('Pick Wall, Door, Window or Eraser on the right first.'); return; }
+      e.preventDefault();
+      state.edgePainting = true;
+      state.lastEdgeKey = null;
+      applyEdge(h);
       return;
     }
     const cell = cellFrom(e.target);
@@ -334,6 +360,12 @@ document.addEventListener('DOMContentLoaded', async () => {
       el.host.scrollTop = state.pan.top - (e.clientY - state.pan.y);
       return;
     }
+    if (state.edgePainting) {
+      const under = document.elementFromPoint(e.clientX, e.clientY);
+      const h = under && under.closest ? under.closest('.edge-handle') : null;
+      if (h && el.host.contains(h)) applyEdge(h);
+      return;
+    }
     if (!state.painting && !state.rect) return;
     const cell = cellFrom(document.elementFromPoint(e.clientX, e.clientY));
     if (!cell) return;
@@ -344,9 +376,12 @@ document.addEventListener('DOMContentLoaded', async () => {
       scheduleRender();
     }
   });
-  const endPointer = () => { state.painting = false; stopPan(); finishRect(); };
+  const endPointer = () => { state.painting = false; state.edgePainting = false; state.lastEdgeKey = null; stopPan(); finishRect(); };
   window.addEventListener('pointerup', endPointer);
-  window.addEventListener('pointercancel', () => { state.rect = null; state.painting = false; stopPan(); schedulePreview(); });
+  window.addEventListener('pointercancel', () => {
+    state.rect = null; state.painting = false; state.edgePainting = false; state.lastEdgeKey = null;
+    stopPan(); schedulePreview();
+  });
 
   // ---- zoom controls: buttons, slider, Ctrl + wheel (or pinch), keys + - 0
   $('btnZoomOut').addEventListener('click', () => zoomBy(1 / 1.25));
@@ -388,7 +423,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
   el.edgeList.addEventListener('click', (e) => {
     const btn = e.target.closest('.zone-item');
-    if (btn) { state.edgeTool = btn.dataset.key; render(); }
+    if (btn) selectEdgeTool(btn.dataset.key);
   });
   document.querySelectorAll('.seg[data-mode]').forEach(btn => btn.addEventListener('click', () => {
     state.mode = btn.dataset.mode;
@@ -402,6 +437,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
       if (state.rect) { state.rect = null; schedulePreview(); return; }      // first Esc: drop the rectangle
+      if (state.mode === 'edges') { if (state.edgeTool != null) selectEdgeTool(state.edgeTool); return; }
       if (state.brush != null) selectBrush(state.brush);
       return;
     }
@@ -425,7 +461,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
   window.addEventListener('blur', () => { state.space = false; el.host.classList.remove('is-pan-ready'); });
   $('btnResetEdges').addEventListener('click', () => {
-    if (!state.layout.overrides.size) return;
+    const count = state.layout.overrides.size;
+    if (!count) { toast('Nothing to reset: every wall is already automatic.'); return; }
+    if (!confirm(`Reset all ${count} wall, door and window edit${count === 1 ? '' : 's'} back to the automatic walls?\n\n`
+        + 'Doors, windows and walls you drew, and walls you erased, will go back to how SpaceGrid draws them by itself. '
+        + 'This only becomes permanent when you press Save layout.')) return;
     state.layout.overrides.clear();
     setDirty(true);
     render();

@@ -76,6 +76,19 @@ Compiled with Maven (offline, JDK 25). Loaded the SQL into a scratch database, s
 
 ---
 
+## 2026-10-28 · Plotter sidebar: Eraser for walls & doors (UI only)
+
+No change to classes, tables or endpoints. The stored edge types are still WALL / DOOR / WINDOW / OPEN.
+
+- The Walls & doors tools are now **Eraser, Wall, Door, Window** (Eraser first, same look as the zone Eraser). **No wall** and **Automatic** were removed from the list.
+- Eraser rule (`gridRenderer.applyEdgeTool`): on a line with an automatic wall it stores `OPEN`; on any other line it just deletes the manual override. The Wall tool on such a line removes the override, so the automatic wall comes back. Old saved `OPEN` edits still load (dashed grey lines).
+- Tools work on click or drag, like the zone brush. No tool is selected at first; click the tool again or press Esc to put it down.
+- **Reset all to automatic** now asks for confirmation (with the number of edits) and says "Nothing to reset" when there are none.
+- Both tabs: numbered steps ("1. Pick…  2. Click or drag…"), a "Tool: …" note at the top of the sidebar, and the Add-a-unit form starts collapsed.
+- Checked with a Node test of `applyEdgeTool` (18 cases) and syntax / element-id checks. Not tried in a real browser.
+
+---
+
 ## PROPOSED (not built) · Commercial ready, permits, bigger grid with zoom
 
 Status: **decided, not implemented.** Nothing below exists in the code yet. When a part is built, move it into a dated section above and update the docs listed at the end.
