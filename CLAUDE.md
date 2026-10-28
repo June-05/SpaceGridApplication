@@ -39,6 +39,7 @@ value objects, with no SQL or web code.
 - Grid methods on `GridZone` are package-private, so only `Property` changes spots.
 - Methods not written yet contain `// TODO` + `throw new UnsupportedOperationException("TODO")`.
 - Frontend: each page loads `/css/base.css` (+ `zones.css`, `grid.css` on grid pages), then `/js/common/api.js`, `auth.js`, `format.js` (+ `grid-renderer.js`), then `/js/pages/<page>.js`. Links start with `/`. `auth.js` `requireLogin(role)` redirects to the right page by role.
+- **Plotter page** (`landlord/property-grid.html`) also loads `/css/plotter.css` and `/js/common/floating-panel.js`. The grid fills the window and the toolbar/panel float on top. All its keyboard shortcuts live in the `SHORTCUTS` list in `property-grid.js` (the `?` dialog is built from it). Undo/redo uses `gridRenderer.snapshot/restore` (size, spots, edge overrides; adding a zone is not undoable).
 - **Exception:** `homepage.html` uses the Tailwind CDN + Font Awesome (not `base.css`) and loads only `api.js` + `js/pages/homepage.js`. It checks login with a plain `fetch('/api/auth/me')` (a 401 means guest), not `auth.requireLogin`.
 - Colors come from enum `cssClass` + `defaultColor`. Spots get classes like `zone zone-unit status-occupied` and `--zone-color`. `css/zones.css` is the file to edit for custom looks.
 

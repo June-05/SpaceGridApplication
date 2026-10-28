@@ -89,6 +89,22 @@ No change to classes, tables or endpoints. The stored edge types are still WALL 
 
 ---
 
+## 2026-10-28 · Plotter redesign: full-screen canvas, floating toolbar & panel, shortcuts, undo (UI only)
+
+No change to classes, tables, endpoints or saved data.
+
+- **Layout:** the grid fills the window on a dotted canvas. Floating on top: back + property name (top-left); Undo, Redo, unsaved dot, Save, ⋯ menu with Keyboard shortcuts / Show-hide panel / Reset walls / Log out (top-right); grid size + numbers (bottom-left); **toolbar** (bottom-center); zoom − 100% + with a menu (bottom-right).
+- **Toolbar:** Spots | Walls, then the tools of that mode. Spots: Hand, Brush, Rectangle, Eraser + the current zone. Walls: Hand, Wall, Door, Window, Eraser. Both modes start on the **Hand** (drag pans, nothing is edited); Esc goes back to it. The old Brush/Rectangle switch is now the Brush and Rectangle tools; Shift + drag also makes a rectangle with the Brush or the Eraser.
+- **Zones panel** (was the right sidebar): floating, drag by its header, minimize with the button or `\`, double-click the header to dock it back. Position and minimized state are remembered in the browser. Starts minimized on screens under 760 px. Zones show their 1–9 key; a filter box appears with more than 8 zones; + Unit / + Common area open small forms in the panel. In Walls mode it shows a legend and Reset all to automatic.
+- **Grid size:** a popover from the size button (or G) with − / + steppers, a dashed outline of the new size on the grid, and a note on what shrinking removes. Same 60 × 60 limit and confirm as before.
+- **Zoom:** − / + buttons and a menu (Zoom to fit, 50%, 100%, 200%). The slider was removed. Ctrl + wheel still zooms around the mouse.
+- **Undo / redo:** one step per stroke, rectangle, resize or wall reset (max 100). "Unsaved" is measured against the last saved layout, so undoing back to it clears the dot. Adding a unit/common area is saved at once and is not undone. New `gridRenderer.snapshot`, `restore`, `sameSnapshot`.
+- **Keyboard shortcuts** (one `SHORTCUTS` list in `property-grid.js`; press `?` for the list): S / W modes · H B R E tools · 1–9 zone (Walls: 1 Wall, 2 Door, 3 Window) · Shift + drag rectangle · Alt + click pick a zone · Space / middle mouse pan · + − zoom · Shift+1 or 0 fit · Shift+0 100% · Ctrl+Z, Ctrl+Shift+Z / Ctrl+Y · Ctrl+S save · G grid size · `\` panel · Esc.
+- **Files:** `property-grid.html` and `property-grid.js` rewritten; new `css/plotter.css` and `js/common/floating-panel.js`; plotter-only rules moved out of `grid.css` (`lease.html` keeps what it uses).
+- **Checked:** a jsdom run of the real page (46 checks: tools, keys, painting, rectangle, eraser, eyedropper, walls, size popover, undo/redo, save requests, dialog, panel, zoom menu, menu reset, add unit), plus the earlier renderer tests. Not tried in a real browser: drag of the panel, look of the tooltips and popovers, touch.
+
+---
+
 ## PROPOSED (not built) · Commercial ready, permits, bigger grid with zoom
 
 Status: **decided, not implemented.** Nothing below exists in the code yet. When a part is built, move it into a dated section above and update the docs listed at the end.

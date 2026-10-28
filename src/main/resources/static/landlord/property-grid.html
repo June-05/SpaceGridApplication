@@ -7,8 +7,9 @@
   <link rel="stylesheet" href="/css/base.css">
   <link rel="stylesheet" href="/css/grid.css">
   <link rel="stylesheet" href="/css/zones.css">
+  <link rel="stylesheet" href="/css/plotter.css">
 </head>
-<body>
+<body class="plotter-page">
   <!--
     GRID PLOTTER  (/landlord/property-grid.html?id=1)
       GET  /api/properties/{id}                    property + zones (with positions) + edgesByType
@@ -16,80 +17,101 @@
       PUT  /api/properties/{id}/edges              JSON {"DOOR": [{"row":2,"col":0,"orientation":"HORIZONTAL"}]}
       POST /api/properties/{id}/units              form: name, rentalRate, electricity, water, exactSize, areaSqm
       POST /api/properties/{id}/common-areas       form: name, areaType
+    The grid fills the window; the toolbar, panel and buttons float on top (plotter.css).
+    Keyboard shortcuts: press ? on the page, or see SHORTCUTS in /js/pages/property-grid.js.
   -->
-  <header class="topbar">
-    <a href="/landlord/dashboard.html" class="back-link">← Dashboard</a>
-    <div class="titles">
-      <h1 id="propertyName">Loading…</h1>
-      <p class="subtitle">Plot the property: place units and common areas, then add doors and windows.</p>
-    </div>
-    <div class="topbar-actions">
-      <span id="saveState" class="save-state" aria-live="polite"></span>
-      <button id="btnSave" class="btn btn-primary" type="button" disabled>Save layout</button>
-      <button id="btnLogout" class="btn" type="button">Log out</button>
-    </div>
+
+  <!-- icons (used with <svg><use href="#i-..."/></svg>) -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <symbol id="i-back" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></symbol>
+    <symbol id="i-hand" viewBox="0 0 24 24"><path d="M8 12.5V6a1.5 1.5 0 0 1 3 0v5.5M11 11V4.5a1.5 1.5 0 0 1 3 0V11M14 11V6a1.5 1.5 0 0 1 3 0v8a6 6 0 0 1-6 6h-.6a6 6 0 0 1-4.6-2.2L3.6 14.9a1.6 1.6 0 0 1 2.4-2.1L8 14.5"/></symbol>
+    <symbol id="i-brush" viewBox="0 0 24 24"><path d="M18.4 3.6a2 2 0 0 1 2.8 2.8L12 15.6 8.4 12zM8.4 12c-2.4 0-4.2 1.6-4.2 4 0 1.6-.8 2.6-2 3 4 1.4 8.2.4 9.8-3.4"/></symbol>
+    <symbol id="i-rect" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="2"/><path d="M8 9h8v6H8z" stroke-dasharray="2 2"/></symbol>
+    <symbol id="i-eraser" viewBox="0 0 24 24"><path d="M15.5 3.5l5 5L10 19H5.5l-3-3zM8.5 10.5l5 5M10 19h11"/></symbol>
+    <symbol id="i-wall" viewBox="0 0 24 24"><path d="M3 5h18v14H3zM3 12h18M9 5v7M15 12v7"/></symbol>
+    <symbol id="i-door" viewBox="0 0 24 24"><path d="M6 21V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v17M3 21h18M14.5 12.5v.01"/></symbol>
+    <symbol id="i-window" viewBox="0 0 24 24"><path d="M4 4h16v16H4zM12 4v16M4 12h16"/></symbol>
+    <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 14L4 9l5-5M4 9h11a5 5 0 0 1 0 10h-4"/></symbol>
+    <symbol id="i-redo" viewBox="0 0 24 24"><path d="M15 14l5-5-5-5M20 9H9a5 5 0 0 0 0 10h4"/></symbol>
+    <symbol id="i-more" viewBox="0 0 24 24"><path d="M5 12h.01M12 12h.01M19 12h.01" stroke-width="3.2"/></symbol>
+    <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-chevron" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+    <symbol id="i-grid" viewBox="0 0 24 24"><path d="M4 4h16v16H4zM4 10h16M4 15h16M10 4v16M15 4v16"/></symbol>
+    <symbol id="i-spots" viewBox="0 0 24 24"><path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4z"/><path d="M13 13h7v7h-7z" stroke-dasharray="2 2"/></symbol>
+  </svg>
+
+  <!-- THE CANVAS: the whole window -->
+  <main id="gridHost" class="grid-host pl-canvas mode-spots tool-hand" aria-label="Property grid"></main>
+
+  <!-- top-left: back + property name -->
+  <header class="pl-float pl-title">
+    <a href="/landlord/dashboard.html" class="icon-btn tip-below" data-tip="Back to dashboard" aria-label="Back to dashboard">
+      <svg class="ico"><use href="#i-back"/></svg>
+    </a>
+    <h1 id="propertyName" class="pl-name">Loading…</h1>
   </header>
 
-  <main class="plotter">
-    <!-- LEFT: the grid -->
-    <section class="board" aria-label="Property grid">
-      <div class="toolbar">
-        <div class="size-controls">
-          <label>Rows <input id="inpRows" type="number" min="1" max="60"></label>
-          <span class="times">×</span>
-          <label>Columns <input id="inpCols" type="number" min="1" max="60"></label>
-          <button id="btnResize" class="btn" type="button">Apply size</button>
-        </div>
-        <div class="seg-group" role="group" aria-label="Tool">
-          <button class="seg is-active" type="button" data-mode="spots" aria-pressed="true">Spots</button>
-          <button class="seg" type="button" data-mode="edges" aria-pressed="false">Walls &amp; doors</button>
-        </div>
-      </div>
-      <div class="tool-row">
-        <div class="zoom-controls" role="group" aria-label="Zoom">
-          <button id="btnZoomOut" class="btn btn-icon" type="button" title="Zoom out (-)" aria-label="Zoom out">−</button>
-          <input id="zoomSlider" type="range" min="6" max="96" step="1" aria-label="Zoom">
-          <button id="btnZoomIn" class="btn btn-icon" type="button" title="Zoom in (+, or Ctrl + mouse wheel)" aria-label="Zoom in">+</button>
-          <span id="zoomLabel" class="zoom-label" aria-live="polite">100%</span>
-          <button id="btnZoomFit" class="btn" type="button" title="Fit the whole grid on screen (0)">Fit</button>
-        </div>
-        <div id="fillGroup" class="seg-group" role="group" aria-label="Paint style">
-          <button class="seg is-active" type="button" data-fill="brush" aria-pressed="true">Brush</button>
-          <button class="seg" type="button" data-fill="rect" aria-pressed="false" title="Drag a rectangle to fill it">Rectangle</button>
-        </div>
-      </div>
-      <p id="hint" class="hint"></p>
-      <div id="gridHost" class="grid-host"></div>
-      <p id="summary" class="summary"></p>
-    </section>
+  <!-- top-right: undo, redo, save, menu -->
+  <div class="pl-float pl-actions">
+    <button id="btnUndo" class="icon-btn tip-below" type="button" data-tip="Undo" data-key="Ctrl+Z" aria-label="Undo" disabled>
+      <svg class="ico"><use href="#i-undo"/></svg>
+    </button>
+    <button id="btnRedo" class="icon-btn tip-below" type="button" data-tip="Redo" data-key="Ctrl+Shift+Z" aria-label="Redo" disabled>
+      <svg class="ico"><use href="#i-redo"/></svg>
+    </button>
+    <span id="saveState" class="pl-save-state" aria-live="polite"></span>
+    <button id="btnSave" class="btn btn-primary tip-below" type="button" data-tip="Save layout" data-key="Ctrl+S" disabled>Save</button>
+    <button id="btnMenu" class="icon-btn tip-below" type="button" data-tip="More" aria-label="More" aria-haspopup="menu" aria-expanded="false">
+      <svg class="ico"><use href="#i-more"/></svg>
+    </button>
+  </div>
+  <div id="menuPop" class="pl-popover" role="menu" hidden>
+    <button class="menu-item" type="button" role="menuitem" data-action="shortcuts">Keyboard shortcuts <kbd>?</kbd></button>
+    <button class="menu-item" type="button" role="menuitem" data-action="panel">Show / hide panel <kbd>\</kbd></button>
+    <button class="menu-item" type="button" role="menuitem" data-action="reset-edges">Reset walls to automatic</button>
+    <div class="menu-sep"></div>
+    <button id="btnLogout" class="menu-item is-danger" type="button" role="menuitem">Log out</button>
+  </div>
 
-    <!-- RIGHT: tools -->
-    <aside class="sidebar">
-      <p id="toolNote" class="tool-note is-none" aria-live="polite">No tool selected</p>
-
+  <!-- floating panel: zones (Spots) or legend (Walls & doors). Drag by the header. -->
+  <aside id="panel" class="pl-float pl-panel" aria-labelledby="panelTitle">
+    <div id="panelHead" class="pl-panel-head">
+      <h2 id="panelTitle">Zones</h2>
+      <button id="btnPanelMin" class="icon-btn pl-min-btn tip-below" type="button" data-tip="Minimize" data-key="\" aria-label="Minimize panel">
+        <svg class="ico"><use href="#i-chevron"/></svg>
+      </button>
+    </div>
+    <div class="pl-panel-body">
       <!-- Spots mode -->
-      <div id="spotTools">
-        <h2>Zones</h2>
-        <ol class="sidebar-steps">
-          <li>Pick a zone, or the Eraser.</li>
-          <li>Click or drag on the grid.</li>
-        </ol>
+      <section id="spotTools" class="panel-section">
+        <p class="panel-help">Pick a zone (or press 1–9), then paint with the Brush or Rectangle.</p>
+        <input id="zoneFilter" class="panel-filter" type="search" placeholder="Filter zones…" aria-label="Filter zones" hidden>
         <div id="zoneList" class="zone-list"></div>
 
-        <details class="add-form">
-          <summary>Add a unit</summary>
+        <div class="add-buttons">
+          <button id="btnAddUnit" class="btn" type="button">+ Unit</button>
+          <button id="btnAddArea" class="btn" type="button">+ Common area</button>
+        </div>
+
+        <div id="addUnitBox" class="add-form" hidden>
+          <h4>New unit</h4>
           <form id="addUnitForm" novalidate>
-            <label class="field"><span>Unit name</span><input name="name" maxlength="100" placeholder="e.g. Unit 105" required></label>
+            <label class="field"><span>Unit name</span><input name="name" maxlength="100" placeholder="e.g. Booth 12" required></label>
             <label class="field"><span>Monthly rate (₱)</span><input name="rentalRate" type="number" min="0" step="0.01" required></label>
             <label class="field"><span>Area in sqm (optional)</span><input name="areaSqm" type="number" min="0.01" step="0.01"></label>
             <label class="check"><input name="electricity" type="checkbox"> Includes electricity</label>
             <label class="check"><input name="water" type="checkbox"> Includes water</label>
-            <button class="btn btn-block" type="submit">+ Add unit</button>
+            <div class="form-actions">
+              <button class="btn" type="button" data-cancel>Cancel</button>
+              <button class="btn btn-primary" type="submit">Add unit</button>
+            </div>
           </form>
-        </details>
+        </div>
 
-        <details class="add-form">
-          <summary>Add a common area</summary>
+        <div id="addAreaBox" class="add-form" hidden>
+          <h4>New common area</h4>
           <form id="addAreaForm" novalidate>
             <label class="field"><span>Name</span><input name="name" maxlength="100" placeholder="e.g. Hallway" required></label>
             <label class="field"><span>Type</span>
@@ -104,24 +126,113 @@
                 <option value="STAIRS">Stairs</option>
               </select>
             </label>
-            <button class="btn btn-block" type="submit">+ Add common area</button>
+            <div class="form-actions">
+              <button class="btn" type="button" data-cancel>Cancel</button>
+              <button class="btn btn-primary" type="submit">Add area</button>
+            </div>
           </form>
-        </details>
-      </div>
+        </div>
+      </section>
 
       <!-- Walls & doors mode -->
-      <div id="edgeTools" hidden>
-        <h2>Walls &amp; doors</h2>
-        <ol class="sidebar-steps">
-          <li>Pick Wall, Door, Window or the Eraser.</li>
-          <li>Click or drag along the lines on the grid.</li>
-        </ol>
-        <p class="sidebar-help">Walls appear on their own around units and rooms. Use the Eraser to open one up (it shows as a dashed grey line), or the Wall to put it back.</p>
-        <div id="edgeList" class="zone-list"></div>
-        <button id="btnResetEdges" class="btn btn-block" type="button" title="Undo every wall, door and window edit">Reset all to automatic</button>
+      <section id="edgeTools" class="panel-section" hidden>
+        <p class="panel-help">Walls appear on their own around units and rooms. Pick a tool in the toolbar (1 Wall, 2 Door, 3 Window, E Eraser), then click or drag along the lines.</p>
+        <ul class="legend">
+          <li><span class="swatch swatch-wall"></span> Wall</li>
+          <li><span class="swatch swatch-door"></span> Door</li>
+          <li><span class="swatch swatch-window"></span> Window</li>
+          <li><span class="swatch swatch-open"></span> Erased wall (an opening)</li>
+        </ul>
+        <button id="btnResetEdges" class="btn btn-block" type="button">Reset all to automatic</button>
+      </section>
+    </div>
+  </aside>
+
+  <!-- bottom-left: grid size + numbers -->
+  <div class="pl-float pl-status">
+    <button id="btnSize" class="text-btn" type="button" data-tip="Grid size" data-key="G" aria-haspopup="dialog" aria-expanded="false">
+      <svg class="ico"><use href="#i-grid"/></svg><span id="sizeLabel">– × –</span>
+    </button>
+    <span id="summary" class="pl-stats"></span>
+  </div>
+  <div id="sizePop" class="pl-popover size-pop" role="dialog" aria-label="Grid size" hidden>
+    <h3>Grid size <span class="zone-meta">(max 60 × 60)</span></h3>
+    <div class="size-row">Rows
+      <div class="stepper">
+        <button type="button" data-step="rows:-1" aria-label="One row less">−</button>
+        <input id="inpRows" type="number" min="1" max="60" inputmode="numeric" aria-label="Rows">
+        <button type="button" data-step="rows:1" aria-label="One row more">+</button>
       </div>
-    </aside>
-  </main>
+    </div>
+    <div class="size-row">Columns
+      <div class="stepper">
+        <button type="button" data-step="cols:-1" aria-label="One column less">−</button>
+        <input id="inpCols" type="number" min="1" max="60" inputmode="numeric" aria-label="Columns">
+        <button type="button" data-step="cols:1" aria-label="One column more">+</button>
+      </div>
+    </div>
+    <p id="sizeNote" class="size-note" aria-live="polite"></p>
+    <div class="size-actions">
+      <button id="btnSizeCancel" class="btn" type="button">Cancel</button>
+      <button id="btnResize" class="btn btn-primary" type="button">Apply</button>
+    </div>
+  </div>
+
+  <!-- hint just above the toolbar -->
+  <p id="hint" class="pl-tip" aria-live="polite"></p>
+
+  <!-- bottom-center toolbar -->
+  <div id="toolbar" class="pl-float pl-toolbar" role="toolbar" aria-label="Plotter tools">
+    <div class="pl-modes" role="group" aria-label="Mode">
+      <button class="text-btn is-active" type="button" data-mode="spots" data-tip="Spots" data-key="S" aria-pressed="true">
+        <svg class="ico"><use href="#i-spots"/></svg><span class="pl-mode-label">Spots</span>
+      </button>
+      <button class="text-btn" type="button" data-mode="edges" data-tip="Walls &amp; doors" data-key="W" aria-pressed="false">
+        <svg class="ico"><use href="#i-wall"/></svg><span class="pl-mode-label">Walls</span>
+      </button>
+    </div>
+    <span class="pl-sep"></span>
+
+    <div id="spotToolBtns" class="pl-tools" role="group" aria-label="Spot tools">
+      <button class="icon-btn" type="button" data-tool="hand" data-tip="Hand: move around" data-key="H" aria-label="Hand"><svg class="ico"><use href="#i-hand"/></svg></button>
+      <button class="icon-btn" type="button" data-tool="brush" data-tip="Brush" data-key="B" aria-label="Brush"><svg class="ico"><use href="#i-brush"/></svg></button>
+      <button class="icon-btn" type="button" data-tool="rect" data-tip="Rectangle" data-key="R" aria-label="Rectangle"><svg class="ico"><use href="#i-rect"/></svg></button>
+      <button class="icon-btn" type="button" data-tool="erase" data-tip="Eraser" data-key="E" aria-label="Eraser"><svg class="ico"><use href="#i-eraser"/></svg></button>
+      <button id="zoneChip" class="zone-chip is-empty" type="button" data-tip="Current zone" data-key="1–9">
+        <span id="zoneChipSwatch" class="swatch"></span><span id="zoneChipName" class="zone-chip-name">Pick a zone</span>
+      </button>
+    </div>
+
+    <div id="edgeToolBtns" class="pl-tools" role="group" aria-label="Wall tools" hidden>
+      <button class="icon-btn" type="button" data-edge="hand" data-tip="Hand: move around" data-key="H" aria-label="Hand"><svg class="ico"><use href="#i-hand"/></svg></button>
+      <button class="icon-btn" type="button" data-edge="WALL" data-tip="Wall" data-key="1" aria-label="Wall"><svg class="ico"><use href="#i-wall"/></svg></button>
+      <button class="icon-btn" type="button" data-edge="DOOR" data-tip="Door" data-key="2" aria-label="Door"><svg class="ico"><use href="#i-door"/></svg></button>
+      <button class="icon-btn" type="button" data-edge="WINDOW" data-tip="Window" data-key="3" aria-label="Window"><svg class="ico"><use href="#i-window"/></svg></button>
+      <button class="icon-btn" type="button" data-edge="erase" data-tip="Eraser" data-key="E" aria-label="Eraser"><svg class="ico"><use href="#i-eraser"/></svg></button>
+    </div>
+  </div>
+
+  <!-- bottom-right: zoom -->
+  <div class="pl-float pl-zoom">
+    <button id="btnZoomOut" class="icon-btn" type="button" data-tip="Zoom out" data-key="−" aria-label="Zoom out"><svg class="ico"><use href="#i-minus"/></svg></button>
+    <button id="btnZoomMenu" class="text-btn" type="button" data-tip="Zoom options" aria-haspopup="menu" aria-expanded="false"><span id="zoomLabel">100%</span></button>
+    <button id="btnZoomIn" class="icon-btn" type="button" data-tip="Zoom in" data-key="+" aria-label="Zoom in"><svg class="ico"><use href="#i-plus"/></svg></button>
+  </div>
+  <div id="zoomPop" class="pl-popover" role="menu" hidden>
+    <button class="menu-item" type="button" role="menuitem" data-zoom="fit">Zoom to fit <kbd>Shift+1</kbd></button>
+    <button class="menu-item" type="button" role="menuitem" data-zoom="0.5">50%</button>
+    <button class="menu-item" type="button" role="menuitem" data-zoom="1">100% <kbd>Shift+0</kbd></button>
+    <button class="menu-item" type="button" role="menuitem" data-zoom="2">200%</button>
+  </div>
+
+  <!-- keyboard shortcuts (filled from SHORTCUTS in property-grid.js) -->
+  <dialog id="shortcutsDialog" class="pl-dialog" aria-labelledby="shortcutsTitle">
+    <div class="pl-dialog-head">
+      <h2 id="shortcutsTitle">Keyboard shortcuts</h2>
+      <button id="btnShortcutsClose" class="icon-btn" type="button" aria-label="Close"><svg class="ico"><use href="#i-close"/></svg></button>
+    </div>
+    <div id="shortcutsBody" class="pl-dialog-body"></div>
+  </dialog>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
@@ -129,6 +240,7 @@
   <script src="/js/common/auth.js"></script>
   <script src="/js/common/format.js"></script>
   <script src="/js/common/grid-renderer.js"></script>
+  <script src="/js/common/floating-panel.js"></script>
   <script src="/js/pages/property-grid.js"></script>
 </body>
 </html>

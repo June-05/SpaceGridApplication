@@ -37,6 +37,28 @@ const gridRenderer = {
     return layout;
   },
 
+  /** A copy of the editable parts of a layout (size, spots, edge overrides), for undo / redo. Zones are not included. */
+  snapshot(layout) {
+    return { rows: layout.rows, cols: layout.cols, cells: new Map(layout.cells), overrides: new Map(layout.overrides) };
+  },
+
+  /** Puts a snapshot back into the layout (copies it again, so the snapshot can be reused). */
+  restore(layout, snap) {
+    layout.rows = snap.rows;
+    layout.cols = snap.cols;
+    layout.cells = new Map(snap.cells);
+    layout.overrides = new Map(snap.overrides);
+  },
+
+  /** True when two snapshots hold the same size, spots and edge overrides. */
+  sameSnapshot(a, b) {
+    if (!a || !b || a.rows !== b.rows || a.cols !== b.cols) return false;
+    if (a.cells.size !== b.cells.size || a.overrides.size !== b.overrides.size) return false;
+    for (const [k, v] of a.cells) if (b.cells.get(k) !== v) return false;
+    for (const [k, v] of a.overrides) if (b.overrides.get(k) !== v) return false;
+    return true;
+  },
+
   /** Body for PUT /api/properties/{id}/grid: { "zoneId": [{row, col}, ...] } */
   toSpotsByZone(layout) {
     const result = {};

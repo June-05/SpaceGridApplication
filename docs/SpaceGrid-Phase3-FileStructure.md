@@ -140,13 +140,15 @@ SpaceGrid/
 │       ├── css/
 │       │   ├── base.css
 │       │   ├── grid.css
+│       │   ├── plotter.css                         full-screen plotter: floating toolbar, panel, popovers
 │       │   └── zones.css
 │       ├── js/
 │       │   ├── common/
 │       │   │   ├── api.js
 │       │   │   ├── auth.js
 │       │   │   ├── format.js
-│       │   │   └── grid-renderer.js
+│       │   │   ├── grid-renderer.js
+│       │   │   └── floating-panel.js                   draggable / minimizable panel (plotter)
 │       │   └── pages/
 │       │       ├── homepage.js
 │       │       ├── requests.js
@@ -264,7 +266,9 @@ Links start with `/` so they work from inside the `landlord/` and `renter/` fold
 | `js/common/api.js` | `fetch` wrapper: JSON in/out, shows `{"error": …}` messages, 401 → `/login.html` |
 | `js/common/auth.js` | `requireLogin(role)`: checks `/api/auth/me`, sends the wrong role away, fills the nav bar, logout button |
 | `js/common/format.js` | ₱ amounts, dates, "12 days left", badge HTML from a state's `cssClass` |
-| `js/common/grid-renderer.js` | Draws a property's zones and edges (automatic walls + overrides) from the property JSON. Editable mode for the plotter; read-only mode with one unit highlighted for `lease.html`. |
+| `js/common/grid-renderer.js` | Draws a property's zones and edges (automatic walls + overrides) from the property JSON. Editable mode for the plotter; read-only mode with one unit highlighted for `lease.html`. Also `applyEdgeTool` and `snapshot`/`restore` (undo). |
+| `css/plotter.css` | Plotter page only: full-window canvas, floating toolbar, Zones panel, popovers, shortcuts dialog |
+| `js/common/floating-panel.js` | Drag / minimize / dock a floating panel; remembers its place in localStorage |
 
 ---
 
