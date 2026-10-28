@@ -1,4 +1,0 @@
--------------------------------------------------------------------------------
-Test set: com.techhub.spacegridapplication.model.LeaseContractTest
--------------------------------------------------------------------------------
-Tests run: 8, Failures: 0, Errors: 0, Skipped: 8, Time elapsed: 0.010 s -- in com.techhub.spacegridapplication.model.LeaseContractTest
