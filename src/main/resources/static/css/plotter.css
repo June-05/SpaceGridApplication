@@ -376,6 +376,7 @@ kbd {
 }
 .menu-item:hover, .menu-item:focus-visible { background: #f1f5f9; }
 .menu-item.is-danger { color: var(--danger); }
+a.menu-item { box-sizing: border-box; text-decoration: none; }
 .menu-sep { height: 1px; margin: 4px 6px; background: var(--border); }
 
 .size-pop, .color-pop { padding: 12px; }

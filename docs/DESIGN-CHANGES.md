@@ -192,6 +192,24 @@ The plotter now has two states. **View** opens first; **Edit** is the editor as 
 
 ---
 
+## 2026-10-29 · Merged the `landlord` branch (UI only, no design change)
+
+The teammate's branch `landlord` (`16b44a9`, details in `landlord.txt`) redesigns the landlord pages as Tailwind mock-ups: `dashboard.html`, `units.html`, `leases.html`, `lease-form.html`, `property-form.html`. They have sample data, inline JavaScript (filters, pagination, modals, calculators) and relative links, and they don't call the API yet.
+
+How the merge was resolved:
+- **`application.properties`**: kept **port 3306** (the branch had changed it to 3307 for the teammate's XAMPP). Use the `SPRING_DATASOURCE_URL` environment variable for another port (see CLAUDE.md).
+- **`dashboard.html`, `units.html`, `lease-form.html`, `property-form.html`** (conflicts): took the teammate's version. Re-applied main's two fixes only:
+  - number fields `step="any"` (units `modalRent`, lease-form `monthlyRent` / `securityDeposit`, property-form `defaultRate` / `totalArea`)
+  - the units page's "Edit Grid Layout" link → `property-grid.html?id=1&mode=edit` (the plotter needs an id; 1 is a placeholder until the page is wired)
+  - Links were left relative, as the teammate wrote them.
+- **`leases.html`**: merged cleanly (only the branch changed it).
+- **`property-grid.html`** (conflict): kept main's redesigned plotter. The branch's "Edit Property Details" header link became an item in the plotter's ⋯ menu, which opens `/landlord/property-form.html?id=<this property>`.
+- Main's old dashboard "Edit Layout" links (`&mode=edit`) are gone with the old dashboard; the plotter is now reached from the units page.
+
+**Next (TODO):** wire the mock-ups to the API and the login check, with real ids in their links (CLAUDE.md, TODO 1).
+
+---
+
 ## PROPOSED (not built) · Commercial ready, permits, bigger grid with zoom
 
 Status: **decided, not implemented.** Nothing below exists in the code yet. When a part is built, move it into a dated section above and update the docs listed at the end.

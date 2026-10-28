@@ -1972,6 +1972,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (first) centerView();
   }
 
+  // ⋯ menu: "Edit property details" opens this property in the property form
+  if (Number.isInteger(propertyId) && propertyId > 0) $('menuPropertyForm').href = `/landlord/property-form.html?id=${propertyId}`;
+
   if (!Number.isInteger(propertyId) || propertyId < 1) {
     el.name.textContent = 'No property selected';
     el.hint.textContent = 'Open this page as /landlord/property-grid.html?id=<property id>.';

@@ -7,7 +7,7 @@ simulated payment step. The project was converted from a Java Swing app to an HT
 ## Stack and setup
 - Spring Boot 4.1.1, Java 17 (JDK 22 installed), Maven, NetBeans.
 - `spring-boot-starter-webmvc` + `spring-boot-starter-jdbc` with **JdbcTemplate**. No JPA/Hibernate.
-- MySQL driver against **XAMPP MariaDB** on `localhost:3306`, database `spacegrid_db`, user `root`, no password.
+- MySQL driver against **XAMPP MariaDB** on `localhost:3306`, database `spacegrid_db`, user `root`, no password. Keep 3306 in `application.properties`; if your XAMPP uses another port (e.g. 3307), override it locally instead of editing the file: set the environment variable `SPRING_DATASOURCE_URL=jdbc:mysql://localhost:3307/spacegrid_db?serverTimezone=Asia/Manila&characterEncoding=UTF-8` (NetBeans: Project Properties → Run → Environment Variables).
 - jBCrypt for passwords. devtools is on.
 - Frontend: plain HTML/CSS/JS in `src/main/resources/static`, served at `http://localhost:8080/`. No framework, no build step.
 - `database/spacegrid_db.sql` is run **by hand** in MySQL Workbench (`spring.sql.init.mode=never`). It drops and recreates the database with sample data.
@@ -42,6 +42,7 @@ value objects, with no SQL or web code.
 - **Plotter page** (`landlord/property-grid.html`) also loads `/css/plotter.css` and `/js/common/floating-panel.js`. The grid fills the window and the toolbar/panel float on top. All its keyboard shortcuts live in the `SHORTCUTS` list in `property-grid.js` (the `?` dialog is built from it). Undo/redo uses `gridRenderer.snapshot/restore` (size, spots, edge overrides; adding a zone is not undoable).
   - It has two states: **View** (opens first: click a unit or pick it in the list → details card from `GET /api/units/{id}/details` = unit + current ACTIVE lease + open requests; legend rows highlight units by status; search zooms to a unit) and **Edit** (the editor). `?mode=edit` opens Edit; keys E (View → Edit) and V (Edit → View). Each `SHORTCUTS` entry lists the `modes` it works in (default: Edit only).
 - **Exception:** `homepage.html` uses the Tailwind CDN + Font Awesome (not `base.css`) and loads only `api.js` + `js/pages/homepage.js`. It checks login with a plain `fetch('/api/auth/me')` (a 401 means guest), not `auth.requireLogin`.
+- **Exception (landlord mock-ups, from the `landlord` branch):** `landlord/dashboard.html`, `units.html`, `leases.html`, `lease-form.html`, `property-form.html` also use Tailwind + Font Awesome, with **hard-coded sample data, inline JavaScript and relative links** (`dashboard.html`, `../index.html`, …). They do not load `api.js` / `auth.js` / their `js/pages/*.js` stubs yet. `property-grid.html` (the plotter) is not one of them.
 - Colors come from enum `cssClass` + `defaultColor`. Spots get classes like `zone zone-unit status-occupied` and `--zone-color`. `css/zones.css` is the file to edit for custom looks.
 
 ## Business rules (summary)
@@ -100,6 +101,7 @@ The plotter works end to end against the real database. After pulling these chan
 
 **TODO (about 79 method bodies + pages), in this order:**
 1. register + `index.html`, landlord dashboard, property form (list/search, create, update, publish, archive)
+   - **wire the landlord mock-ups to the API**: replace their sample arrays with `api.get(...)`, add `auth.requireLogin('LANDLORD')`, and pass real ids in links (e.g. units → `property-grid.html?id=<id>&mode=edit`; today it is a placeholder `?id=1`)
 2. units page (`units.html`: list + the update / maintenance / archive / delete endpoints, which already exist)
 3. leases: `LeaseContract` logic, DAO, service, controller, `leases.html`, `lease-form.html` (make it read `?requestId=` to prefill renter and dates from an approved request)
    - then **lease timing markers on the plotter**: a small dot on occupied units, "Expiring soon" (30 days or fewer) or "Upcoming", plus a matching legend row. Needs each unit's current lease state in the grid page's data.

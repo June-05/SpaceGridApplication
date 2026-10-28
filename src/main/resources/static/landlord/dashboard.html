@@ -1,69 +1,756 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>My properties · SpaceGrid</title>
-  <link rel="stylesheet" href="/css/base.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SpaceGrid - Landlord Portfolio Management Dashboard</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+        .bg-space-purple { background-color: #4f46e5; }
+        .hover-bg-space-purple:hover { background-color: #4338ca; }
+        .text-space-purple { color: #4f46e5; }
+        .border-space-purple { border-color: #4f46e5; }
+        .ring-space-purple { --tw-ring-color: #4f46e5; }
+        .shadow-xs { box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05); }
+    </style>
 </head>
-<body class="dashboard-page">
-  <header class="topbar">
-    <div class="titles">
-      <h1>SpaceGrid</h1>
-      <p class="subtitle">Landlord Workspace</p>
-    </div>
-    <div class="topbar-actions">
-      <a href="/requests.html" class="btn">Lease requests</a>
-      <a href="/landlord/property-form.html" class="btn btn-primary">+ Add property</a>
-      <button id="btnLogout" class="btn" type="button">Log out</button>
-    </div>
-  </header>
-
-  <main class="container">
-    <section class="toolbar">
-      <div class="filters">
-        <input id="search" type="search" placeholder="Search properties..." aria-label="Search properties">
-        <select id="type" aria-label="Filter by property type">
-          <option value="">All Types</option>
-          <option value="APARTMENT">Apartment</option>
-          <option value="CONDOMINIUM">Condominium</option>
-          <option value="TOWNHOUSE">Townhouse</option>
-          <option value="COMMERCIAL">Commercial</option>
-          <option value="NIGHT_MARKET">Night Market</option>
-          <option value="OPEN_SPACE">Open Space</option>
-        </select>
-      </div>
-    </section>
-
-    <div id="cards" class="card-grid">
-      <!-- Sample Property Cards for User Manual Screenshots -->
-      <article class="card property-card">
-        <h2>Sunset Apartments</h2>
-        <span class="badge">APARTMENT</span>
-        <p class="address">123 Main Street, Zone 4</p>
-        <div class="card-actions">
-          <a href="/landlord/property-grid.html?id=1&mode=edit" class="btn btn-primary">Edit Layout</a>
-          <a href="/landlord/units.html?propertyId=1" class="btn">Manage Units</a>
-          <a href="/landlord/property-form.html?id=1" class="btn">Edit Details</a>
+<body class="bg-[#f8fafc] text-slate-900 min-h-screen flex flex-col antialiased">
+    <!-- TOP NAVIGATION BAR -->
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-xs">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between gap-6">
+            <div class="flex items-center gap-2 cursor-pointer flex-shrink-0" onclick="window.location.href='dashboard.html'">
+                <span class="text-2xl font-black tracking-tight text-slate-900">Space<span class="text-indigo-600">Grid</span></span>
+            </div>
+            <div class="flex-1 max-w-2xl mx-auto">
+                <div class="relative flex items-center">
+                    <i class="fa-solid fa-magnifying-glass absolute left-4 text-slate-400 text-sm"></i>
+                    <input id="searchInput" type="text" placeholder="Search my owned properties by name, location, or Property ID..." class="w-full pl-11 pr-24 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition">
+                    <button id="searchBtn" class="absolute right-1.5 px-4 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-semibold rounded-lg transition">Search</button>
+                </div>
+            </div>
+            <div class="flex items-center gap-3.5 flex-shrink-0 relative">
+                <a href="../renter/dashboard.html" id="switchViewBtn" class="hidden md:flex items-center gap-2 px-3.5 py-2 bg-indigo-50/80 hover:bg-indigo-100 text-indigo-600 rounded-xl text-xs font-semibold transition border border-indigo-100">
+                    <i class="fa-solid fa-repeat text-indigo-500 text-xs"></i>
+                    <span>Switch to Renter View</span>
+                </a>
+                <a href="property-form.html" class="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow-sm shadow-indigo-200">
+                    <i class="fa-solid fa-plus text-xs"></i>
+                    <span>Add New Property</span>
+                </a>
+                <div id="userDropdownBtn" class="flex items-center gap-2.5 pl-2 border-l border-slate-200 cursor-pointer select-none">
+                    <img src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&auto=format&fit=crop&q=80" alt="Maria S." class="w-9 h-9 rounded-full object-cover ring-2 ring-indigo-600/10">
+                    <span class="text-sm font-semibold text-slate-800 hidden lg:inline">Maria S.</span>
+                    <i class="fa-solid fa-chevron-down text-xs text-slate-400"></i>
+                </div>
+                <div id="userMenu" class="hidden absolute right-0 top-14 w-52 bg-white border border-slate-200 rounded-2xl shadow-xl py-2 z-50">
+                    <div class="px-4 py-2.5 border-b border-slate-100">
+                        <p class="text-xs font-bold text-slate-900">Maria Santos</p>
+                        <p class="text-[11px] text-slate-400">Landlord Portfolio Admin</p>
+                    </div>
+                    <a href="dashboard.html" class="block px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"><i class="fa-solid fa-gauge-high mr-2 text-slate-400"></i>Dashboard / Overview</a>
+                    <a href="units.html" class="block px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"><i class="fa-solid fa-building mr-2 text-slate-400"></i>All Owned Units / Blocks</a>
+                    <a href="leases.html" class="block px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"><i class="fa-solid fa-file-contract mr-2 text-slate-400"></i>Leases & Revenue</a>
+                    <div class="border-t border-slate-100 my-1"></div>
+                    <a href="../index.html" class="block px-4 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50"><i class="fa-solid fa-right-from-bracket mr-2 text-rose-400"></i>Log Out</a>
+                </div>
+            </div>
         </div>
-      </article>
+    </header>
 
-      <article class="card property-card">
-        <h2>Grand Heights Plaza</h2>
-        <span class="badge">COMMERCIAL</span>
-        <p class="address">456 Commercial Ave, Downtown</p>
-        <div class="card-actions">
-          <a href="/landlord/property-grid.html?id=2&mode=edit" class="btn btn-primary">Edit Layout</a>
-          <a href="/landlord/units.html?propertyId=2" class="btn">Manage Units</a>
-          <a href="/landlord/property-form.html?id=2" class="btn">Edit Details</a>
+    <!-- MAIN CONTAINER -->
+    <main class="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 flex flex-col md:flex-row gap-8">
+        <!-- SIDEBAR FILTERS -->
+        <aside class="w-full md:w-72 flex-shrink-0">
+            <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs sticky top-28 space-y-6">
+                <div class="flex items-center justify-between pb-4 border-b border-slate-100">
+                    <h2 class="text-xs font-extrabold tracking-wider text-slate-900 uppercase">Portfolio Filters</h2>
+                    <button id="resetFiltersBtn" class="text-xs font-semibold text-indigo-600 hover:text-indigo-700 transition">Reset All</button>
+                </div>
+                <div>
+                    <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Sort By</label>
+                    <div class="relative">
+                        <select id="sortSelect" class="w-full appearance-none bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm font-medium text-slate-800 focus:outline-none focus:border-indigo-600 pr-9 cursor-pointer">
+                            <option value="revenue-desc">Highest Monthly Revenue</option>
+                            <option value="occupancy-desc">Highest Occupancy %</option>
+                            <option value="occupancy-asc">Lowest Occupancy %</option>
+                            <option value="recent">Recently Added</option>
+                        </select>
+                        <i class="fa-solid fa-chevron-down absolute right-3.5 top-3.5 text-xs text-slate-400 pointer-events-none"></i>
+                    </div>
+                </div>
+                <div class="pt-2">
+                    <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3">Space Type</label>
+                    <div class="space-y-2.5">
+                        <label class="flex items-center justify-between group cursor-pointer">
+                            <div class="flex items-center gap-2.5">
+                                <input type="checkbox" value="Commercial Lot" checked class="filter-type w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300">
+                                <span class="text-sm text-slate-700 font-medium">Commercial Lot</span>
+                            </div>
+                            <span id="count-commercial" class="text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full font-semibold">0</span>
+                        </label>
+                        <label class="flex items-center justify-between group cursor-pointer">
+                            <div class="flex items-center gap-2.5">
+                                <input type="checkbox" value="Night Market" checked class="filter-type w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300">
+                                <span class="text-sm text-slate-700 font-medium">Night Market</span>
+                            </div>
+                            <span id="count-night" class="text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full font-semibold">0</span>
+                        </label>
+                        <label class="flex items-center justify-between group cursor-pointer">
+                            <div class="flex items-center gap-2.5">
+                                <input type="checkbox" value="Building / Complex" class="filter-type w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300">
+                                <span class="text-sm text-slate-700 font-medium">Building / Complex</span>
+                            </div>
+                            <span id="count-building" class="text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full font-semibold">0</span>
+                        </label>
+                        <label class="flex items-center justify-between group cursor-pointer">
+                            <div class="flex items-center gap-2.5">
+                                <input type="checkbox" value="Open Space / Plaza" class="filter-type w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300">
+                                <span class="text-sm text-slate-700 font-medium">Open Space / Plaza</span>
+                            </div>
+                            <span id="count-openspace" class="text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full font-semibold">0</span>
+                        </label>
+                    </div>
+                </div>
+                <div class="pt-2">
+                    <div class="flex items-center justify-between mb-2">
+                        <label class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Minimum Occupancy Rate</label>
+                        <span id="sliderValueBadge" class="text-xs font-bold text-indigo-600 bg-indigo-50 px-2.5 py-0.5 rounded-md">45% / 100%</span>
+                    </div>
+                    <input id="occupancySlider" type="range" min="0" max="100" value="45" class="w-full accent-indigo-600 cursor-pointer">
+                    <div class="flex justify-between text-[11px] text-slate-400 font-medium mt-1">
+                        <span>0%</span>
+                        <span>50%</span>
+                        <span>100%</span>
+                    </div>
+                </div>
+                <div class="pt-2 flex items-center justify-between">
+                    <div>
+                        <div class="text-xs font-bold text-slate-800 uppercase tracking-wide">Active Management Only</div>
+                        <p class="text-[11px] text-slate-400">Show currently operating properties</p>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input id="activeToggle" type="checkbox" checked class="sr-only peer">
+                        <div class="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                    </label>
+                </div>
+                <button id="applyFiltersBtn" class="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold shadow-sm shadow-indigo-200 transition">
+                    Apply Filters
+                </button>
+            </div>
+        </aside>
+
+        <!-- PORTFOLIO PROPERTIES GRID -->
+        <section class="flex-1 min-w-0 flex flex-col justify-between">
+            <div>
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                    <div>
+                        <h1 class="text-2xl font-extrabold text-slate-900 tracking-tight">My Properties</h1>
+                        <p class="text-sm text-slate-500 mt-0.5">
+                            Portfolio Overview • <strong id="totalOwnedHeader" class="text-slate-800 font-semibold">0 total owned properties</strong>
+                        </p>
+                    </div>
+                    <div id="filterPillsContainer" class="flex items-center gap-2 flex-wrap">
+                        <span id="pillTypes" class="text-xs font-medium text-slate-600 bg-white border border-slate-200 px-3 py-1.5 rounded-lg shadow-xs">
+                            Type: All
+                        </span>
+                        <span id="pillOccupancy" class="text-xs font-medium text-slate-600 bg-white border border-slate-200 px-3 py-1.5 rounded-lg shadow-xs">
+                            Min. Occupancy: ≥ 45%
+                        </span>
+                    </div>
+                </div>
+                <div id="propertiesGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+                <div id="emptyState" class="hidden py-16 text-center bg-white border border-slate-200 rounded-2xl p-8 shadow-xs">
+                    <i class="fa-solid fa-chart-line text-4xl text-slate-300 mb-3"></i>
+                    <h3 class="text-base font-bold text-slate-800">No matching owned properties found</h3>
+                    <p class="text-xs text-slate-500 mt-1 max-w-sm mx-auto">Try lowering the minimum occupancy threshold, clearing search terms, or checking additional space categories.</p>
+                    <button onclick="resetAllFilters()" class="mt-4 px-4 py-2 bg-indigo-600 text-white text-xs font-semibold rounded-xl hover:bg-indigo-700 transition">Reset Filters</button>
+                </div>
+            </div>
+
+            <!-- PAGINATION CONTAINER -->
+            <div id="paginationContainer" class="mt-10 pt-6 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <p class="text-xs text-slate-500 font-medium">
+                    Showing <span id="showingStart" class="font-bold text-slate-800">0</span> to <span id="showingEnd" class="font-bold text-slate-800">0</span> of <span id="showingTotal" class="font-bold text-slate-800">0</span> owned properties
+                </p>
+                <div id="paginationButtons" class="flex items-center gap-1"></div>
+            </div>
+        </section>
+    </main>
+
+    <!-- MANAGE PROPERTY MODAL -->
+    <div id="manageModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-lg w-full border border-slate-200 shadow-2xl overflow-hidden">
+            <div id="modalHeader" class="h-40 bg-gradient-to-br from-slate-800 to-slate-900 relative p-6 flex flex-col justify-between">
+                <div class="flex items-center justify-between">
+                    <span id="modalTypeBadge" class="bg-white text-slate-900 font-bold text-xs px-3 py-1 rounded-md shadow-xs">Commercial Lot</span>
+                    <button onclick="closeManageModal()" class="w-8 h-8 rounded-full bg-white/20 hover:bg-white/40 text-white flex items-center justify-center text-sm transition">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+                <div>
+                    <span id="modalStatusBadge" class="inline-flex items-center gap-1.5 bg-emerald-500 text-white font-semibold text-xs px-2.5 py-1 rounded-md shadow-xs">
+                        <span class="w-1.5 h-1.5 rounded-full bg-white"></span> <span id="modalStatusText">Fully Leased</span>
+                    </span>
+                </div>
+            </div>
+            <div class="p-6 space-y-4">
+                <div>
+                    <h2 id="modalTitle" class="text-xl font-extrabold text-slate-900">Property Name</h2>
+                    <p id="modalLocation" class="text-xs text-slate-500 mt-0.5"><i class="fa-solid fa-location-dot text-slate-400 mr-1"></i>Location</p>
+                </div>
+                <div class="grid grid-cols-2 gap-3 bg-slate-50 p-4 rounded-xl border border-slate-100">
+                    <div>
+                        <p class="text-[11px] font-bold text-slate-400 uppercase">Monthly Income</p>
+                        <p id="modalRevenue" class="text-sm font-extrabold text-slate-900">₱0</p>
+                    </div>
+                    <div>
+                        <p class="text-[11px] font-bold text-slate-400 uppercase">Blocks Leased</p>
+                        <p id="modalLeased" class="text-sm font-extrabold text-emerald-600">0 / 0</p>
+                    </div>
+                    <div>
+                        <p class="text-[11px] font-bold text-slate-400 uppercase">Operating Status</p>
+                        <p id="modalOperating" class="text-sm font-semibold text-slate-700">Active Management</p>
+                    </div>
+                    <div>
+                        <p class="text-[11px] font-bold text-slate-400 uppercase">Property ID</p>
+                        <p id="modalPropId" class="text-sm font-semibold text-slate-700">SG-PROP-00</p>
+                    </div>
+                </div>
+                <div class="pt-2 flex items-center gap-3">
+                    <button onclick="alert('Navigating to block layout and lease contract manager.'); closeManageModal();" class="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition shadow-sm shadow-indigo-200">Edit Blocks & Lease Rates</button>
+                    <button onclick="closeManageModal()" class="px-5 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition">Close</button>
+                </div>
+            </div>
         </div>
-      </article>
     </div>
-  </main>
 
-  <script src="/js/common/api.js"></script>
-  <script src="/js/common/auth.js"></script>
-  <script src="/js/common/format.js"></script>
-  <script src="/js/pages/landlord-dashboard.js"></script>
+    <!-- ADD PROPERTY MODAL -->
+    <div id="addPropertyModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-lg w-full border border-slate-200 shadow-2xl p-6 space-y-4">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                <h2 class="text-base font-extrabold text-slate-900">+ Add Property to Portfolio</h2>
+                <button onclick="closeAddPropertyModal()" class="text-slate-400 hover:text-slate-600 text-sm">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <form id="addPropertyForm" onsubmit="handleAddNewProperty(event)" class="space-y-3.5">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Property Name</label>
+                    <input id="newPropTitle" required type="text" placeholder="e.g. BGC Central Promenade Lot" class="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-600">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Location</label>
+                    <input id="newPropLocation" required type="text" placeholder="e.g. Bonifacio Global City, Taguig" class="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-600">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Space Type</label>
+                        <select id="newPropType" class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-600">
+                            <option value="Commercial Lot">Commercial Lot</option>
+                            <option value="Night Market">Night Market</option>
+                            <option value="Building / Complex">Building / Complex</option>
+                            <option value="Open Space / Plaza">Open Space / Plaza</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Est. Monthly Revenue (₱)</label>
+                        <input id="newPropRevenue" required type="number" placeholder="200000" class="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-600">
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Leased Blocks</label>
+                        <input id="newPropLeased" required type="number" value="40" class="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-600">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Total Blocks</label>
+                        <input id="newPropTotal" required type="number" value="50" class="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-600">
+                    </div>
+                </div>
+                <div class="pt-2 flex items-center justify-end gap-3">
+                    <button type="button" onclick="closeAddPropertyModal()" class="px-4 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition">Cancel</button>
+                    <button type="submit" class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition shadow-sm shadow-indigo-200">Save to Portfolio</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Portfolio Data
+        let ALL_PORTFOLIO = [
+            {
+                id: "SG-PROP-01",
+                title: "Clark Global City Commercial Hub",
+                location: "Clark Freeport, Pampanga",
+                type: "Commercial Lot",
+                revenue: 265000,
+                leased: 77,
+                total: 85,
+                active: true,
+                addedDate: "2024-01-15",
+                image: "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=800&auto=format&fit=crop&q=80"
+            },
+            {
+                id: "SG-PROP-02",
+                title: "BGC Night Market Stalls",
+                location: "Bonifacio Global City, Taguig",
+                type: "Night Market",
+                revenue: 180000,
+                leased: 42,
+                total: 60,
+                active: true,
+                addedDate: "2024-02-20",
+                image: "https://images.unsplash.com/photo-1555529669-e69e7aa0ba9a?w=800&auto=format&fit=crop&q=80"
+            },
+            {
+                id: "SG-PROP-03",
+                title: "Makati Corporate Tower Retail",
+                location: "Makati CBD, Metro Manila",
+                type: "Building / Complex",
+                revenue: 450000,
+                leased: 24,
+                total: 30,
+                active: true,
+                addedDate: "2024-03-10",
+                image: "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=800&auto=format&fit=crop&q=80"
+            },
+            {
+                id: "SG-PROP-04",
+                title: "Ayala Triangle Open Plaza",
+                location: "Makati Avenue, Makati",
+                type: "Open Space / Plaza",
+                revenue: 95000,
+                leased: 15,
+                total: 20,
+                active: true,
+                addedDate: "2024-03-25",
+                image: "https://images.unsplash.com/photo-1519501025264-65ba15a82390?w=800&auto=format&fit=crop&q=80"
+            },
+            {
+                id: "SG-PROP-05",
+                title: "Subic Bay Commercial Lots",
+                location: "Subic Bay Freeport Zone",
+                type: "Commercial Lot",
+                revenue: 320000,
+                leased: 28,
+                total: 40,
+                active: true,
+                addedDate: "2024-04-05",
+                image: "https://images.unsplash.com/photo-1497366216548-37526070297c?w=800&auto=format&fit=crop&q=80"
+            },
+            {
+                id: "SG-PROP-06",
+                title: "Divisoria Night Bazaar",
+                location: "Divisoria, Manila",
+                type: "Night Market",
+                revenue: 150000,
+                leased: 85,
+                total: 100,
+                active: true,
+                addedDate: "2024-04-18",
+                image: "https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=800&auto=format&fit=crop&q=80"
+            },
+            {
+                id: "SG-PROP-07",
+                title: "Ortigas Business Center",
+                location: "Ortigas Center, Pasig",
+                type: "Building / Complex",
+                revenue: 380000,
+                leased: 18,
+                total: 25,
+                active: true,
+                addedDate: "2024-05-02",
+                image: "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=800&auto=format&fit=crop&q=80"
+            },
+            {
+                id: "SG-PROP-08",
+                title: "Greenbelt Park Plaza",
+                location: "Ayala Center, Makati",
+                type: "Open Space / Plaza",
+                revenue: 120000,
+                leased: 12,
+                total: 15,
+                active: true,
+                addedDate: "2024-05-15",
+                image: "https://images.unsplash.com/photo-1519501025264-65ba15a82390?w=800&auto=format&fit=crop&q=80"
+            },
+            {
+                id: "SG-PROP-09",
+                title: "Cebu IT Park Commercial Strip",
+                location: "Cebu IT Park, Cebu City",
+                type: "Commercial Lot",
+                revenue: 290000,
+                leased: 35,
+                total: 50,
+                active: true,
+                addedDate: "2024-06-01",
+                image: "https://images.unsplash.com/photo-1497366216548-37526070297c?w=800&auto=format&fit=crop&q=80"
+            },
+            {
+                id: "SG-PROP-10",
+                title: "Quiapo Night Market Zone",
+                location: "Quiapo, Manila",
+                type: "Night Market",
+                revenue: 165000,
+                leased: 65,
+                total: 80,
+                active: false,
+                addedDate: "2024-06-20",
+                image: "https://images.unsplash.com/photo-1555529669-e69e7aa0ba9a?w=800&auto=format&fit=crop&q=80"
+            }
+        ];
+
+        let currentPage = 1;
+        const itemsPerPage = 6;
+        let filteredProperties = [...ALL_PORTFOLIO];
+
+        // Update category counts
+        function updateCategoryCounts() {
+            const counts = {
+                "Commercial Lot": 0,
+                "Night Market": 0,
+                "Building / Complex": 0,
+                "Open Space / Plaza": 0
+            };
+            ALL_PORTFOLIO.forEach(prop => {
+                if (counts.hasOwnProperty(prop.type)) {
+                    counts[prop.type]++;
+                }
+            });
+            document.getElementById('count-commercial').textContent = counts["Commercial Lot"];
+            document.getElementById('count-night').textContent = counts["Night Market"];
+            document.getElementById('count-building').textContent = counts["Building / Complex"];
+            document.getElementById('count-openspace').textContent = counts["Open Space / Plaza"];
+        }
+
+        // Apply filters
+        function applyFilters() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const sortBy = document.getElementById('sortSelect').value;
+            const minOccupancy = parseInt(document.getElementById('occupancySlider').value);
+            const activeOnly = document.getElementById('activeToggle').checked;
+            
+            const selectedTypes = [];
+            document.querySelectorAll('.filter-type:checked').forEach(cb => {
+                selectedTypes.push(cb.value);
+            });
+            
+            filteredProperties = ALL_PORTFOLIO.filter(prop => {
+                // Search filter
+                if (searchTerm) {
+                    const searchable = (prop.title + ' ' + prop.location + ' ' + prop.id).toLowerCase();
+                    if (!searchable.includes(searchTerm)) return false;
+                }
+                // Type filter
+                if (selectedTypes.length > 0 && !selectedTypes.includes(prop.type)) {
+                    return false;
+                }
+                // Occupancy filter
+                const occupancy = (prop.leased / prop.total) * 100;
+                if (occupancy < minOccupancy) return false;
+                // Active filter
+                if (activeOnly && !prop.active) return false;
+                return true;
+            });
+            
+            // Sort
+            filteredProperties.sort((a, b) => {
+                if (sortBy === 'revenue-desc') return b.revenue - a.revenue;
+                if (sortBy === 'occupancy-desc') {
+                    const occA = (a.leased / a.total);
+                    const occB = (b.leased / b.total);
+                    return occB - occA;
+                }
+                if (sortBy === 'occupancy-asc') {
+                    const occA = (a.leased / a.total);
+                    const occB = (b.leased / b.total);
+                    return occA - occB;
+                }
+                if (sortBy === 'recent') {
+                    return new Date(b.addedDate) - new Date(a.addedDate);
+                }
+                return 0;
+            });
+            
+            currentPage = 1;
+            updateFilterPills(selectedTypes, minOccupancy);
+            renderProperties();
+            renderPagination();
+        }
+
+        function updateFilterPills(selectedTypes, minOccupancy) {
+            const pillTypes = document.getElementById('pillTypes');
+            if (selectedTypes.length === 4) {
+                pillTypes.textContent = 'Type: All';
+            } else if (selectedTypes.length === 0) {
+                pillTypes.textContent = 'Type: None';
+            } else {
+                pillTypes.textContent = 'Type: ' + selectedTypes.join(', ');
+            }
+            document.getElementById('pillOccupancy').textContent = 'Min. Occupancy: ≥ ' + minOccupancy + '%';
+            document.getElementById('totalOwnedHeader').textContent = ALL_PORTFOLIO.length + ' total owned properties';
+        }
+
+        function renderProperties() {
+            const grid = document.getElementById('propertiesGrid');
+            const emptyState = document.getElementById('emptyState');
+            grid.innerHTML = '';
+            
+            if (filteredProperties.length === 0) {
+                emptyState.classList.remove('hidden');
+                document.getElementById('paginationContainer').style.display = 'none';
+                return;
+            }
+            
+            emptyState.classList.add('hidden');
+            document.getElementById('paginationContainer').style.display = 'flex';
+            
+            const start = (currentPage - 1) * itemsPerPage;
+            const end = start + itemsPerPage;
+            const pageItems = filteredProperties.slice(start, end);
+            
+            pageItems.forEach(prop => {
+                const occupancy = Math.round((prop.leased / prop.total) * 100);
+                const card = document.createElement('div');
+                card.className = 'bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs hover:shadow-md transition cursor-pointer';
+                card.innerHTML = `
+                    <div class="h-36 bg-gradient-to-br from-slate-700 to-slate-900 relative" style="background-image: url('${prop.image}'); background-size: cover; background-position: center;">
+                        <div class="absolute inset-0 bg-black/40"></div>
+                        <div class="absolute top-3 left-3">
+                            <span class="bg-white/90 text-slate-900 text-xs font-bold px-2.5 py-1 rounded-md">${prop.type}</span>
+                        </div>
+                        <div class="absolute top-3 right-3">
+                            <span class="bg-${prop.active ? 'emerald' : 'slate'}-500 text-white text-xs font-semibold px-2.5 py-1 rounded-md">${prop.active ? 'Active' : 'Inactive'}</span>
+                        </div>
+                    </div>
+                    <div class="p-4 space-y-3">
+                        <div>
+                            <h3 class="font-bold text-slate-900 text-sm line-clamp-1">${prop.title}</h3>
+                            <p class="text-xs text-slate-500 mt-0.5"><i class="fa-solid fa-location-dot text-slate-400 mr-1"></i>${prop.location}</p>
+                        </div>
+                        <div class="flex items-center justify-between text-xs">
+                            <div>
+                                <p class="text-slate-400 font-medium">Monthly Revenue</p>
+                                <p class="text-slate-900 font-bold">₱${prop.revenue.toLocaleString()}</p>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-slate-400 font-medium">Occupancy</p>
+                                <p class="text-${occupancy >= 90 ? 'emerald' : occupancy >= 70 ? 'amber' : 'rose'}-600 font-bold">${occupancy}%</p>
+                            </div>
+                        </div>
+                        <div class="w-full bg-slate-100 rounded-full h-1.5">
+                            <div class="bg-indigo-600 h-1.5 rounded-full" style="width: ${occupancy}%"></div>
+                        </div>
+                        <a href="units.html" class="block w-full text-center py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-semibold rounded-xl transition border border-slate-200">
+                            Manage Property
+                        </a>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        function renderPagination() {
+            const total = filteredProperties.length;
+            const totalPages = Math.ceil(total / itemsPerPage) || 1;
+            const start = total === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1;
+            const end = Math.min(currentPage * itemsPerPage, total);
+            
+            document.getElementById('showingStart').textContent = start;
+            document.getElementById('showingEnd').textContent = end;
+            document.getElementById('showingTotal').textContent = total;
+            
+            const buttonsDiv = document.getElementById('paginationButtons');
+            buttonsDiv.innerHTML = '';
+            
+            // Previous button
+            const prevBtn = document.createElement('button');
+            prevBtn.className = 'px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition disabled:opacity-40 disabled:cursor-not-allowed';
+            prevBtn.innerHTML = '<i class="fa-solid fa-chevron-left mr-1"></i> Previous';
+            prevBtn.disabled = currentPage === 1;
+            prevBtn.onclick = () => {
+                if (currentPage > 1) {
+                    currentPage--;
+                    renderProperties();
+                    renderPagination();
+                }
+            };
+            buttonsDiv.appendChild(prevBtn);
+            
+            // Page numbers
+            for (let i = 1; i <= totalPages; i++) {
+                const pageBtn = document.createElement('button');
+                pageBtn.className = `px-3 py-1.5 text-xs font-semibold rounded-lg transition ${currentPage === i ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:bg-slate-100'}`;
+                pageBtn.textContent = i;
+                pageBtn.onclick = () => {
+                    currentPage = i;
+                    renderProperties();
+                    renderPagination();
+                };
+                buttonsDiv.appendChild(pageBtn);
+            }
+            
+            // Next button
+            const nextBtn = document.createElement('button');
+            nextBtn.className = 'px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition disabled:opacity-40 disabled:cursor-not-allowed';
+            nextBtn.innerHTML = 'Next <i class="fa-solid fa-chevron-right ml-1"></i>';
+            nextBtn.disabled = currentPage === totalPages;
+            nextBtn.onclick = () => {
+                if (currentPage < totalPages) {
+                    currentPage++;
+                    renderProperties();
+                    renderPagination();
+                }
+            };
+            buttonsDiv.appendChild(nextBtn);
+        }
+
+        // Open manage modal
+        function openManageModal(propId) {
+            const prop = ALL_PORTFOLIO.find(p => p.id === propId);
+            if (!prop) return;
+            
+            const occupancy = Math.round((prop.leased / prop.total) * 100);
+            const statusText = occupancy >= 100 ? 'Fully Leased' : occupancy >= 70 ? 'Partially Leased' : 'Low Occupancy';
+            const statusColor = occupancy >= 100 ? 'bg-emerald-500' : occupancy >= 70 ? 'bg-amber-500' : 'bg-rose-500';
+            
+            document.getElementById('modalTypeBadge').textContent = prop.type;
+            document.getElementById('modalTitle').textContent = prop.title;
+            document.getElementById('modalLocation').innerHTML = '<i class="fa-solid fa-location-dot text-slate-400 mr-1"></i>' + prop.location;
+            document.getElementById('modalRevenue').textContent = '₱' + prop.revenue.toLocaleString();
+            document.getElementById('modalLeased').textContent = prop.leased + ' / ' + prop.total + ' Blocks (' + occupancy + '%)';
+            document.getElementById('modalLeased').className = 'text-sm font-extrabold ' + (occupancy >= 90 ? 'text-emerald-600' : occupancy >= 70 ? 'text-amber-600' : 'text-rose-600');
+            document.getElementById('modalOperating').textContent = prop.active ? 'Active Management' : 'Inactive';
+            document.getElementById('modalPropId').textContent = prop.id;
+            document.getElementById('modalStatusBadge').className = 'inline-flex items-center gap-1.5 ' + statusColor + ' text-white font-semibold text-xs px-2.5 py-1 rounded-md shadow-xs';
+            document.getElementById('modalStatusText').textContent = statusText;
+            document.getElementById('modalHeader').style.backgroundImage = 'url(' + prop.image + ')';
+            document.getElementById('modalHeader').style.backgroundSize = 'cover';
+            document.getElementById('modalHeader').style.backgroundPosition = 'center';
+            document.getElementById('modalHeader').style.backgroundBlendMode = 'overlay';
+            document.getElementById('modalHeader').style.backgroundColor = 'rgba(0,0,0,0.5)';
+            
+            document.getElementById('manageModal').classList.remove('hidden');
+        }
+
+        function closeManageModal() {
+            document.getElementById('manageModal').classList.add('hidden');
+        }
+
+        // Open add property modal
+        function openAddPropertyModal() {
+            document.getElementById('addPropertyModal').classList.remove('hidden');
+        }
+
+        function closeAddPropertyModal() {
+            document.getElementById('addPropertyModal').classList.add('hidden');
+        }
+
+        // Handle add new property
+        function handleAddNewProperty(e) {
+            e.preventDefault();
+            
+            const title = document.getElementById('newPropTitle').value;
+            const location = document.getElementById('newPropLocation').value;
+            const type = document.getElementById('newPropType').value;
+            const revenue = parseInt(document.getElementById('newPropRevenue').value);
+            const leased = parseInt(document.getElementById('newPropLeased').value);
+            const total = parseInt(document.getElementById('newPropTotal').value);
+            
+            const newId = 'SG-PROP-' + String(ALL_PORTFOLIO.length + 1).padStart(2, '0');
+            
+            const newProperty = {
+                id: newId,
+                title: title,
+                location: location,
+                type: type,
+                revenue: revenue,
+                leased: leased,
+                total: total,
+                active: true,
+                addedDate: new Date().toISOString().split('T')[0],
+                image: "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=800&auto=format&fit=crop&q=80"
+            };
+            
+            ALL_PORTFOLIO.push(newProperty);
+            updateCategoryCounts();
+            applyFilters();
+            closeAddPropertyModal();
+            document.getElementById('addPropertyForm').reset();
+            document.getElementById('newPropLeased').value = '40';
+            document.getElementById('newPropTotal').value = '50';
+            
+            alert('Property added successfully!');
+        }
+
+        // Reset all filters
+        function resetAllFilters() {
+            document.getElementById('searchInput').value = '';
+            document.getElementById('sortSelect').value = 'revenue-desc';
+            document.getElementById('occupancySlider').value = '45';
+            document.getElementById('sliderValueBadge').textContent = '45% / 100%';
+            document.getElementById('activeToggle').checked = true;
+            document.querySelectorAll('.filter-type').forEach(cb => {
+                cb.checked = cb.value === 'Commercial Lot' || cb.value === 'Night Market';
+            });
+            applyFilters();
+        }
+
+        // Event Listeners
+        document.addEventListener('DOMContentLoaded', function() {
+            // Occupancy slider
+            document.getElementById('occupancySlider').addEventListener('input', function() {
+                document.getElementById('sliderValueBadge').textContent = this.value + '% / 100%';
+            });
+            
+            // User dropdown
+            document.getElementById('userDropdownBtn').addEventListener('click', function(e) {
+                e.stopPropagation();
+                document.getElementById('userMenu').classList.toggle('hidden');
+            });
+            
+            document.addEventListener('click', function() {
+                document.getElementById('userMenu').classList.add('hidden');
+            });
+            
+            document.getElementById('userMenu').addEventListener('click', function(e) {
+                e.stopPropagation();
+            });
+            
+            // Search
+            document.getElementById('searchBtn').addEventListener('click', applyFilters);
+            document.getElementById('searchInput').addEventListener('keyup', function(e) {
+                if (e.key === 'Enter') {
+                    applyFilters();
+                }
+            });
+            
+            // Reset filters button
+            document.getElementById('resetFiltersBtn').addEventListener('click', resetAllFilters);
+            
+            // Apply filters button
+            document.getElementById('applyFiltersBtn').addEventListener('click', applyFilters);
+            
+            // Sort select
+            document.getElementById('sortSelect').addEventListener('change', applyFilters);
+            
+            // Filter type checkboxes
+            document.querySelectorAll('.filter-type').forEach(cb => {
+                cb.addEventListener('change', applyFilters);
+            });
+            
+            // Active toggle
+            document.getElementById('activeToggle').addEventListener('change', applyFilters);
+            
+            // Initial setup
+            updateCategoryCounts();
+            applyFilters();
+        });
+    </script>
 </body>
 </html>
