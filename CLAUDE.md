@@ -15,8 +15,7 @@ simulated payment step. The project was converted from a Java Swing app to an HT
 - pom.xml must keep `<start-class>` and `<exec.mainClass>` = `com.techhub.spacegridapplication.SpaceGridApplication`.
 
 ## Package
-**Base package: `com.techhub.spacegridapplication`.** Use it in all code. Older docs in `docs/` say
-`com.techhub.spacegrid`; that name is outdated.
+**Base package: `com.techhub.spacegridapplication`.** Use it in all code and docs.
 
 ## Architecture
 controller → service → DAO interface → `dao.jdbc` implementation → MySQL. `model` holds entities, enums and

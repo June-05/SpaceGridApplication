@@ -1,6 +1,6 @@
 # SpaceGrid · Phase 3: Final File Structure (Spring Boot, Maven)
 
-Spring Boot **4.1.1** · Java **17** · Maven project in NetBeans · Base package `com.techhub.spacegrid`.
+Spring Boot **4.1.1** · Java **17** · Maven project in NetBeans · Base package `com.techhub.spacegridapplication`.
 Related documents: Phase 1 (`SpaceGrid-Phase1-Spec.md`, class diagram), Phase 2 (`spacegrid_db.sql`, ERD).
 
 Only `pom.xml` exists so far. Every other file below is planned and will be written when coding starts.
@@ -30,7 +30,7 @@ SpaceGrid/
 ├── database/
 │   └── spacegrid_db.sql                            Phase 2 script: run in Workbench
 │
-├── src/main/java/com/techhub/spacegrid/            ── Source Packages
+├── src/main/java/com/techhub/spacegridapplication/            ── Source Packages
 │   ├── SpaceGridApplication.java
 │   ├── model/
 │   │   ├── BaseEntity.java
@@ -146,7 +146,7 @@ SpaceGrid/
 │       └── images/
 │           └── zones/                              optional textures for zones.css
 │
-└── src/test/java/com/techhub/spacegrid/            ── Test Packages (written later)
+└── src/test/java/com/techhub/spacegridapplication/            ── Test Packages (written later)
     ├── SpaceGridApplicationTests.java
     └── model/
         ├── PropertyTest.java
@@ -195,7 +195,7 @@ server.servlet.session.timeout=30m
 server.servlet.session.cookie.http-only=true
 
 # --- Logging: show this app's debug messages while developing ---
-logging.level.com.techhub.spacegrid=DEBUG
+logging.level.com.techhub.spacegridapplication=DEBUG
 ```
 
 > XAMPP must be running (MySQL started in the XAMPP Control Panel) before you run the app.
