@@ -161,6 +161,37 @@ No change to classes, tables, endpoints or saved data.
 
 ---
 
+## 2026-10-28 · Edit units and common areas from the plotter (no design change)
+
+Uses the endpoints that were already in the spec (they were TODO): `PUT /api/units/{id}`, `POST /api/units/{id}/maintenance`, `PUT /api/common-areas/{id}`. Implemented: `RentableUnit.updateDetails / changeRate / markAvailable / markUnderMaintenance`, `CommonArea.changeType`, `RentableUnitService.updateUnit / setUnderMaintenance`, `CommonAreaService.updateCommonArea`, `JdbcCommonAreaDao.update`, the three controller methods. (Small change: `setUnderMaintenance` now returns the unit; the endpoint still returns nothing.)
+
+- Rules: archived units can't be edited (409); the rate can't be negative (400); "Under maintenance" can't be switched on for an occupied unit (409); switching it off only moves UNDER_MAINTENANCE → AVAILABLE. **Changing a unit's rate does not change existing leases** (their rent is fixed); it is the rate for new leases. Changing a common area's type keeps its picked color; indoor/outdoor (and so the automatic walls) follows the new type.
+- Plotter, Edit state: a **pencil** on every unit and common-area row (next to the trash) and the **Enter** key (when no button or field has the focus) open the add dialog in edit mode, prefilled ("Edit unit" / "Edit common area", "Save changes"). The unit form has a new optional **size description** (used when no area is given) and, when editing, an **Under maintenance** switch (disabled with a note for occupied units; the preview turns amber). Common areas: name, type and color (its own color selectable, the others' disabled). Saved at once, not undoable.
+- Plotter, View state: an **Edit unit** button in the details card opens the same dialog; the card refreshes after saving.
+- **Number fields** (rate, area, here and on the units / property / lease forms): `step="any"` so the arrows move by 1, any decimals can be typed; in the plotter the value is rounded to 2 decimals when leaving the field (`12.5` → `12.50`).
+
+**Checked:** Maven build; live API on a scratch DB (edit name/rate/size/utilities with spots unchanged; approximate size; 400 for negative rate / blank name / bad type; maintenance on/off and 409 when occupied; 409 for an archived unit; the occupied unit's lease rent stays 12000 after its rate changes; common area rename + type change becomes indoor; a picked color survives a type change; 403 / 404); jsdom: 28 edit checks + the View (41) and Edit (101) suites. Not tried in a real browser.
+
+---
+
+## 2026-10-28 · Plotter View mode: select units, see details (design change)
+
+The plotter now has two states. **View** opens first; **Edit** is the editor as before.
+
+**Design change:** new endpoint `GET /api/units/{id}/details` (landlord owner) → new value object `UnitDetails(unit, currentLease, openRequests)` (`RentableUnitService.getUnitDetails`). `LeaseContract.getCurrentState`, `daysRemaining`, `getDaysRemaining` and `isRenewal` are now implemented (they were TODO and Jackson calls the getters): ENDED / TERMINATED / RENEWED from the status, otherwise UPCOMING, EXPIRED, EXPIRING_SOON (30 days or fewer) or ACTIVE by date.
+
+**View mode:**
+- A `View | Edit` switch in the top-right pill (keys **E** from View, **V** from Edit). `?mode=edit` opens Edit directly; the dashboard's "Edit Layout" links use it.
+- In View the drawing toolbar, Resize pill, resize handles, wall click lines and Undo/Redo are hidden; Save shows only for unsaved edits (they stay visible in View). A hint pill: "Click a unit to see its details · drag to move around · E to edit".
+- Drag pans; a click (less than 4 px of movement) on a unit selects it, outlines it and dims the rest; a click elsewhere clears it. Esc: details → list → legend highlight.
+- Panel "Units": a search box (Enter picks the first match) and the list of units; picking one zooms to it (fits its spots in the free area left of the panel). The details card: status, monthly rate, size, power/water, spots; the current lease (renter, period, rent, state badge, days left / start date) or "No current lease"; open lease requests with a link to requests.html; "← All units".
+- Legend rows are buttons in View: one keeps the units with that status bright (renderer option `highlightZoneIds`) and filters the list; again clears it.
+- Shortcuts carry the modes they work in; the `?` dialog tags the ones that work in View.
+
+**Checked:** Maven build; live API on a scratch DB (Active 215 days left; Expiring soon 18 / 12 days; Upcoming; Expired with 0 days; no lease with 1 open request; 403 / 404 / 401); jsdom: 41 View checks and the 101 Edit checks; renderer tests. Not tried in a real browser.
+
+---
+
 ## PROPOSED (not built) · Commercial ready, permits, bigger grid with zoom
 
 Status: **decided, not implemented.** Nothing below exists in the code yet. When a part is built, move it into a dated section above and update the docs listed at the end.

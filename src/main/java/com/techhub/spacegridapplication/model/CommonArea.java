@@ -53,8 +53,12 @@ public class CommonArea extends GridZone {
         return c;
     }
 
+    /** New type. Indoor / outdoor follows it, so the automatic walls around it may change. */
     public void changeType(CommonAreaType areaType) {
-        // TODO: reject null
+        if (areaType == null) {
+            throw new ValidationException("Area type is required.");
+        }
+        this.areaType = areaType;
     }
 
     @Override

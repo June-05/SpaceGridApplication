@@ -40,6 +40,7 @@ value objects, with no SQL or web code.
 - Methods not written yet contain `// TODO` + `throw new UnsupportedOperationException("TODO")`.
 - Frontend: each page loads `/css/base.css` (+ `zones.css`, `grid.css` on grid pages), then `/js/common/api.js`, `auth.js`, `format.js` (+ `grid-renderer.js`), then `/js/pages/<page>.js`. Links start with `/`. `auth.js` `requireLogin(role)` redirects to the right page by role.
 - **Plotter page** (`landlord/property-grid.html`) also loads `/css/plotter.css` and `/js/common/floating-panel.js`. The grid fills the window and the toolbar/panel float on top. All its keyboard shortcuts live in the `SHORTCUTS` list in `property-grid.js` (the `?` dialog is built from it). Undo/redo uses `gridRenderer.snapshot/restore` (size, spots, edge overrides; adding a zone is not undoable).
+  - It has two states: **View** (opens first: click a unit or pick it in the list → details card from `GET /api/units/{id}/details` = unit + current ACTIVE lease + open requests; legend rows highlight units by status; search zooms to a unit) and **Edit** (the editor). `?mode=edit` opens Edit; keys E (View → Edit) and V (Edit → View). Each `SHORTCUTS` entry lists the `modes` it works in (default: Edit only).
 - **Exception:** `homepage.html` uses the Tailwind CDN + Font Awesome (not `base.css`) and loads only `api.js` + `js/pages/homepage.js`. It checks login with a plain `fetch('/api/auth/me')` (a 401 means guest), not `auth.requireLogin`.
 - Colors come from enum `cssClass` + `defaultColor`. Spots get classes like `zone zone-unit status-occupied` and `--zone-color`. `css/zones.css` is the file to edit for custom looks.
 
@@ -93,12 +94,13 @@ value objects, with no SQL or web code.
 - lease requests: `LeaseRequest` model, DAO, service, controller, `requests.html` (both roles)
 - `RentableUnitDao` `findById` / `findByPropertyId`, `User.isLandlord()` / `isRenter()`, `format.date` / `format.badge`
 - delete / archive units and delete common areas (service, controller, DAO, plotter dialog); `JdbcLeaseContractDao` row mapper, `findActiveByUnitId`, `existsByUnitId`; `JdbcCommonAreaDao` reads; `RentableUnitDao.update`
+- edit units (`PUT /api/units/{id}`, `POST /api/units/{id}/maintenance`) and common areas (`PUT /api/common-areas/{id}`) from the plotter (pencil on each zone, Enter, View's "Edit unit"); `LeaseContract` state / days remaining; plotter View mode (`GET /api/units/{id}/details`)
 
 The plotter works end to end against the real database. After pulling these changes, **re-run `database/spacegrid_db.sql`** (new types, `lease_requests` table, its name copies and `ON DELETE SET NULL`, view, common-area colors, 60×60 cap, sample data).
 
 **TODO (about 79 method bodies + pages), in this order:**
 1. register + `index.html`, landlord dashboard, property form (list/search, create, update, publish, archive)
-2. units page (list, update, maintenance; archive/delete endpoints already exist) and common area update
+2. units page (`units.html`: list + the update / maintenance / archive / delete endpoints, which already exist)
 3. leases: `LeaseContract` logic, DAO, service, controller, `leases.html`, `lease-form.html` (make it read `?requestId=` to prefill renter and dates from an approved request)
    - then **lease timing markers on the plotter**: a small dot on occupied units, "Expiring soon" (30 days or fewer) or "Upcoming", plus a matching legend row. Needs each unit's current lease state in the grid page's data.
 4. `lease.html` (details, read-only grid, statement, history), renter dashboard, `renter/pay.html` + payments

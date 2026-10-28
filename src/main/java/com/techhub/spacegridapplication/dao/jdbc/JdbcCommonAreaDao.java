@@ -76,9 +76,12 @@ public class JdbcCommonAreaDao implements CommonAreaDao {
         jdbcTemplate.update("UPDATE common_areas SET color = ? WHERE zone_id = ?", color, zoneId);
     }
 
+    /** Saves the name, type and picked color (the spots are saved with the grid layout). */
     @Override
     public void update(CommonArea entity) {
-        // TODO: SQL with jdbcTemplate
+        jdbcTemplate.update("UPDATE grid_zones SET name = ? WHERE id = ?", entity.getName(), entity.getId());
+        jdbcTemplate.update("UPDATE common_areas SET area_type = ?, color = ? WHERE zone_id = ?",
+                entity.getAreaType().name(), entity.getCustomColor(), entity.getId());
     }
 
     /** Deletes the grid_zones row; the common_areas row and the spots go with it (ON DELETE CASCADE). */

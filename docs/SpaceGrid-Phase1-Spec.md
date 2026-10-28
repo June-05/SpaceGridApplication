@@ -184,6 +184,16 @@ A renter's request to lease an AVAILABLE unit found on the homepage. Only a PEND
 + cancel(): void
 ```
 
+#### `UnitDetails`, Class · value object (record)
+
+What the plotter's View mode shows for a selected unit (`GET /api/units/{id}/details`).
+
+```
+unit: RentableUnit
+currentLease: LeaseContract    // the ACTIVE lease (running or upcoming), or null
+openRequests: int              // PENDING + APPROVED lease requests
+```
+
 #### `UnitRemovalCheck`, Class · value object (record)
 
 What the landlord may do to take a unit off the grid (`GET /api/units/{id}/removal-check`).
@@ -263,7 +273,7 @@ A space that can be leased. isRentable() and isEnclosed() return true; CSS class
 
 + RentableUnit(propertyId: int, name: String, rentalRate: BigDecimal, dimensions: Dimensions, includesElectricity: boolean, includesWater: boolean)
 + updateDetails(name: String, dimensions: Dimensions, includesElectricity: boolean, includesWater: boolean): void
-+ changeRate(rate: BigDecimal): void
++ changeRate(rate: BigDecimal): void          // existing leases keep their own rent; the new rate is for new leases
 + isAvailable(): boolean
 + markOccupied(): void
 + markAvailable(): void
@@ -721,10 +731,11 @@ Reads the `lease_request_details` view; writes `lease_requests`. `update` change
 - propertyService: PropertyService
 
 + removalCheck(unitId: int, landlord: User): UnitRemovalCheck
++ getUnitDetails(unitId: int, landlord: User): UnitDetails
 + getUnits(propertyId: int, landlord: User): List<RentableUnit>
 + addUnit(propertyId: int, landlord: User, name: String, rentalRate: BigDecimal, dimensions: Dimensions, electricity: boolean, water: boolean): RentableUnit
 + updateUnit(unitId: int, landlord: User, name: String, rentalRate: BigDecimal, dimensions: Dimensions, electricity: boolean, water: boolean): RentableUnit
-+ setUnderMaintenance(unitId: int, landlord: User, underMaintenance: boolean): void
++ setUnderMaintenance(unitId: int, landlord: User, underMaintenance: boolean): RentableUnit   // off: only UNDER_MAINTENANCE → AVAILABLE
 + archiveUnit(unitId: int, landlord: User): void
 + deleteUnit(unitId: int, landlord: User): void
 ```
@@ -832,6 +843,7 @@ Reads the `lease_request_details` view; writes `lease_requests`. `update` change
 + update(id, name, rentalRate, exactSize, areaSqm, sizeDescription, electricity, water): RentableUnit
 + setMaintenance(id, underMaintenance): void
 + removalCheck(id): UnitRemovalCheck
++ details(id): UnitDetails
 + archive(id): void
 + delete(id): void
 ```
@@ -839,6 +851,7 @@ Reads the `lease_request_details` view; writes `lease_requests`. `update` change
 | Endpoint | Method |
 |---|---|
 | `GET /api/units/{id}/removal-check` | `removalCheck` |
+| `GET /api/units/{id}/details` | `details` |
 | `GET /api/properties/{propertyId}/units` | `list` |
 | `POST /api/properties/{propertyId}/units` | `create` |
 | `PUT /api/units/{id}` | `update` |

@@ -8,7 +8,9 @@ import com.techhub.spacegridapplication.exception.NotFoundException;
 import com.techhub.spacegridapplication.model.Dimensions;
 import com.techhub.spacegridapplication.model.Property;
 import com.techhub.spacegridapplication.model.RentableUnit;
+import com.techhub.spacegridapplication.model.UnitDetails;
 import com.techhub.spacegridapplication.model.UnitRemovalCheck;
+import com.techhub.spacegridapplication.model.UnitStatus;
 import com.techhub.spacegridapplication.model.User;
 
 import org.springframework.stereotype.Service;
@@ -56,6 +58,8 @@ public class RentableUnitService {
         return unitDao.save(unit);
     }
 
+    /** Name, rate, size and utilities. Not for archived units. Existing leases keep their own rent. */
+    @Transactional
     public RentableUnit updateUnit(
             int unitId,
             User landlord,
@@ -64,12 +68,24 @@ public class RentableUnitService {
             Dimensions dimensions,
             boolean electricity,
             boolean water) {
-        // TODO
-        throw new UnsupportedOperationException("TODO");
+        RentableUnit unit = getOwnedUnit(unitId, landlord);
+        unit.updateDetails(name, dimensions, electricity, water);
+        unit.changeRate(rentalRate);
+        unitDao.update(unit);
+        return unit;
     }
 
-    public void setUnderMaintenance(int unitId, User landlord, boolean underMaintenance) {
-        // TODO
+    /** true: AVAILABLE → UNDER_MAINTENANCE (not while occupied). false: UNDER_MAINTENANCE → AVAILABLE. */
+    @Transactional
+    public RentableUnit setUnderMaintenance(int unitId, User landlord, boolean underMaintenance) {
+        RentableUnit unit = getOwnedUnit(unitId, landlord);
+        if (underMaintenance) {
+            unit.markUnderMaintenance();
+        } else if (unit.getStatus() == UnitStatus.UNDER_MAINTENANCE) {
+            unit.markAvailable();
+        }
+        unitDao.update(unit);
+        return unit;
     }
 
     /**
@@ -125,6 +141,13 @@ public class RentableUnitService {
         }
         leaseRequestDao.declineOpenByUnitId(unitId);  // the renters still see them, marked declined
         unitDao.deleteById(unitId);
+    }
+
+    /** For the plotter's View mode: the unit, its ACTIVE lease (or null) and how many lease requests are open. */
+    public UnitDetails getUnitDetails(int unitId, User landlord) {
+        RentableUnit unit = getOwnedUnit(unitId, landlord);
+        return new UnitDetails(unit, leaseDao.findActiveByUnitId(unitId).orElse(null),
+                leaseRequestDao.countOpenByUnitId(unitId));
     }
 
     /** NotFoundException if missing, AccessDeniedException (via getOwnedProperty) if not the landlord's. */

@@ -73,9 +73,16 @@ public class CommonAreaService {
         }
     }
 
+    /** Rename and/or change the type (its color stays; change it with changeColor). */
+    @Transactional
     public CommonArea updateCommonArea(int areaId, User landlord, String name, CommonAreaType areaType) {
-        // TODO
-        throw new UnsupportedOperationException("TODO");
+        CommonArea area = commonAreaDao.findById(areaId)
+                .orElseThrow(() -> new NotFoundException("Common area not found."));
+        propertyService.getOwnedProperty(area.getPropertyId(), landlord);
+        area.rename(name);
+        area.changeType(areaType);
+        commonAreaDao.update(area);
+        return area;
     }
 
     /** Deletes a common area of the landlord's property; its spots are cleared with it. Nothing else refers to it. */

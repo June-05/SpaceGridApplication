@@ -205,8 +205,10 @@ const gridRenderer = {
 
   /**
    * Draws the grid into container.
-   * options: { mode: 'view' | 'spots' | 'edges', brushZoneId, highlightZoneId, minCell, maxCell,
+   * options: { mode: 'view' | 'spots' | 'edges', brushZoneId, highlightZoneId, highlightZoneIds, minCell, maxCell,
    *             cell }   cell = exact cell size in px (zoom); without it the grid is fitted to the container width
+   *   highlightZoneId  = one zone outlined, the others dimmed (lease.html, the plotter's selected unit)
+   *   highlightZoneIds = a Set of zones kept bright, the others dimmed (the plotter's "highlight by status")
    */
   render(container, layout, options = {}) {
     const mode = options.mode || 'view';
@@ -243,6 +245,8 @@ const gridRenderer = {
           if (zone.id === options.brushZoneId) el.classList.add('is-brush');
           if (options.highlightZoneId != null) {
             el.classList.add(zone.id === options.highlightZoneId ? 'is-highlight' : 'is-dim');
+          } else if (options.highlightZoneIds) {          // several zones at once (e.g. all available units)
+            el.classList.add(options.highlightZoneIds.has(zone.id) ? 'is-picked' : 'is-dim');
           }
           if (showLabels && !labelled.has(zone.id)) {    // name on the zone's first spot (hover title when cells are small)
             labelled.add(zone.id);

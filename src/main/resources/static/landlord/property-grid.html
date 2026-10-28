@@ -61,6 +61,11 @@
 
   <!-- top-right: undo, redo, save, menu -->
   <div class="pl-float pl-actions">
+    <div class="pl-viewedit" role="group" aria-label="View or edit the layout">
+      <button class="text-btn is-active tip-below" type="button" data-view="view" data-tip="Look around, select units" data-key="V" aria-pressed="true">View</button>
+      <button class="text-btn tip-below" type="button" data-view="edit" data-tip="Change the layout" data-key="E" aria-pressed="false">Edit</button>
+    </div>
+    <span class="pl-sep edit-only"></span>
     <button id="btnUndo" class="icon-btn tip-below" type="button" data-tip="Undo" data-key="Ctrl+Z" aria-label="Undo" disabled>
       <svg class="ico"><use href="#i-undo"/></svg>
     </button>
@@ -97,7 +102,16 @@
       </div>
       <input id="zoneFilter" class="panel-filter" type="search" placeholder="Filter zones…" aria-label="Filter zones" hidden>
     </div>
+    <!-- View mode: search units (Enter picks the first match) -->
+    <div id="viewTop" class="pl-panel-top" hidden>
+      <input id="unitSearch" class="panel-filter" type="search" placeholder="Search units…" aria-label="Search units">
+    </div>
     <div class="pl-panel-body">
+      <!-- View mode: the units, or the selected unit's details (GET /api/units/{id}/details) -->
+      <section id="viewTools" class="panel-section" hidden>
+        <div id="unitList" class="zone-list"></div>
+        <div id="unitDetails" class="unit-details" hidden></div>
+      </section>
       <section id="spotTools" class="panel-section">
         <div id="zoneList" class="zone-list"></div>
       </section>
@@ -157,6 +171,7 @@
 
   <!-- hint and the short "Rectangle" / "Brush" label just above the toolbar -->
   <p id="hint" class="pl-tip" aria-live="polite"></p>
+  <p id="viewHint" class="pl-float pl-viewhint" hidden>Click a unit to see its details · drag to move around · <kbd>E</kbd> to edit</p>
   <p id="flash" class="pl-flash" aria-hidden="true"></p>
 
   <!-- bottom-center toolbar: always Spots | Walls · Hand · Brush/Rectangle · Eraser · Preview -->
@@ -195,7 +210,8 @@
     <button class="menu-item" type="button" role="menuitem" data-zoom="2">200%</button>
   </div>
 
-  <!-- add a unit / common area (saved on the server at once) -->
+  <!-- add or edit a unit / common area (saved on the server at once).
+       Edit: PUT /api/units/{id} (+ POST /api/units/{id}/maintenance), PUT /api/common-areas/{id} (+ PUT …/color) -->
   <dialog id="addDialog" class="pl-dialog add-dialog" aria-labelledby="addTitle">
     <div class="pl-dialog-head">
       <h2 id="addTitle">New unit</h2>
@@ -204,17 +220,23 @@
     <div class="pl-dialog-body add-body">
       <form id="addUnitForm" class="add-form" novalidate>
         <label class="field"><span>Unit name</span><input name="name" maxlength="100" placeholder="e.g. Booth 12" required></label>
-        <label class="field"><span>Monthly rate (₱)</span><input name="rentalRate" type="number" min="0" step="0.01" required></label>
-        <label class="field"><span>Area in sqm (optional)</span><input name="areaSqm" type="number" min="0.01" step="0.01"></label>
+        <!-- step="any": the arrows move by 1, and any amount with up to 2 decimals can be typed (rounded on leaving the field) -->
+        <label class="field"><span>Monthly rate (₱)</span><input name="rentalRate" type="number" min="0" step="any" inputmode="decimal" data-money required></label>
+        <label class="field"><span>Area in sqm (optional)</span><input name="areaSqm" type="number" min="0.01" step="any" inputmode="decimal" data-money></label>
+        <label class="field"><span>Or describe the size (optional)</span><input name="sizeDescription" maxlength="100" placeholder="e.g. Corner booth"></label>
         <label class="check"><input name="electricity" type="checkbox"> Includes electricity</label>
         <label class="check"><input name="water" type="checkbox"> Includes water</label>
+        <div id="maintenanceRow" class="maintenance-row" hidden>
+          <label class="check"><input name="maintenance" type="checkbox"> Under maintenance (not offered to renters)</label>
+          <p id="maintenanceNote" class="size-note"></p>
+        </div>
         <div class="preview-block">
           <div id="unitPreview" class="zone-preview"><span class="zone-preview-label">New unit</span></div>
           <p class="panel-help">Units are colored by their status: green while available, red when leased, amber under maintenance.</p>
         </div>
         <div class="form-actions">
           <button class="btn" type="button" data-close>Cancel</button>
-          <button class="btn btn-primary" type="submit">Add unit</button>
+          <button class="btn btn-primary" type="submit" data-add-label="Add unit">Add unit</button>
         </div>
       </form>
 
@@ -242,7 +264,7 @@
         </div>
         <div class="form-actions">
           <button class="btn" type="button" data-close>Cancel</button>
-          <button class="btn btn-primary" type="submit">Add common area</button>
+          <button class="btn btn-primary" type="submit" data-add-label="Add common area">Add common area</button>
         </div>
       </form>
     </div>

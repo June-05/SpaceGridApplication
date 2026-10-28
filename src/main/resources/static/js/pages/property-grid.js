@@ -73,11 +73,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     shortcutsDialog: $('shortcutsDialog'), toast: $('toast'),
     legend: $('legend'), legendList: $('legendList'), btnLegend: $('btnLegend'),
     removeDialog: $('removeDialog'), removeTitle: $('removeTitle'), removeText: $('removeText'),
-    removeNote: $('removeNote'), btnDelete: $('btnDelete'), btnArchive: $('btnArchive')
+    removeNote: $('removeNote'), btnDelete: $('btnDelete'), btnArchive: $('btnArchive'),
+    viewTop: $('viewTop'), unitSearch: $('unitSearch'), viewTools: $('viewTools'), unitList: $('unitList'),
+    unitDetails: $('unitDetails'), viewHint: $('viewHint')
   };
 
-  const propertyId = Number(new URLSearchParams(location.search).get('id'));
+  const params = new URLSearchParams(location.search);
+  const propertyId = Number(params.get('id'));
   const state = {
+    view: params.get('mode') !== 'edit',   // View (look, select units) is the first state; ?mode=edit opens Edit
+    selectedUnit: null,        // View: the unit whose details are shown
+    statusFilter: null,        // View: a unit status picked in the legend (its units stay bright)
+    unitSearch: '',            // View: text in the units search box
+    details: {},               // View: unitId → { loading } | { data } | { error } from GET /api/units/{id}/details
+    downAt: null,              // View: where the pointer went down, to tell a click from a drag
     layout: null,
     mode: 'spots',             // 'spots' | 'edges'
     tool: 'hand',              // hand | brush | rect | erase (the same tools in both modes)
@@ -95,6 +104,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     space: false,              // space bar held down: drag to pan
     pan: null,                 // { x, y, left, top } while panning
     openPop: null,             // { pop, anchor } of the open popover
+    editingId: null,           // the zone being edited in the add/edit dialog (null = adding a new one)
     addColor: null,            // color chosen in the add-common-area dialog
     addColorPicked: false,     // true once the user picked a color (then changing the type keeps it)
     dirty: false,
@@ -190,6 +200,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     el.saveState.classList.toggle('is-dirty', state.dirty && !state.saving);
     el.btnUndo.disabled = !history.undo.length;
     el.btnRedo.disabled = !history.redo.length;
+    el.btnSave.hidden = state.view && !state.dirty && !state.saving;    // in View, Save only shows for unsaved edits
   }
 
   // ------------------------------------------------------------------ zoom and view
@@ -265,21 +276,31 @@ document.addEventListener('DOMContentLoaded', async () => {
   function render() {
     const L = state.layout;
     if (!L) return;
+    const view = state.view;
+    document.body.classList.toggle('is-view', view);
     gridRenderer.render(el.world, L, {
-      mode: state.mode,
-      brushZoneId: state.mode === 'spots' && isDrawTool() ? state.zoneId : null,
+      mode: view ? 'view' : state.mode,
+      brushZoneId: !view && state.mode === 'spots' && isDrawTool() ? state.zoneId : null,
+      highlightZoneId: view ? state.selectedUnit : null,
+      highlightZoneIds: view && state.selectedUnit == null ? statusHighlight() : null,
       cell: currentCell()
     });
-    addResizeHandles();
+    if (!view) addResizeHandles();
     el.host.classList.toggle('mode-spots', state.mode === 'spots');
     el.host.classList.toggle('mode-edges', state.mode === 'edges');
-    el.host.classList.toggle('tool-hand', state.tool === 'hand');
-    el.host.classList.toggle('tool-rect', state.tool === 'rect');
+    el.host.classList.toggle('tool-hand', view || state.tool === 'hand');
+    el.host.classList.toggle('tool-rect', !view && state.tool === 'rect');
+    el.viewHint.hidden = !view;
+    document.querySelectorAll('[data-view]').forEach(b => {
+      const on = (b.dataset.view === 'view') === view;
+      b.classList.toggle('is-active', on);
+      b.setAttribute('aria-pressed', String(on));
+    });
     renderToolbar();
     renderPanel();
     renderStatus();
     el.zoomLabel.textContent = `${Math.round((currentCell() / CELL_BASE) * 100)}%`;
-    el.hint.textContent = hintText();
+    el.hint.textContent = view ? '' : hintText();
     el.hint.classList.remove('is-error');
     updateSaveState();
     if (!el.sizePop.hidden) updateSizePreview();
@@ -385,10 +406,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     renderLegend(units);
   }
 
-  /** Unit status legend (bottom-left): what the unit colors mean, and how many units have each. */
+  /**
+   * Unit status legend (bottom-left): what the unit colors mean, and how many units have each.
+   * In View the rows are buttons: one keeps the units with that status bright and dims the rest (again = clear).
+   */
   function renderLegend(units) {
+    el.legend.classList.toggle('is-interactive', state.view);
     el.legendList.replaceChildren(...LEGEND_STATUSES.map(({ status, label, color }) => {
       const li = document.createElement('li');
+      li.dataset.status = status;
+      if (state.view) {
+        li.setAttribute('role', 'button');
+        li.tabIndex = 0;
+        li.title = state.statusFilter === status ? 'Show all units again' : `Highlight the ${label.toLowerCase()} units`;
+        li.setAttribute('aria-pressed', String(state.statusFilter === status));
+      }
+      li.classList.toggle('is-active', state.view && state.statusFilter === status);
       const sw = document.createElement('span');
       sw.className = `swatch zone zone-unit status-${status.toLowerCase().replaceAll('_', '-')}`;
       sw.style.setProperty('--zone-color', color);
@@ -401,6 +434,27 @@ document.addEventListener('DOMContentLoaded', async () => {
       return li;
     }));
   }
+
+  /** View: the units to keep bright for the status picked in the legend, or null. */
+  function statusHighlight() {
+    if (!state.statusFilter) return null;
+    return new Set(visibleZones().filter(z => z.rentable && z.status === state.statusFilter).map(z => z.id));
+  }
+
+  function toggleStatusFilter(status) {
+    if (!state.view) return;
+    state.statusFilter = state.statusFilter === status ? null : status;
+    state.selectedUnit = null;
+    render();
+  }
+  el.legendList.addEventListener('click', (e) => {
+    const row = e.target.closest('[data-status]');
+    if (row && state.view) toggleStatusFilter(row.dataset.status);
+  });
+  el.legendList.addEventListener('keydown', (e) => {
+    const row = e.target.closest('[data-status]');
+    if (row && state.view && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); toggleStatusFilter(row.dataset.status); }
+  });
 
   function setLegendOpen(open) {
     el.legend.classList.toggle('is-collapsed', !open);
@@ -476,6 +530,17 @@ document.addEventListener('DOMContentLoaded', async () => {
       b.textContent = badge;
       btn.appendChild(b);
     }
+    if (removeZone) {                                 // pencil: edit this zone's details
+      const ed = document.createElement('span');
+      ed.className = 'zone-remove zone-edit';
+      ed.setAttribute('role', 'button');
+      ed.tabIndex = 0;
+      ed.dataset.edit = removeZone.id;
+      ed.title = `Edit ${removeZone.name}`;
+      ed.setAttribute('aria-label', ed.title);
+      ed.appendChild(icon('pencil'));
+      btn.appendChild(ed);
+    }
     if (removeZone) {                                 // trash: delete (or archive) this zone
       const rm = document.createElement('span');
       rm.className = 'zone-remove';
@@ -491,6 +556,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function renderPanel() {
+    el.viewTop.hidden = el.viewTools.hidden = !state.view;
+    if (state.view) {
+      el.panelTop.hidden = el.spotTools.hidden = el.edgeTools.hidden = true;
+      renderViewPanel();
+      return;
+    }
     const spots = state.mode === 'spots';
     el.panelTitle.textContent = spots ? 'Zones' : 'Walls & doors';
     el.panelTop.hidden = !spots;
@@ -539,6 +610,225 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (filter && !zones.some(shown)) list.push(note('No zone matches the filter.'));
     el.zoneList.replaceChildren(...list);
   }
+
+  // ------------------------------------------------------------------ View mode: units list and details
+  /** The units shown in the View list: not archived, matching the search and the legend's status. */
+  function viewUnits() {
+    const q = state.unitSearch.trim().toLowerCase();
+    return visibleZones().filter(z => z.rentable
+      && (!state.statusFilter || z.status === state.statusFilter)
+      && (!q || z.name.toLowerCase().includes(q)));
+  }
+
+  function renderViewPanel() {
+    const unit = state.selectedUnit == null ? null : gridRenderer.zoneById(state.layout, state.selectedUnit);
+    el.panelTitle.textContent = unit ? 'Unit details' : 'Units';
+    el.unitList.hidden = Boolean(unit);
+    el.unitDetails.hidden = !unit;
+    if (unit) { renderDetails(unit); return; }
+
+    const counts = spotCounts();
+    const units = viewUnits();
+    const rows = [];
+    if (state.statusFilter) {
+      const label = LEGEND_STATUSES.find(s => s.status === state.statusFilter).label.toLowerCase();
+      rows.push(Object.assign(document.createElement('p'), { className: 'empty-note', textContent: `Showing ${label} units only (click it in the legend again to show all).` }));
+    }
+    units.forEach(z => {
+      const n = counts.get(z.id) || 0;
+      rows.push(listItem({
+        key: { unit: z.id }, swatch: { zone: z }, name: z.name,
+        meta: `${format.label(z.status)} · ${format.peso(z.rentalRate)}/mo`,
+        badge: n ? plural(n, 'spot') : 'Not placed', warn: !n
+      }));
+    });
+    if (!units.length) {
+      rows.push(Object.assign(document.createElement('p'), {
+        className: 'empty-note',
+        textContent: visibleZones().some(z => z.rentable) ? 'No unit matches.' : 'No units yet. Switch to Edit to add one.'
+      }));
+    }
+    el.unitList.replaceChildren(...rows);
+  }
+
+  /** One "label: value" row of the details card. value may be a string or an element. */
+  function detailRow(label, value) {
+    const dt = document.createElement('dt');
+    dt.textContent = label;
+    const dd = document.createElement('dd');
+    if (value instanceof Node) dd.appendChild(value); else dd.textContent = value;
+    return [dt, dd];
+  }
+
+  function badgeEl(prefix, enumName) {
+    const b = document.createElement('span');
+    b.className = `badge ${format.cssClass(prefix, enumName)}`;
+    b.textContent = format.label(enumName);
+    return b;
+  }
+
+  function sizeText(d) {
+    if (!d) return 'Not given';
+    return d.exact ? `${Number(d.areaSqm)} sqm` : `Approx. ${d.description}`;
+  }
+
+  function renderDetails(unit) {
+    const box = el.unitDetails;
+    const back = document.createElement('button');
+    back.type = 'button';
+    back.className = 'details-back';
+    back.dataset.back = '1';
+    back.textContent = '← All units';
+
+    const head = document.createElement('div');
+    head.className = 'details-head';
+    const sw = document.createElement('span');
+    setSwatch(sw, { zone: unit });
+    const name = document.createElement('h3');
+    name.textContent = unit.name;
+    head.append(sw, name, badgeEl('status-', unit.status));
+
+    const n = spotCounts().get(unit.id) || 0;
+    const includes = [unit.includesElectricity && 'Power', unit.includesWater && 'Water'].filter(Boolean).join(' & ') || 'None';
+    const facts = document.createElement('dl');
+    facts.className = 'details-grid';
+    facts.append(
+      ...detailRow('Monthly rate', format.peso(unit.rentalRate)),
+      ...detailRow('Size', sizeText(unit.dimensions)),
+      ...detailRow('Includes', includes),
+      ...detailRow('On the grid', n ? plural(n, 'spot') : 'Not placed'));
+    const edit = document.createElement('button');
+    edit.type = 'button';
+    edit.className = 'btn details-edit';
+    edit.dataset.editUnit = unit.id;
+    edit.append(icon('pencil'), ' Edit unit');
+
+    const leaseTitle = document.createElement('h4');
+    leaseTitle.textContent = 'Current lease';
+    const lease = document.createElement('div');
+    lease.className = 'details-lease';
+    const reqTitle = document.createElement('h4');
+    reqTitle.textContent = 'Lease requests';
+    const req = document.createElement('p');
+    req.className = 'details-requests';
+
+    const info = state.details[unit.id];
+    if (!info || info.loading) {
+      lease.textContent = 'Loading…';
+      req.textContent = 'Loading…';
+    } else if (info.error) {
+      lease.textContent = info.error;
+      lease.classList.add('is-error');
+      req.textContent = '—';
+    } else {
+      const l = info.data.currentLease;
+      if (!l) {
+        lease.textContent = 'No current lease.';
+      } else {
+        const when = l.currentState === 'UPCOMING' ? `Starts ${format.date(l.startDate)}`
+          : l.currentState === 'EXPIRED' ? `Ended ${format.date(l.endDate)}: end or renew it`
+          : `${plural(l.daysRemaining, 'day')} left`;
+        const dl = document.createElement('dl');
+        dl.className = 'details-grid';
+        const state_ = document.createElement('span');
+        state_.className = 'details-state';
+        state_.append(badgeEl('state-', l.currentState), ` ${when}`);
+        dl.append(
+          ...detailRow('Renter', l.renterName),
+          ...detailRow('Period', `${format.date(l.startDate)} – ${format.date(l.endDate)}`),
+          ...detailRow('Rent', `${format.peso(l.monthlyRent)} / month`),
+          ...detailRow('State', state_));
+        lease.appendChild(dl);
+      }
+      const open = info.data.openRequests;
+      req.textContent = open ? `${plural(open, 'open request')} · ` : 'No open requests · ';
+      const link = document.createElement('a');
+      link.href = '/requests.html';
+      link.textContent = 'See requests';
+      req.appendChild(link);
+    }
+    box.replaceChildren(back, head, facts, edit, leaseTitle, lease, reqTitle, req);
+  }
+
+  async function loadDetails(unitId) {
+    if (state.details[unitId] && !state.details[unitId].error) return;
+    state.details[unitId] = { loading: true };
+    try {
+      state.details[unitId] = { data: await api.get(`/api/units/${unitId}/details`) };
+    } catch (err) {
+      state.details[unitId] = { error: err.message };
+    }
+    if (state.view && state.selectedUnit === unitId) renderPanel();
+  }
+
+  /** View: select a unit (zoom = also zoom to it, used from the list and the search). */
+  function selectUnit(unitId, zoom) {
+    const unit = gridRenderer.zoneById(state.layout, unitId);
+    if (!unit || !unit.rentable) return;
+    state.selectedUnit = unitId;
+    if (panel.isMinimized()) panel.setMinimized(false);
+    render();
+    if (zoom) focusZone(unitId);
+    loadDetails(unitId);
+  }
+
+  function clearSelection() {
+    if (state.selectedUnit == null) return false;
+    state.selectedUnit = null;
+    render();
+    return true;
+  }
+
+  /** Zooms so the zone's spots fill the free part of the window (left of the panel), centered. */
+  function focusZone(zoneId) {
+    const keys = [...state.layout.cells].filter(([, id]) => id === zoneId).map(([k]) => k.split(',').map(Number));
+    if (!keys.length) { toast('This unit is not placed on the grid yet.'); return; }
+    const rows = keys.map(k => k[0]), cols = keys.map(k => k[1]);
+    const top = Math.min(...rows), bottom = Math.max(...rows), left = Math.min(...cols), right = Math.max(...cols);
+    const panelW = panel.isMinimized() ? 0 : 320;
+    const freeW = el.host.clientWidth - panelW - 120, freeH = el.host.clientHeight - 260;
+    const fit = Math.floor(Math.min(freeW / (right - left + 1), freeH / (bottom - top + 1)));
+    setZoom(Math.min(CELL_FIT_MAX, clampCell(fit)));
+    const s = stage();
+    if (!s) return;
+    const cell = currentCell();
+    el.host.scrollLeft = s.offsetLeft + ((left + right + 1) / 2) * cell - (el.host.clientWidth - panelW) / 2;
+    el.host.scrollTop = s.offsetTop + ((top + bottom + 1) / 2) * cell - el.host.clientHeight / 2;
+  }
+
+  /** View ↔ Edit. Entering View drops the old details (they may have changed while editing). */
+  function setView(view) {
+    if (view === state.view || busy()) return;
+    cancelRect();
+    closePopover();
+    state.view = view;
+    state.selectedUnit = null;
+    state.hover = null;
+    if (view) state.details = {};
+    render();
+  }
+  document.querySelectorAll('[data-view]').forEach(b => b.addEventListener('click', () => setView(b.dataset.view === 'view')));
+
+  el.unitList.addEventListener('click', (e) => {
+    const item = e.target.closest('[data-unit]');
+    if (item) selectUnit(Number(item.dataset.unit), true);
+  });
+  el.unitDetails.addEventListener('click', (e) => {
+    if (e.target.closest('[data-back]')) clearSelection();
+    const edit = e.target.closest('[data-edit-unit]');
+    if (edit) openEditFor(Number(edit.dataset.editUnit));
+  });
+  el.unitSearch.addEventListener('input', () => {
+    state.unitSearch = el.unitSearch.value;
+    if (state.selectedUnit != null) state.selectedUnit = null;
+    render();
+  });
+  el.unitSearch.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    const first = viewUnits()[0];
+    if (first) selectUnit(first.id, true); else toast('No unit matches.');
+  });
 
   // ------------------------------------------------------------------ choosing tools
   function setMode(mode) {
@@ -756,6 +1046,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   el.host.addEventListener('pointerdown', (e) => {
     if (!state.layout) return;
     closePopover();
+    if (state.view) {                                // View: drag pans; a click (no real move) selects, see pointerup
+      if (e.button > 1) return;
+      state.downAt = e.button === 0 ? { x: e.clientX, y: e.clientY } : null;
+      startPan(e);
+      return;
+    }
     const handle = e.target.closest('.resize-handle');
     if (handle && e.button === 0) {
       e.preventDefault();
@@ -852,8 +1148,17 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   /** End of a drag: one undo step for the whole stroke / rectangle. */
-  window.addEventListener('pointerup', () => {
+  window.addEventListener('pointerup', (e) => {
     stopPan();
+    if (state.view) {
+      const d = state.downAt;
+      state.downAt = null;
+      if (!d || Math.abs(e.clientX - d.x) + Math.abs(e.clientY - d.y) >= 4) return;   // it was a drag
+      const at = cellAtPoint(e.clientX, e.clientY, false);
+      const zone = at ? gridRenderer.zoneAt(state.layout, at.r, at.c) : null;
+      if (zone && zone.rentable) selectUnit(zone.id, false); else clearSelection();
+      return;
+    }
     if (state.resizing) { endResize(); return; }
     finishRect();
     state.painting = false;
@@ -1129,6 +1434,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (swatch) { e.stopPropagation(); openColorPop(Number(swatch.dataset.color), swatch); return; }
     const trash = e.target.closest('[data-remove]');
     if (trash) { e.stopPropagation(); openRemove(Number(trash.dataset.remove)); return; }
+    const pencil = e.target.closest('[data-edit]');
+    if (pencil) { e.stopPropagation(); openEditFor(Number(pencil.dataset.edit)); return; }
     const item = e.target.closest('.zone-item');
     if (!item) return;
     if (item.dataset.eraser) setTool(ERASER);
@@ -1138,10 +1445,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (e.key !== 'Enter' && e.key !== ' ') return;
     const swatch = e.target.closest('[data-color]');
     const trash = e.target.closest('[data-remove]');
-    if (!swatch && !trash) return;
+    const pencil = e.target.closest('[data-edit]');
+    if (!swatch && !trash && !pencil) return;
     e.preventDefault();
     e.stopPropagation();
-    if (swatch) openColorPop(Number(swatch.dataset.color), swatch); else openRemove(Number(trash.dataset.remove));
+    if (swatch) openColorPop(Number(swatch.dataset.color), swatch);
+    else if (pencil) openEditFor(Number(pencil.dataset.edit));
+    else openRemove(Number(trash.dataset.remove));
   });
 
   // ------------------------------------------------------------------ delete / archive a zone (saved at once)
@@ -1266,36 +1576,80 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
   $('btnResetEdges').addEventListener('click', resetEdges);
 
-  // ------------------------------------------------------------------ add unit / common area (dialog, saved at once)
-  function openAddDialog(kind) {
+  // ------------------------------------------------------------------ add / edit a unit or common area (dialog, saved at once)
+  const money = (n) => (n == null || n === '' ? '' : Number(n).toFixed(2));
+  const MAINTENANCE_COLOR = '#f59e0b';
+
+  /** kind 'unit' | 'area'; zone = the zone to edit (prefilled), or nothing to add a new one. */
+  function openAddDialog(kind, zone) {
     if (!state.layout) return;
     closePopover();
     const unit = kind === 'unit';
-    el.addTitle.textContent = unit ? 'New unit' : 'New common area';
+    state.editingId = zone ? zone.id : null;
+    el.addTitle.textContent = zone ? (unit ? 'Edit unit' : 'Edit common area') : (unit ? 'New unit' : 'New common area');
     el.addUnitForm.hidden = !unit;
     el.addAreaForm.hidden = unit;
     el.addUnitForm.reset();
     el.addAreaForm.reset();
     el.areaColorNote.textContent = '';
     state.addColorPicked = false;
+    const form = unit ? el.addUnitForm : el.addAreaForm;
+    const submit = form.querySelector('button[type=submit]');
+    submit.textContent = zone ? 'Save changes' : submit.dataset.addLabel;
+    $('maintenanceRow').hidden = !(unit && zone);
     if (unit) {
-      setPreviewTile(el.unitPreview, UNIT_PREVIEW_COLOR, 'New unit', false);
+      const f = el.addUnitForm.elements;
+      if (zone) {
+        f.name.value = zone.name;
+        f.rentalRate.value = money(zone.rentalRate);
+        const d = zone.dimensions;
+        if (d && d.exact) f.areaSqm.value = money(d.areaSqm);
+        if (d && !d.exact) f.sizeDescription.value = d.description || '';
+        f.electricity.checked = Boolean(zone.includesElectricity);
+        f.water.checked = Boolean(zone.includesWater);
+        f.maintenance.checked = zone.status === 'UNDER_MAINTENANCE';
+        f.maintenance.disabled = zone.status === 'OCCUPIED';
+        $('maintenanceNote').textContent = zone.status === 'OCCUPIED'
+          ? 'Occupied units can\'t go under maintenance.' : '';
+      }
+      updateUnitPreview();
+    } else if (zone) {
+      const f = el.addAreaForm.elements;
+      f.name.value = zone.name;
+      f.areaType.value = zone.areaType;
+      state.addColor = zone.color.toLowerCase();
+      state.addColorPicked = true;
+      renderAreaColor();
     } else {
       suggestAreaColor();
     }
     el.addDialog.showModal();
-    (unit ? el.addUnitForm : el.addAreaForm).elements.name.focus();
+    form.elements.name.focus();
+  }
+
+  function openEditFor(zoneId) {
+    const zone = gridRenderer.zoneById(state.layout, zoneId);
+    if (zone) openAddDialog(zone.rentable ? 'unit' : 'area', zone);
+  }
+
+  /** The unit preview tile: its status color (amber while "Under maintenance" is ticked) and its name. */
+  function updateUnitPreview() {
+    const f = el.addUnitForm.elements;
+    const zone = state.editingId == null ? null : gridRenderer.zoneById(state.layout, state.editingId);
+    let color = zone ? zone.color : UNIT_PREVIEW_COLOR;
+    if (zone && !f.maintenance.disabled) color = f.maintenance.checked ? MAINTENANCE_COLOR : UNIT_PREVIEW_COLOR;
+    setPreviewTile(el.unitPreview, color, f.name.value.trim() || 'New unit', false);
   }
 
   function suggestAreaColor() {
     const type = el.addAreaForm.elements.areaType.value;
-    state.addColor = firstFreeColor(usedColors(null), TYPE_COLORS[type]);
+    state.addColor = firstFreeColor(usedColors(state.editingId), TYPE_COLORS[type]);
     renderAreaColor();
   }
 
   function renderAreaColor() {
     const f = el.addAreaForm.elements;
-    const used = usedColors(null);
+    const used = usedColors(state.editingId);
     renderPalette(el.areaPalette, state.addColor, used, (color) => {
       state.addColor = color;
       state.addColorPicked = true;
@@ -1311,15 +1665,20 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('btnAddArea').addEventListener('click', () => openAddDialog('area'));
   document.querySelectorAll('dialog [data-close]').forEach(btn => btn.addEventListener('click', () => btn.closest('dialog').close()));
   document.querySelectorAll('dialog').forEach(d => d.addEventListener('click', (e) => { if (e.target === d) d.close(); }));
-  el.addUnitForm.elements.name.addEventListener('input', () =>
-    setPreviewTile(el.unitPreview, UNIT_PREVIEW_COLOR, el.addUnitForm.elements.name.value.trim() || 'New unit', false));
+  el.addUnitForm.elements.name.addEventListener('input', updateUnitPreview);
+  el.addUnitForm.elements.maintenance.addEventListener('change', updateUnitPreview);
   el.addAreaForm.elements.name.addEventListener('input', renderAreaColor);
   el.addAreaForm.elements.areaType.addEventListener('change', () => {
     if (state.addColorPicked) renderAreaColor(); else suggestAreaColor();
   });
+  // money / area fields: the arrows move by 1 (step="any"), and the typed value is kept to 2 decimals
+  document.querySelectorAll('input[data-money]').forEach(input => input.addEventListener('change', () => {
+    const n = Number(input.value);
+    if (input.value !== '' && Number.isFinite(n)) input.value = n.toFixed(2);
+  }));
   el.areaCustom.addEventListener('input', () => {
     const color = el.areaCustom.value.toLowerCase();
-    const by = usedColors(null).get(color);
+    const by = usedColors(state.editingId).get(color);
     if (by) { el.areaColorNote.textContent = `That color is already used by ${by}.`; return; }
     el.areaColorNote.textContent = '';
     state.addColor = color;
@@ -1343,6 +1702,32 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
+  /** Puts the server's answer into the zone on the grid (its spots stay as drawn) and redraws. */
+  function applyZoneUpdate(zone, data) {
+    const { positions, ...rest } = data;
+    Object.assign(zone, rest);
+    delete state.details[zone.id];
+    render();
+    if (state.view && state.selectedUnit === zone.id) loadDetails(zone.id);
+  }
+
+  async function saveEdit(form, steps) {
+    const btn = form.querySelector('button[type=submit]');
+    btn.disabled = true;
+    try {
+      const zone = gridRenderer.zoneById(state.layout, state.editingId);
+      let data = null;
+      for (const step of steps) data = (await step()) || data;
+      if (zone && data) applyZoneUpdate(zone, data);
+      el.addDialog.close();
+      toast(`${zone ? zone.name : 'Changes'} saved. (Saved at once; Ctrl+Z doesn't undo it.)`);
+    } catch (err) {
+      toast(err.message, true);                     // e.g. "Unit 101 is occupied, so it can't go under maintenance."
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
   el.addUnitForm.addEventListener('submit', (e) => {
     e.preventDefault();
     const f = e.target.elements;
@@ -1350,9 +1735,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     const rate = f.rentalRate.value;
     if (!name) return toast('Give the unit a name.', true);
     if (rate === '' || Number(rate) < 0) return toast('Enter a monthly rate of 0 or more.', true);
-    const fields = { name, rentalRate: rate, electricity: f.electricity.checked, water: f.water.checked };
-    if (f.areaSqm.value) Object.assign(fields, { exactSize: true, areaSqm: f.areaSqm.value });
-    addZone(e.target, `/api/properties/${propertyId}/units`, fields);
+    const fields = { name, rentalRate: money(rate), electricity: f.electricity.checked, water: f.water.checked };
+    if (f.areaSqm.value) Object.assign(fields, { exactSize: true, areaSqm: money(f.areaSqm.value) });
+    else if (f.sizeDescription.value.trim()) Object.assign(fields, { exactSize: false, sizeDescription: f.sizeDescription.value.trim() });
+    if (state.editingId == null) {
+      addZone(e.target, `/api/properties/${propertyId}/units`, fields);
+      return;
+    }
+    const id = state.editingId;
+    const zone = gridRenderer.zoneById(state.layout, id);
+    const steps = [];
+    const wantMaintenance = f.maintenance.checked;
+    if (!f.maintenance.disabled && wantMaintenance !== (zone.status === 'UNDER_MAINTENANCE')) {
+      steps.push(() => api.form('POST', `/api/units/${id}/maintenance`, { underMaintenance: wantMaintenance }));
+    }
+    steps.push(() => api.form('PUT', `/api/units/${id}`, fields));     // its answer has the final status too
+    saveEdit(e.target, steps);
   });
 
   el.addAreaForm.addEventListener('submit', (e) => {
@@ -1361,7 +1759,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     const name = f.name.value.trim();
     if (!name) return toast('Give the common area a name.', true);
     if (!state.addColor) return toast('Pick a color for the common area.', true);
-    addZone(e.target, `/api/properties/${propertyId}/common-areas`, { name, areaType: f.areaType.value, color: state.addColor });
+    if (state.editingId == null) {
+      addZone(e.target, `/api/properties/${propertyId}/common-areas`, { name, areaType: f.areaType.value, color: state.addColor });
+      return;
+    }
+    const id = state.editingId;
+    const zone = gridRenderer.zoneById(state.layout, id);
+    const steps = [() => api.form('PUT', `/api/common-areas/${id}`, { name, areaType: f.areaType.value })];
+    if (state.addColor !== zone.color.toLowerCase()) {   // its answer is the whole area (new name, type and color)
+      steps.push(() => api.form('PUT', `/api/properties/${propertyId}/common-areas/${id}/color`, { color: state.addColor }));
+    }
+    saveEdit(e.target, steps);
   });
 
   // ------------------------------------------------------------------ save (two requests)
@@ -1403,7 +1811,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   const ctrl = (key, shift) => (e) => (e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === key && e.shiftKey === shift;
   const shiftDigit = (d) => (e) => noMods(e) && e.shiftKey && e.code === `Digit${d}`;
 
+  // `modes`: where a key works ('view', 'edit'); without it, only in Edit.
+  const BOTH = ['view', 'edit'];
   const SHORTCUTS = [
+    { group: 'View & Edit', keys: ['E'], label: 'Edit the layout (from View)', modes: ['view'], test: plain('e'), run: () => setView(false) },
+    { group: 'View & Edit', keys: ['V'], label: 'Back to View (select units, see details)', test: plain('v'), run: () => setView(true) },
+    { group: 'View & Edit', keys: ['Click'], label: 'View: select a unit and see its details', modes: ['view'] },
+    { group: 'View & Edit', keys: ['Esc'], label: 'View: close the details · clear the legend highlight', modes: ['view'] },
+
     { group: 'Tools', keys: ['S'], label: 'Spots mode', test: plain('s'), run: () => setMode('spots') },
     { group: 'Tools', keys: ['W'], label: 'Walls & doors mode', test: plain('w'), run: () => setMode('edges') },
     { group: 'Tools', keys: ['H'], label: 'Hand (move around, hover to inspect)', test: plain('h'), run: () => setTool('hand') },
@@ -1421,26 +1836,31 @@ document.addEventListener('DOMContentLoaded', async () => {
     { group: 'Tools', keys: ['Alt', 'click'], label: 'Pick the zone of a placed spot' },
     { group: 'Tools', keys: ['Esc'], label: 'Close a menu · cancel a rectangle · back to the Hand' },
 
-    { group: 'View', keys: ['Space', 'drag'], label: 'Move around (also: middle mouse button)' },
-    { group: 'View', keys: ['+'], label: 'Zoom in', test: plain('+', '='), run: () => zoomBy(1.25) },
-    { group: 'View', keys: ['−'], label: 'Zoom out', test: plain('-', '_'), run: () => zoomBy(1 / 1.25) },
-    { group: 'View', keys: ['Ctrl', 'wheel'], label: 'Zoom around the mouse' },
-    { group: 'View', keys: ['Shift', '1'], label: 'Zoom to fit (also: 0)', test: shiftDigit(1), run: () => setZoom('fit') },
-    { group: 'View', keys: ['Shift', '0'], label: 'Zoom to 100%', test: shiftDigit(0), run: () => setZoom(CELL_BASE) },
-    { group: 'View', keys: ['0'], label: 'Zoom to fit', hidden: true, test: (e) => noMods(e) && !e.shiftKey && e.key === '0', run: () => setZoom('fit') },
-    { group: 'View', keys: ['\\'], label: 'Show / hide the panel', test: plain('\\'), run: () => panel.toggle() },
-    { group: 'View', keys: ['G'], label: 'Resize grid (or drag the grid\'s edges)', test: plain('g'), run: openSizePop },
-    { group: 'View', keys: ['L'], label: 'Show / hide the unit color legend', test: plain('l'),
+    { group: 'Navigate', keys: ['Space', 'drag'], label: 'Move around (also: middle mouse button)', modes: BOTH },
+    { group: 'Navigate', keys: ['+'], label: 'Zoom in', modes: BOTH, test: plain('+', '='), run: () => zoomBy(1.25) },
+    { group: 'Navigate', keys: ['−'], label: 'Zoom out', modes: BOTH, test: plain('-', '_'), run: () => zoomBy(1 / 1.25) },
+    { group: 'Navigate', keys: ['Ctrl', 'wheel'], label: 'Zoom around the mouse', modes: BOTH },
+    { group: 'Navigate', keys: ['Shift', '1'], label: 'Zoom to fit (also: 0)', modes: BOTH, test: shiftDigit(1), run: () => setZoom('fit') },
+    { group: 'Navigate', keys: ['Shift', '0'], label: 'Zoom to 100%', modes: BOTH, test: shiftDigit(0), run: () => setZoom(CELL_BASE) },
+    { group: 'Navigate', keys: ['0'], label: 'Zoom to fit', hidden: true, modes: BOTH, test: (e) => noMods(e) && !e.shiftKey && e.key === '0', run: () => setZoom('fit') },
+    { group: 'Navigate', keys: ['\\'], label: 'Show / hide the panel', modes: BOTH, test: plain('\\'), run: () => panel.toggle() },
+    { group: 'Navigate', keys: ['G'], label: 'Resize grid (or drag the grid\'s edges)', test: plain('g'), run: openSizePop },
+    { group: 'Navigate', keys: ['L'], label: 'Show / hide the unit color legend', modes: BOTH, test: plain('l'),
       run: () => setLegendOpen(el.legend.classList.contains('is-collapsed')) },
 
     { group: 'Edit', keys: ['Ctrl', 'Z'], label: 'Undo', test: ctrl('z', false), run: undo },
     { group: 'Edit', keys: ['Ctrl', 'Shift', 'Z'], label: 'Redo (also: Ctrl + Y)', test: ctrl('z', true), run: redo },
     { group: 'Edit', keys: ['Ctrl', 'Y'], label: 'Redo', hidden: true, test: ctrl('y', false), run: redo },
-    { group: 'Edit', keys: ['Ctrl', 'S'], label: 'Save', test: ctrl('s', false), run: save, inFields: true },
+    { group: 'Edit', keys: ['Ctrl', 'S'], label: 'Save', modes: BOTH, test: ctrl('s', false), run: save, inFields: true },
+    { group: 'Edit', keys: ['Enter'], label: 'Edit the selected zone (name, rate, size…)',
+      // only when no button / link / field has the focus (there Enter keeps its normal meaning)
+      test: (e) => noMods(e) && e.key === 'Enter'
+        && !(e.target.closest && e.target.closest('button, a, input, select, textarea, [role=button]')),
+      run: () => { if (state.mode === 'spots' && state.zoneId != null) openEditFor(state.zoneId); else toast('Select a zone first.'); } },
     { group: 'Edit', keys: ['Delete'], label: 'Delete (or archive) the selected zone',
       test: (e) => noMods(e) && e.key === 'Delete',
       run: () => { if (state.mode === 'spots' && state.zoneId != null) openRemove(state.zoneId); else toast('Select a zone first.'); } },
-    { group: 'Edit', keys: ['?'], label: 'This list of shortcuts', test: (e) => !e.ctrlKey && !e.metaKey && e.key === '?', run: () => openShortcuts() }
+    { group: 'Edit', keys: ['?'], label: 'This list of shortcuts', modes: BOTH, test: (e) => !e.ctrlKey && !e.metaKey && e.key === '?', run: () => openShortcuts() }
   ];
 
   function openShortcuts() {
@@ -1458,6 +1878,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         row.className = 'shortcut-row';
         const label = document.createElement('span');
         label.textContent = s.label;
+        if ((s.modes || []).includes('view')) {      // works in View too (or only there)
+          const tag = document.createElement('span');
+          tag.className = 'mode-tag';
+          tag.textContent = (s.modes || []).includes('edit') ? 'View & Edit' : 'View';
+          label.append(' ', tag);
+        }
         const keys = document.createElement('span');
         keys.className = 'shortcut-keys';
         s.keys.forEach((k, i) => {
@@ -1485,6 +1911,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   function onEscape(e) {
     if (state.openPop) { closePopover(); return; }
     if (typingInField(e)) { e.target.blur(); return; }
+    if (state.view) {                                // View: details → list → clear the legend highlight
+      if (clearSelection()) return;
+      if (state.statusFilter) { state.statusFilter = null; render(); }
+      return;
+    }
     if (state.resizing) { state.resizing = null; removeSizePreview(); return; }
     if (state.rect) { cancelRect(); return; }
     if (state.tool !== 'hand') setTool('hand');
@@ -1503,8 +1934,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
     if (e.repeat && !/^[+=\-_]$/.test(e.key)) return;     // other keys act once per press (only zoom repeats)
+    const mode = state.view ? 'view' : 'edit';
     for (const s of SHORTCUTS) {
-      if (!s.test || (typing && !s.inFields) || !s.test(e)) continue;
+      if (!s.test || !(s.modes || ['edit']).includes(mode) || (typing && !s.inFields) || !s.test(e)) continue;
       e.preventDefault();
       s.run(e);
       return;

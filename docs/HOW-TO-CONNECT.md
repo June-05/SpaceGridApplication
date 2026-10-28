@@ -102,6 +102,7 @@ The JSON keys are the getter names without `get`/`is` (`getFullName()` → `full
 | `PropertyListing` (`/api/browse`) | `id, name, address, propertyType, description, landlordName, createdAt, units[], availableBlocks, minRate, maxRate, powerIncluded, waterIncluded` |
 | unit in `units[]` | `id, name, rentalRate, dimensions{exact, description, areaSqm} or null, includesElectricity, includesWater` |
 | `LeaseRequest` | `id, unitId, renterId, desiredStart, months, message, status, decidedAt, createdAt, propertyId, landlordId, unitName, propertyName, renterName, monthlyRate, suggestedEndDate, unitRemoved` (after the unit is deleted: `unitId` null, `unitRemoved` true, the names kept, rate/property/landlord empty) |
+| `UnitDetails` | `unit{…RentableUnit}, currentLease{…LeaseContract incl. currentState, daysRemaining} or null, openRequests` (from `GET /api/units/{id}/details`, the plotter's View mode) |
 | `UnitRemovalCheck` | `canDelete, canArchive, openRequests, reason` (from `GET /api/units/{id}/removal-check`; then `DELETE /api/units/{id}` or `POST /api/units/{id}/archive`, both sent with `api.send(method, url)`) |
 
 To see the real JSON at any time, open a GET URL in the browser while logged in, e.g. `http://localhost:8080/api/auth/me`.

@@ -84,25 +84,34 @@ public class LeaseContract extends BaseEntity {
 
     /** UPCOMING, ACTIVE, EXPIRING_SOON, EXPIRED, ENDED, TERMINATED or RENEWED for the given day. */
     public LeaseState getCurrentState(LocalDate today) {
-        // TODO: see the LeaseState rules in the Phase 1 spec
-        throw new UnsupportedOperationException("TODO");
+        switch (status) {
+            case ENDED: return LeaseState.ENDED;
+            case TERMINATED: return LeaseState.TERMINATED;
+            case RENEWED: return LeaseState.RENEWED;
+            default: break;                               // ACTIVE: the dates decide
+        }
+        if (startDate.isAfter(today)) {
+            return LeaseState.UPCOMING;
+        }
+        if (endDate.isBefore(today)) {
+            return LeaseState.EXPIRED;                    // still ACTIVE: the landlord should end or renew it
+        }
+        return daysRemaining(today) <= EXPIRING_SOON_DAYS ? LeaseState.EXPIRING_SOON : LeaseState.ACTIVE;
     }
 
     /** Today's state, so the lease screens get "currentState" in the JSON. */
     public LeaseState getCurrentState() {
-        // TODO: return getCurrentState(LocalDate.now())
-        throw new UnsupportedOperationException("TODO");
+        return getCurrentState(LocalDate.now());
     }
 
+    /** Days from today until the end date (the end date itself counts as 0), never below 0. */
     public long daysRemaining(LocalDate today) {
-        // TODO: days until endDate, 0 once it's over
-        throw new UnsupportedOperationException("TODO");
+        return Math.max(0, java.time.temporal.ChronoUnit.DAYS.between(today, endDate));
     }
 
     /** Today's days remaining, so the lease screens get "daysRemaining" in the JSON. */
     public long getDaysRemaining() {
-        // TODO: return daysRemaining(LocalDate.now())
-        throw new UnsupportedOperationException("TODO");
+        return daysRemaining(LocalDate.now());
     }
 
     public long durationInMonths() {
@@ -117,8 +126,7 @@ public class LeaseContract extends BaseEntity {
 
     @JsonIgnore
     public boolean isRenewal() {
-        // TODO: previousLeaseId != null
-        throw new UnsupportedOperationException("TODO");
+        return previousLeaseId != null;
     }
 
     /** Start month through the last month in effect (closedOn, or endDate). */

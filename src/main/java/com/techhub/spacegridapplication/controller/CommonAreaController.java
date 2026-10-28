@@ -71,8 +71,8 @@ public class CommonAreaController {
             @RequestParam String name,
             @RequestParam CommonAreaType areaType,
             HttpSession session) {
-        // TODO: get the user from sessionManager, call the service, return the result
-        throw new UnsupportedOperationException("TODO");
+        User landlord = sessionManager.requireRole(session, Role.LANDLORD);
+        return commonAreaService.updateCommonArea(id, landlord, name, areaType);
     }
 
     /** Deletes the common area and clears its spots. Saved at once. */
