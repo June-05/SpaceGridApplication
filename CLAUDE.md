@@ -78,7 +78,7 @@ value objects, with no SQL or web code.
   - Each month is paid once, oldest unpaid first. **Paying ahead is allowed.**
   - Due status per month: PAID / OVERDUE / DUE (within 7 days) / UPCOMING.
   - Methods are GCASH / MAYA / CARD. The fake gateway declines account numbers ending in `0000`, saving the payment as FAILED so it can be retried.
-- **Browsing (public homepage):** `homepage.html` lists every ACTIVE property that has at least one AVAILABLE unit. A **block = one AVAILABLE unit**. `GET /api/browse` (and `/{id}`) needs no login. Search, filter, sort and pagination run in the browser. "Power included" = at least one free unit includes electricity. "Saved" spaces live only in the browser (localStorage).
+- **Browsing (public homepage):** `homepage.html` lists every ACTIVE property that has at least one AVAILABLE unit. A free space is an AVAILABLE unit (the pages never say "block": the word is "unit" everywhere). `GET /api/browse` (and `/{id}`) needs no login. Search, filter, sort and pagination run in the browser. "Power included" = at least one free unit includes electricity. "Saved" spaces live only in the browser (localStorage).
 - **Lease requests:** a logged-in renter asks for an AVAILABLE unit (start date, 1–60 months, optional message). One PENDING request per renter per unit. The landlord of that property approves or declines; the renter can cancel while PENDING. Only PENDING changes; the rest are final. **Approving does not create the lease**: the landlord still creates it with the lease form (the unit stays AVAILABLE until then). Approve fails if the unit is no longer AVAILABLE. Each request keeps a copy of the unit and property names (`unit_label`, `property_label`); if the landlord deletes the unit, `rentable_unit_id` becomes NULL (`ON DELETE SET NULL`), the request stays (declined) and `LeaseRequest.isUnitRemoved()` is true.
 - The landlord can also create a lease directly by typing the renter's username.
 
@@ -107,6 +107,12 @@ The plotter works end to end against the real database. After pulling these chan
    - then **lease timing markers on the plotter**: a small dot on occupied units, "Expiring soon" (30 days or fewer) or "Upcoming", plus a matching legend row. Needs each unit's current lease state in the grid page's data.
 4. `lease.html` (details, read-only grid, statement, history), renter dashboard, `renter/pay.html` + payments
 5. tests: `PropertyTest`, `LeaseContractTest`, `SpaceGridApplicationTests` (written last)
+
+**TODO: problems found in the teammate's renter redesign (PR #7, `457066d`). Not fixed yet, ask the owner first because they are the teammate's files:**
+- `css/base.css`: `.btn` background changed to `--btnbg: #e6e6e6` for **every** page, so the plotter's buttons turned gray too. Move that rule into `css/renter-css/*.css`.
+- `js/pages/renter-dashboard.js`: `propertyName` / `unitName` go into `innerHTML` unescaped. Landlords type those names, so HTML in a name would run on the renter's page. Escape them or build the cards with `textContent`.
+- `js/pages/renter-dashboard.js`: `auth.requireLogin('RENTER')` is inside a `try/catch` that ignores the error, so the page still loads when the check fails. Remove the `try/catch` like the other pages.
+- `lease.imageUrl` (renter lease card) is not sent by the API yet; the card shows a placeholder. It becomes real with the unit photos (see the landlord pages plan).
 
 ## Reference docs (in `docs/`)
 - `SpaceGrid-Phase1-Spec.md` + `SpaceGrid-Phase1-ClassDiagram.drawio`: every class, field, method and endpoint.

@@ -7,10 +7,10 @@
 <!--
   HOMEPAGE  (public: anyone can browse without logging in)
   Routes: /   /home   /browse   (WebConfig)   and   /homepage.html
-  Endpoints: GET /api/browse                (all spaces with free blocks)
+  Endpoints: GET /api/browse                (all spaces with free units)
              GET /api/browse/{id}           (one space, for the details window)
              GET /api/auth/me               (who is logged in, optional)
-             POST /api/lease-requests       (renter asks to lease a block)
+             POST /api/lease-requests       (renter asks to lease a unit)
              POST /api/auth/logout
   Script: /js/pages/homepage.js
   This page keeps Tailwind (CDN) and Font Awesome on purpose: it is the one page that is not styled by base.css.
@@ -92,7 +92,7 @@ body { font-family: 'Plus Jakarta Sans', sans-serif; }
 <option value="recommended">Recommended</option>
 <option value="price-low">Rent: Low to High</option>
 <option value="price-high">Rent: High to Low</option>
-<option value="availability">Most available blocks</option>
+<option value="availability">Most available units</option>
 <option value="newest">Newest</option>
 </select>
 <i class="fa-solid fa-chevron-down absolute right-3.5 top-3.5 text-xs text-slate-400 pointer-events-none"></i>
@@ -146,20 +146,20 @@ body { font-family: 'Plus Jakarta Sans', sans-serif; }
 </label>
 </div>
 </div>
-<!-- Available Blocks Slider (max is set from the real data) -->
+<!-- Available Units Slider (max is set from the real data) -->
 <div class="pt-2">
 <div class="flex items-center justify-between mb-2">
-<label class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Min. Avail Blocks</label>
+<label class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Min. Avail Units</label>
 <span id="sliderValueBadge" class="text-xs font-bold text-indigo-600 bg-indigo-50 px-2.5 py-0.5 rounded-md">0 / 10</span>
 </div>
 <input id="blocksSlider" type="range" min="0" max="10" value="0" class="w-full accent-indigo-600 cursor-pointer">
 <div class="flex justify-between text-[11px] text-slate-400 font-medium mt-1">
-<span>0 blocks</span>
+<span>0 units</span>
 <span id="sliderMidLabel">5</span>
-<span id="sliderMaxLabel">10 blocks</span>
+<span id="sliderMaxLabel">10 units</span>
 </div>
 </div>
-<!-- Power Included Toggle (at least one free block includes electricity) -->
+<!-- Power Included Toggle (at least one free unit includes electricity) -->
 <div class="pt-2 flex items-center justify-between">
 <div>
 <div class="text-xs font-bold text-slate-800 uppercase tracking-wide">Power Included</div>
@@ -195,7 +195,7 @@ body { font-family: 'Plus Jakarta Sans', sans-serif; }
 <div id="emptyState" class="hidden py-16 text-center bg-white border border-slate-200 rounded-2xl p-8">
 <i class="fa-solid fa-store-slash text-4xl text-slate-300 mb-3"></i>
 <h3 class="text-base font-bold text-slate-800">No properties match your criteria</h3>
-<p class="text-xs text-slate-500 mt-1 max-w-sm mx-auto">Try lowering the minimum blocks slider, clearing search terms, or checking additional space categories.</p>
+<p class="text-xs text-slate-500 mt-1 max-w-sm mx-auto">Try lowering the minimum units slider, clearing search terms, or checking additional space categories.</p>
 <button id="emptyResetBtn" class="mt-4 px-4 py-2 bg-indigo-600 text-white text-xs font-semibold rounded-xl">Reset Filters</button>
 </div>
 </div>
@@ -247,9 +247,9 @@ body { font-family: 'Plus Jakarta Sans', sans-serif; }
 <p id="modalOwner" class="text-sm font-semibold text-slate-700"></p>
 </div>
 </div>
-<!-- The free blocks (units) -->
+<!-- The free units -->
 <div>
-<p class="text-[11px] font-bold text-slate-400 uppercase mb-2">Available blocks</p>
+<p class="text-[11px] font-bold text-slate-400 uppercase mb-2">Available units</p>
 <div id="modalUnits" class="space-y-2"></div>
 </div>
 <!-- Request form: shown to renters only. Guests get a login button, landlords a note. -->
@@ -267,7 +267,7 @@ body { font-family: 'Plus Jakarta Sans', sans-serif; }
 <textarea name="message" rows="2" maxlength="500" class="mt-1 w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium text-slate-800 normal-case"></textarea>
 </label>
 <p id="requestError" class="text-xs text-rose-600 min-h-[1rem]" aria-live="polite"></p>
-<button id="requestSubmit" type="submit" class="w-full py-3 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl transition shadow-sm shadow-indigo-200">Send request for the selected block</button>
+<button id="requestSubmit" type="submit" class="w-full py-3 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl transition shadow-sm shadow-indigo-200">Send request for the selected unit</button>
 </form>
 <div id="requestNotice" class="hidden text-xs text-slate-600 bg-slate-50 border border-slate-100 rounded-xl p-3"></div>
 <div class="pt-1 flex items-center gap-3">

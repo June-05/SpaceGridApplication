@@ -218,6 +218,16 @@ How the merge was resolved:
 
 ---
 
+## 2026-10-29 · "Block" wording changed to "Unit" (on-screen text only, no design change)
+
+The teammate's landlord mock-ups and the homepage said "Block". The project says **unit** everywhere (class `RentableUnit`, table `rentable_units`, `/api/units`), so the words on screen now match.
+- Changed: landlord `dashboard`, `units`, `leases`, `lease-form`, `property-form` (e.g. "Total Units", "Units Leased", "Unit Management", "Default Rate per Unit", sample codes "Unit A-01"), the homepage (slider "Min. Avail Units", "Available units", "Send request for the selected unit") and `homepage.js` (badges "1 Unit Available" / "3 Units Available", filter pill "Units: ≥ n").
+- **Not** changed (code, not wording): the JSON field `availableBlocks` from `/api/browse`, the element id `modalBlocks`, the JS variables `minBlocks` / `totalBlocks`, and Tailwind's `block` CSS class.
+- `CLAUDE.md` glossary: the "block = one AVAILABLE unit" definition is gone; a free space is an AVAILABLE unit.
+- Still to remove from the forms later (decided, not done): the "Total Units" input on the property form (the plotter decides the count) and the security deposit field.
+
+---
+
 ## PROPOSED (not built) · Commercial ready, permits, bigger grid with zoom
 
 Status: **decided, not implemented.** Nothing below exists in the code yet. When a part is built, move it into a dated section above and update the docs listed at the end.

@@ -46,7 +46,7 @@
                 <div class="flex-1 max-w-md hidden md:block">
                     <div class="relative">
                         <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-2.5 text-slate-400 text-sm"></i>
-                        <input id="unitSearch" type="text" placeholder="Search by block/unit code..." class="w-full pl-10 pr-4 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-600">
+                        <input id="unitSearch" type="text" placeholder="Search by unit code..." class="w-full pl-10 pr-4 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-600">
                     </div>
                 </div>
             </div>
@@ -67,8 +67,8 @@
     <main class="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8">
         <!-- Page Header -->
         <div class="mb-6">
-            <h1 class="text-2xl font-extrabold text-slate-900 tracking-tight">Unit & Block Management</h1>
-            <p class="text-sm text-slate-500 mt-0.5">Manage individual blocks, assign tenants, and update rental status</p>
+            <h1 class="text-2xl font-extrabold text-slate-900 tracking-tight">Unit Management</h1>
+            <p class="text-sm text-slate-500 mt-0.5">Manage individual units, assign tenants, and update rental status</p>
         </div>
 
         <!-- Stats Bar -->
@@ -76,7 +76,7 @@
             <div class="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs">
                 <div class="flex items-center justify-between">
                     <div>
-                        <p class="text-xs text-slate-500 font-medium">Total Blocks</p>
+                        <p class="text-xs text-slate-500 font-medium">Total Units</p>
                         <p id="statTotal" class="text-xl font-extrabold text-slate-900 mt-0.5">0</p>
                     </div>
                     <div class="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center">
@@ -135,7 +135,7 @@
             </button>
         </div>
 
-        <!-- Block Grid -->
+        <!-- Unit Grid -->
         <div id="blockGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"></div>
         <div id="emptyState" class="hidden py-16 text-center bg-white border border-slate-200 rounded-2xl">
             <i class="fa-solid fa-cube text-4xl text-slate-300 mb-3"></i>
@@ -193,18 +193,18 @@
 
     <script>
         let units = [
-            { id: 1, code: "Block A-01", sqft: 25, status: "Occupied", tenant: "Maria Rodriguez", rent: 25000 },
-            { id: 2, code: "Block A-02", sqft: 25, status: "Occupied", tenant: "Miguel Torres", rent: 28000 },
-            { id: 3, code: "Block A-03", sqft: 30, status: "Vacant", tenant: null, rent: 30000 },
-            { id: 4, code: "Block A-04", sqft: 25, status: "Occupied", tenant: "Ana Santos", rent: 25000 },
-            { id: 5, code: "Block B-01", sqft: 20, status: "Vacant", tenant: null, rent: 20000 },
-            { id: 6, code: "Block B-02", sqft: 20, status: "Maintenance", tenant: null, rent: 20000 },
-            { id: 7, code: "Block B-03", sqft: 25, status: "Occupied", tenant: "Carlos Mendoza", rent: 25000 },
-            { id: 8, code: "Block B-04", sqft: 30, status: "Vacant", tenant: null, rent: 32000 },
-            { id: 9, code: "Block C-01", sqft: 35, status: "Occupied", tenant: "Roberto Cruz", rent: 35000 },
-            { id: 10, code: "Block C-02", sqft: 35, status: "Vacant", tenant: null, rent: 35000 },
-            { id: 11, code: "Block C-03", sqft: 25, status: "Maintenance", tenant: null, rent: 28000 },
-            { id: 12, code: "Block C-04", sqft: 25, status: "Vacant", tenant: null, rent: 28000 }
+            { id: 1, code: "Unit A-01", sqft: 25, status: "Occupied", tenant: "Maria Rodriguez", rent: 25000 },
+            { id: 2, code: "Unit A-02", sqft: 25, status: "Occupied", tenant: "Miguel Torres", rent: 28000 },
+            { id: 3, code: "Unit A-03", sqft: 30, status: "Vacant", tenant: null, rent: 30000 },
+            { id: 4, code: "Unit A-04", sqft: 25, status: "Occupied", tenant: "Ana Santos", rent: 25000 },
+            { id: 5, code: "Unit B-01", sqft: 20, status: "Vacant", tenant: null, rent: 20000 },
+            { id: 6, code: "Unit B-02", sqft: 20, status: "Maintenance", tenant: null, rent: 20000 },
+            { id: 7, code: "Unit B-03", sqft: 25, status: "Occupied", tenant: "Carlos Mendoza", rent: 25000 },
+            { id: 8, code: "Unit B-04", sqft: 30, status: "Vacant", tenant: null, rent: 32000 },
+            { id: 9, code: "Unit C-01", sqft: 35, status: "Occupied", tenant: "Roberto Cruz", rent: 35000 },
+            { id: 10, code: "Unit C-02", sqft: 35, status: "Vacant", tenant: null, rent: 35000 },
+            { id: 11, code: "Unit C-03", sqft: 25, status: "Maintenance", tenant: null, rent: 28000 },
+            { id: 12, code: "Unit C-04", sqft: 25, status: "Vacant", tenant: null, rent: 28000 }
         ];
 
         let currentFilter = 'all';

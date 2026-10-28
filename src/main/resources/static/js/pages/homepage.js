@@ -1,7 +1,7 @@
 /*
  * homepage.js — script for homepage.html (the public "browse spaces to rent" page)
  *
- * 1. GET /api/browse (BrowseController.list) → every ACTIVE property that has free blocks (AVAILABLE units).
+ * 1. GET /api/browse (BrowseController.list) → every ACTIVE property that has free units (AVAILABLE).
  *    Each listing: id, name, address, propertyType, description, landlordName, createdAt,
  *                  availableBlocks, minRate, maxRate, powerIncluded, waterIncluded, units[]
  * 2. Search / filter / sort / pagination all happen here in the browser, on that list.
@@ -31,7 +31,7 @@ let me = null;                // the logged-in user, or null for a guest
 let savedIds = loadSaved();   // ids of the saved spaces
 let savedOnly = false;        // "Saved" button: show only the saved spaces
 let openListing = null;       // the space shown in the details window
-let selectedUnitId = null;    // the block picked in the details window
+let selectedUnitId = null;    // the unit picked in the details window
 
 const $ = (id) => document.getElementById(id);
 
@@ -151,13 +151,13 @@ async function loadListings() {
   applyFilters();
 }
 
-/** The slider goes from 0 to the biggest number of free blocks any space has. */
+/** The slider goes from 0 to the biggest number of free units any space has. */
 function setupSlider() {
   const max = Math.max(1, ...listings.map((l) => l.availableBlocks));
   $('blocksSlider').max = max;
   $('blocksSlider').value = 0;
   $('sliderMidLabel').textContent = Math.round(max / 2);
-  $('sliderMaxLabel').textContent = `${max} blocks`;
+  $('sliderMaxLabel').textContent = `${max} units`;
   updateSliderBadge();
 }
 
@@ -213,7 +213,7 @@ function applyFilters() {
 function renderPills(selectedTypes, minBlocks, powerOnly, query) {
   const pills = [];
   if (selectedTypes.length > 0) pills.push(`Type: ${selectedTypes.map((t) => TYPE_LABELS[t]).join(', ')}`);
-  if (minBlocks > 0) pills.push(`Blocks: ≥ ${minBlocks}`);
+  if (minBlocks > 0) pills.push(`Units: ≥ ${minBlocks}`);
   if (powerOnly) pills.push('Power included');
   if (savedOnly) pills.push('Saved only');
   if (query) pills.push(`Search: "${query}"`);
@@ -261,7 +261,7 @@ function renderProperties() {
   renderPaginationControls(totalPages);
 }
 
-/** Few blocks left (3 or fewer) get the amber "Few Left" badge, the rest the green "Open" badge. */
+/** Few units left (3 or fewer) get the amber "Few Left" badge, the rest the green "Open" badge. */
 function cardHtml(item) {
   const fewLeft = item.availableBlocks <= 3;
   const color = fewLeft ? 'amber' : 'emerald';
@@ -280,7 +280,7 @@ function cardHtml(item) {
   <div class="p-5 flex-1 flex flex-col justify-between">
     <div>
       <div class="flex items-center gap-1.5 text-xs font-bold text-${color}-600 mb-1">
-        <span class="w-2 h-2 rounded-full bg-${color}-500"></span>${item.availableBlocks} ${item.availableBlocks === 1 ? 'Block' : 'Blocks'} Available
+        <span class="w-2 h-2 rounded-full bg-${color}-500"></span>${item.availableBlocks} ${item.availableBlocks === 1 ? 'Unit' : 'Units'} Available
       </div>
       <h3 class="text-base font-bold text-slate-900 truncate" title="${esc(item.name)}">${esc(item.name)}</h3>
       <p class="text-xs text-slate-500 mt-1">${esc(item.address)}</p>
@@ -323,7 +323,7 @@ function changePage(page) {
 async function openDetails(id) {
   let item;
   try {
-    item = await api.get(`/api/browse/${id}`);          // fresh data: the blocks may have been taken meanwhile
+    item = await api.get(`/api/browse/${id}`);          // fresh data: the units may have been taken meanwhile
   } catch (err) {
     toast(err.message);
     loadListings();
@@ -337,7 +337,7 @@ async function openDetails(id) {
   $('modalLocation').innerHTML = `<i class="fa-solid fa-location-dot text-slate-400 mr-1"></i>${esc(item.address)}`;
   $('modalDescription').textContent = item.description || '';
   $('modalPrice').textContent = `${rentRange(item)} / month`;
-  $('modalBlocks').textContent = `${item.availableBlocks} ${item.availableBlocks === 1 ? 'Block' : 'Blocks'} Available`;
+  $('modalBlocks').textContent = `${item.availableBlocks} ${item.availableBlocks === 1 ? 'Unit' : 'Units'} Available`;
   $('modalUtilities').textContent = utilitiesText(item.powerIncluded, item.waterIncluded);
   $('modalOwner').textContent = item.landlordName;
   renderModalUnits();
@@ -382,7 +382,7 @@ function renderRequestArea() {
   if (!me) {
     loginLink.href = `/login.html?next=${encodeURIComponent('/?space=' + openListing.id)}`;
     loginLink.classList.remove('hidden');
-    notice.textContent = 'Log in or register as a renter to request a lease on one of these blocks.';
+    notice.textContent = 'Log in or register as a renter to request a lease on one of these units.';
     notice.classList.remove('hidden');
   } else if (me.role === 'RENTER') {
     const today = new Date().toLocaleDateString('en-CA');       // yyyy-MM-dd, the format the server expects
@@ -406,7 +406,7 @@ async function submitRequest(event) {
   const error = $('requestError');
   error.textContent = '';
   if (!selectedUnitId) {
-    error.textContent = 'Choose a block first.';
+    error.textContent = 'Choose a unit first.';
     return;
   }
   if (!form.startDate.value) {
