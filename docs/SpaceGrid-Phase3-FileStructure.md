@@ -40,6 +40,7 @@ SpaceGrid/
 │   │   ├── User.java
 │   │   ├── Role.java
 │   │   ├── Property.java
+│   │   ├── Amenities.java              (record)
 │   │   ├── PropertyType.java
 │   │   ├── PropertyStatus.java
 │   │   ├── PropertyListing.java        (homepage, record)
@@ -58,6 +59,7 @@ SpaceGrid/
 │   │   ├── EdgeType.java
 │   │   ├── Dimensions.java
 │   │   ├── LeaseContract.java
+│   │   ├── PaymentTerms.java
 │   │   ├── LeaseStatus.java
 │   │   ├── LeaseState.java
 │   │   ├── Payment.java
@@ -65,7 +67,9 @@ SpaceGrid/
 │   │   ├── PaymentMethod.java
 │   │   ├── RentDue.java
 │   │   ├── DueStatus.java
-│   │   └── PaymentResult.java
+│   │   ├── PaymentResult.java
+│   │   ├── StoredFile.java             (uploaded photo / site plan / contract)
+│   │   └── FileKind.java
 │   ├── dao/
 │   │   ├── CrudDao.java
 │   │   ├── UserDao.java
@@ -75,6 +79,7 @@ SpaceGrid/
 │   │   ├── LeaseContractDao.java
 │   │   ├── PaymentDao.java
 │   │   ├── LeaseRequestDao.java
+│   │   ├── StoredFileDao.java
 │   │   └── jdbc/
 │   │       ├── JdbcUserDao.java
 │   │       ├── JdbcPropertyDao.java
@@ -82,7 +87,8 @@ SpaceGrid/
 │   │       ├── JdbcCommonAreaDao.java
 │   │       ├── JdbcLeaseContractDao.java
 │   │       ├── JdbcPaymentDao.java
-│   │       └── JdbcLeaseRequestDao.java
+│   │       ├── JdbcLeaseRequestDao.java
+│   │       └── JdbcStoredFileDao.java
 │   ├── service/
 │   │   ├── AuthService.java
 │   │   ├── PropertyService.java
@@ -90,7 +96,8 @@ SpaceGrid/
 │   │   ├── CommonAreaService.java
 │   │   ├── LeaseService.java
 │   │   ├── LeaseRequestService.java
-│   │   └── PaymentService.java
+│   │   ├── PaymentService.java
+│   │   └── FileService.java            (uploads folder)
 │   ├── controller/
 │   │   ├── AuthController.java
 │   │   ├── PropertyController.java
@@ -99,7 +106,8 @@ SpaceGrid/
 │   │   ├── LeaseController.java
 │   │   ├── LeaseRequestController.java
 │   │   ├── BrowseController.java       (public)
-│   │   └── PaymentController.java
+│   │   ├── PaymentController.java
+│   │   └── FileController.java         (uploads; photos of ACTIVE properties are public)
 │   ├── config/
 │   │   └── WebConfig.java              (page routes)
 │   ├── security/
@@ -245,16 +253,16 @@ Links start with `/` so they work from inside the `landlord/` and `renter/` fold
 | `homepage.html` | everyone | **Front door (`/`).** Browse spaces with free blocks: search, type / min-blocks / power filters, sort, pagination, saved spaces, details window. Renters send a lease request there; guests are sent to log in. Uses Tailwind CDN, not `base.css` | `homepage.js` | | `GET /api/browse`, `GET /api/browse/{id}`, `GET /api/auth/me` (plain fetch), `POST /api/lease-requests`, `POST /api/auth/logout` |
 | `requests.html` | both | Renter: own requests + Cancel. Landlord: incoming requests + Approve / Decline, "Create lease" on approved ones | `requests.js` | | `GET /api/lease-requests`, `POST …/{id}/approve`, `…/decline`, `…/cancel` |
 | `login.html` | everyone | Login, then redirect by role | `login.js` | | `POST /api/auth/login` |
-| `register.html` | everyone | Create an account (choose role) | `register.js` | | `POST /api/auth/register` |
-| `landlord/dashboard.html` | landlord | Property cards, search, type filter, "+ Add property" | `landlord-dashboard.js` | | `GET /api/properties?search=&type=` |
-| `landlord/property-form.html` | landlord | Add (no id) or edit (`?id=`) a property; publish / archive | `property-form.js` | | `GET/POST/PUT /api/properties`, `POST …/{id}/publish`, `POST …/{id}/archive` |
-| `landlord/property-grid.html` | landlord | Grid plotter: resize, paint units and common areas, edit walls/doors/windows, add unit or common area | `property-grid.js` | ✔ editable | `GET /api/properties/{id}`, `PUT …/{id}/grid`, `PUT …/{id}/edges`, `POST …/{id}/units`, `POST …/{id}/common-areas` |
-| `landlord/units.html` | landlord | Unit list: add/edit, maintenance, archive, delete, "Archived" filter | `units.js` | | `GET/POST /api/properties/{id}/units`, `PUT/DELETE /api/units/{id}`, `POST /api/units/{id}/maintenance`, `POST /api/units/{id}/archive` |
-| `landlord/leases.html` | landlord | All leases with state badges (Expiring soon / Expired highlighted) | `leases.js` | | `GET /api/leases` |
-| `landlord/lease-form.html` | landlord | New lease, or renew (`?renew=<leaseId>`) | `lease-form.js` | | `POST /api/leases`, `POST /api/leases/{id}/renew` |
-| `lease.html` | both | Lease details, unit location on the grid, rent statement, payment history. **Landlord:** End / Terminate / Renew. **Renter:** "Pay" on payable months. | `lease.js` | ✔ read-only | `GET /api/leases/{id}`, `GET …/{id}/statement`, `GET …/{id}/payments`, `POST …/{id}/end`, `POST …/{id}/terminate` |
-| `renter/dashboard.html` | renter | My leases, days remaining, next amount due | `renter-dashboard.js` | | `GET /api/leases` |
-| `renter/pay.html` | renter | Simulated checkout: method (GCash / Maya / Card), account number, confirm | `pay.js` | | `POST /api/leases/{id}/payments` |
+| `register.html` | everyone | Create an account (choose role), then logged in right away | `register.js` | | `POST /api/auth/register`, `POST /api/auth/login` |
+| `landlord/dashboard.html` | landlord | Property cards (cover photo, occupancy, income from active leases), search, type / occupancy / published filters; card → modal with Units, Grid, Edit, Leases, Publish / Archive | `landlord-dashboard.js` | | `GET /api/properties`, `GET /api/leases`, `POST /api/properties/{id}/publish`, `POST …/{id}/archive` |
+| `landlord/property-form.html` | landlord | Add (no id) or edit (`?id=`) a property: street / city / region, type, description, default rate, area, amenities, photos and site plans (map pin is a placeholder); save draft / publish / archive | `property-form.js` | | `GET/POST/PUT /api/properties`, `POST …/{id}/publish`, `POST …/{id}/archive`, `GET/POST /api/properties/{id}/files`, `DELETE /api/files/{id}` |
+| `landlord/property-grid.html` | landlord | Grid plotter: resize, paint units and common areas, edit walls/doors/windows, add unit (rate starts at the default rate) or common area | `property-grid.js` | ✔ editable | `GET /api/properties/{id}`, `PUT …/{id}/grid`, `PUT …/{id}/edges`, `POST …/{id}/units`, `POST …/{id}/common-areas` |
+| `landlord/units.html` | landlord | `?propertyId=`: unit cards with tenant, rate editable on the card, status filters; Quick Edit (status, rate, unit photos); Create Lease / View Lease | `units.js` | | `GET /api/properties`, `GET /api/properties/{id}/units`, `GET …/{id}/leases`, `PUT /api/units/{id}`, `POST /api/units/{id}/maintenance`, `GET/POST /api/units/{id}/files`, `DELETE /api/files/{id}` |
+| `landlord/leases.html` | landlord | All leases (or `?propertyId=`) with contract state and payment status (Paid / Pending / Overdue), filters, details modal with the contract PDF; renew / terminate | `leases.js` | | `GET /api/leases`, `GET /api/properties/{id}/leases`, `GET /api/leases/{id}/statement`, `GET /api/leases/{id}/files`, `GET /api/lease-requests`, `POST /api/leases/{id}/terminate` |
+| `landlord/lease-form.html` | landlord | New lease (`?unitId=`, `?requestId=` prefill), or renew (`?renew=<leaseId>`): renter account + contact details, unit, dates, rent, payment terms, contract PDF | `lease-form.js` | | `GET /api/renters`, `GET /api/properties`, `GET …/{id}/units`, `POST /api/leases`, `POST /api/leases/{id}/renew`, `POST /api/leases/{id}/files` |
+| `lease.html` | both | Lease details, unit location on the grid, statement by billing period, payment history, contract. **Landlord:** End / Terminate / Renew, upload contract. **Renter:** "Pay" on the oldest unpaid period. | `lease.js` | ✔ read-only | `GET /api/leases/{id}`, `GET …/{id}/property`, `GET …/{id}/statement`, `GET …/{id}/payments`, `GET/POST …/{id}/files`, `POST …/{id}/end`, `POST …/{id}/terminate` |
+| `renter/dashboard.html` | renter | My leases (unit photo), days remaining, next amount due | `renter-dashboard.js` | | `GET /api/leases`, `GET /api/leases/{id}/statement` |
+| `renter/pay.html` | renter | Simulated checkout for one period (`?leaseId=&month=`): method (GCash / Maya / Card), account number, confirm | `pay.js` | | `GET /api/leases/{id}/statement`, `POST /api/leases/{id}/payments` |
 
 ### Shared CSS and JS
 

@@ -68,16 +68,28 @@ public class Payment extends BaseEntity {
     public LocalDateTime getPaidAt() { return paidAt; }
 
     public void markPaid(String referenceNo, LocalDateTime paidAt) {
-        // TODO: only from PENDING; set status = PAID, referenceNo, paidAt
+        requirePending();
+        if (referenceNo == null || referenceNo.isBlank() || paidAt == null) {
+            throw new ValidationException("A paid payment needs a reference number and a time.");
+        }
+        this.status = PaymentStatus.PAID;
+        this.referenceNo = referenceNo;
+        this.paidAt = paidAt;
     }
 
     public void markFailed() {
-        // TODO: only from PENDING; status = FAILED
+        requirePending();
+        this.status = PaymentStatus.FAILED;
     }
 
     @JsonIgnore
     public boolean isPaid() {
-        // TODO
-        throw new UnsupportedOperationException("TODO");
+        return status == PaymentStatus.PAID;
+    }
+
+    private void requirePending() {
+        if (status != PaymentStatus.PENDING) {
+            throw new IllegalStateException("This payment is already " + status.getLabel().toLowerCase() + ".");
+        }
     }
 }

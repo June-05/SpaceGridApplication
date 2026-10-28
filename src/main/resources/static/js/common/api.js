@@ -5,6 +5,7 @@
  *   @RequestParam  → api.form(method, url, data)   sent like an HTML form (most endpoints)
  *   @RequestBody   → api.json(method, url, data)   sent as JSON (only the grid page's two PUTs)
  *   reading        → api.get(url)
+ *   MultipartFile  → api.upload(url, formData)       a file (photos, site plans, contracts)
  * Each call returns the JSON the controller returned (or null for void methods),
  * or throws an Error whose message is the server's {"error": "..."} text.
  * 401 (nobody logged in) → redirects to /login.html?next=<this page>, and login.js comes back here after login.
@@ -20,6 +21,11 @@ const api = {
 
   json(method, url, data) {
     return this.send(method, url, JSON.stringify(data), 'application/json');
+  },
+
+  /** File upload (FileController): POST a FormData with a "file" field. The browser sets the content type. */
+  upload(url, formData) {
+    return this.send('POST', url, formData);
   },
 
   async send(method, url, body, contentType) {

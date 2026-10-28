@@ -65,6 +65,13 @@ function utilitiesText(hasPower, hasWater) {
   return 'Not included';
 }
 
+/** "Amenities: Parking, Security." from the property form's checkboxes, or '' when none are ticked. */
+function amenitiesText(amenities) {
+  const names = { parking: 'Parking', powerBackup: 'Power backup', security: 'Security', waterAccess: 'Water access', open24h: '24/7 access' };
+  const list = Object.keys(names).filter((key) => amenities && amenities[key]).map((key) => names[key]);
+  return list.length ? `Amenities: ${list.join(', ')}.` : '';
+}
+
 function toast(message) {
   const el = $('toast');
   el.textContent = message;
@@ -269,6 +276,7 @@ function cardHtml(item) {
   return `
 <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition flex flex-col">
   <div class="relative h-48 w-full bg-black overflow-hidden flex items-center justify-center">
+    ${item.coverPhotoUrl ? `<img src="${item.coverPhotoUrl}" alt="" class="absolute inset-0 w-full h-full object-cover">` : '<i class="fa-solid fa-image text-3xl text-white/30"></i>'}
     <span class="absolute top-3 left-3 bg-white text-slate-900 font-bold text-[11px] px-2.5 py-1 rounded-md shadow-sm">${esc(TYPE_LABELS[item.propertyType])}</span>
     <span class="absolute top-3 right-3 bg-${color}-500 text-white font-semibold text-[11px] px-2.5 py-1 rounded-md flex items-center gap-1 shadow-sm">
       <span class="w-1.5 h-1.5 rounded-full bg-white ${fewLeft ? '' : 'animate-pulse'}"></span>${fewLeft ? 'Few Left' : 'Open'}
@@ -335,7 +343,7 @@ async function openDetails(id) {
   $('modalTypeBadge').textContent = TYPE_LABELS[item.propertyType];
   $('modalTitle').textContent = item.name;
   $('modalLocation').innerHTML = `<i class="fa-solid fa-location-dot text-slate-400 mr-1"></i>${esc(item.address)}`;
-  $('modalDescription').textContent = item.description || '';
+  $('modalDescription').textContent = [item.description, amenitiesText(item.amenities)].filter(Boolean).join(' ');
   $('modalPrice').textContent = `${rentRange(item)} / month`;
   $('modalBlocks').textContent = `${item.availableBlocks} ${item.availableBlocks === 1 ? 'Unit' : 'Units'} Available`;
   $('modalUtilities').textContent = utilitiesText(item.powerIncluded, item.waterIncluded);

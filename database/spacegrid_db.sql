@@ -38,12 +38,20 @@ CREATE TABLE properties (
     id                INT           NOT NULL AUTO_INCREMENT,
     landlord_id       INT           NOT NULL,
     name              VARCHAR(100)  NOT NULL,
-    address           VARCHAR(255)  NOT NULL,
+    address           VARCHAR(255)  NOT NULL,                  -- street address
+    city              VARCHAR(100)  NOT NULL,
+    region            VARCHAR(100)  NOT NULL,                  -- region / province
     property_type     VARCHAR(20)   NOT NULL,
     description       TEXT          NULL,
     is_exact_size     BOOLEAN       NULL,                  -- NULL = no size given
     size_description  VARCHAR(100)  NULL,                  -- used when is_exact_size = FALSE
     area_sqm          DECIMAL(10,2) NULL,                  -- used when is_exact_size = TRUE
+    default_rate      DECIMAL(10,2) NULL,                  -- pre-fills a new unit's rate; each unit keeps its own
+    has_parking       BOOLEAN       NOT NULL DEFAULT FALSE,   -- amenities (Java: Amenities)
+    has_power_backup  BOOLEAN       NOT NULL DEFAULT FALSE,
+    has_security      BOOLEAN       NOT NULL DEFAULT FALSE,
+    has_water_access  BOOLEAN       NOT NULL DEFAULT FALSE,
+    is_open_24h       BOOLEAN       NOT NULL DEFAULT FALSE,
     status            VARCHAR(20)   NOT NULL DEFAULT 'DRAFT',
     grid_rows         TINYINT       NOT NULL DEFAULT 1,
     grid_columns      TINYINT       NOT NULL DEFAULT 1,
@@ -53,6 +61,7 @@ CREATE TABLE properties (
         ON DELETE RESTRICT ON UPDATE RESTRICT,
     CONSTRAINT ck_properties_type   CHECK (property_type IN ('APARTMENT', 'CONDOMINIUM', 'TOWNHOUSE', 'COMMERCIAL', 'NIGHT_MARKET', 'OPEN_SPACE')),
     CONSTRAINT ck_properties_status CHECK (status IN ('DRAFT', 'ACTIVE', 'ARCHIVED')),
+    CONSTRAINT ck_properties_rate   CHECK (default_rate IS NULL OR default_rate >= 0),
     CONSTRAINT ck_properties_rows   CHECK (grid_rows BETWEEN 1 AND 60),
     CONSTRAINT ck_properties_cols   CHECK (grid_columns BETWEEN 1 AND 60),
     CONSTRAINT ck_properties_size   CHECK (
@@ -131,8 +140,8 @@ CREATE TABLE zone_cells (
     CONSTRAINT pk_zone_cells PRIMARY KEY (property_id, row_idx, col_idx),
     CONSTRAINT fk_zone_cells_zone FOREIGN KEY (zone_id, property_id) REFERENCES grid_zones (id, property_id)
         ON DELETE CASCADE ON UPDATE RESTRICT,
-    CONSTRAINT ck_zone_cells_row CHECK (row_idx BETWEEN 0 AND 29),
-    CONSTRAINT ck_zone_cells_col CHECK (col_idx BETWEEN 0 AND 29)
+    CONSTRAINT ck_zone_cells_row CHECK (row_idx BETWEEN 0 AND 59),          -- grid is at most 60 x 60
+    CONSTRAINT ck_zone_cells_col CHECK (col_idx BETWEEN 0 AND 59)
 ) ENGINE = InnoDB;
 
 -- ---------------------------------------------------------------------
@@ -170,6 +179,10 @@ CREATE TABLE lease_contracts (
     start_date         DATE          NOT NULL,
     end_date           DATE          NOT NULL,
     monthly_rent       DECIMAL(10,2) NOT NULL,
+    payment_terms      VARCHAR(20)   NOT NULL DEFAULT 'MONTHLY_ADVANCE',   -- Java: PaymentTerms
+    tenant_name        VARCHAR(100)  NOT NULL,             -- contact details typed in the lease form
+    tenant_email       VARCHAR(100)  NULL,
+    tenant_phone       VARCHAR(30)   NULL,
     status             VARCHAR(20)   NOT NULL DEFAULT 'ACTIVE',
     closed_on          DATE          NULL,                 -- date it actually ended / was terminated / renewed
     created_at         DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -186,12 +199,16 @@ CREATE TABLE lease_contracts (
     CONSTRAINT ck_lease_contracts_dates  CHECK (end_date > start_date),
     CONSTRAINT ck_lease_contracts_rent   CHECK (monthly_rent >= 0),
     CONSTRAINT ck_lease_contracts_status CHECK (status IN ('ACTIVE', 'ENDED', 'TERMINATED', 'RENEWED')),
+    CONSTRAINT ck_lease_contracts_terms  CHECK (payment_terms IN
+        ('MONTHLY_ADVANCE', 'MONTHLY_ARREARS', 'QUARTERLY_ADVANCE', 'SEMI_ANNUAL_ADVANCE', 'ANNUAL_ADVANCE')),
     CONSTRAINT ck_lease_contracts_closed CHECK (
         (status = 'ACTIVE' AND closed_on IS NULL) OR (status <> 'ACTIVE' AND closed_on IS NOT NULL))
 ) ENGINE = InnoDB;
 
 -- ---------------------------------------------------------------------
 -- 9. payments  (Java: Payment; billing_month = YearMonth stored as the 1st of the month)
+--    billing_month is the FIRST month of the period paid (one month, or 3 / 6 / 12 with
+--    quarterly / semi-annual / annual payment terms); amount covers the whole period.
 --    paid_lease_id is calculated: the lease id only when status = 'PAID'.
 --    UNIQUE (paid_lease_id, billing_month) blocks paying the same month twice,
 --    while FAILED / PENDING attempts can repeat.
@@ -226,24 +243,60 @@ CREATE TABLE payments (
 CREATE INDEX ix_payments_lease_month ON payments (lease_id, billing_month);
 
 -- ---------------------------------------------------------------------
+-- 10. uploaded_files  (Java: StoredFile) - photos, site plans and contract PDFs.
+--     The file itself is saved in the uploads/ folder (spacegrid.upload-dir) under stored_name;
+--     this row says what it belongs to. Exactly one owner column is set, matching file_kind:
+--       PROPERTY_PHOTO, SITE_PLAN -> property_id   UNIT_PHOTO -> unit_id   CONTRACT -> lease_id
+-- ---------------------------------------------------------------------
+CREATE TABLE uploaded_files (
+    id            INT          NOT NULL AUTO_INCREMENT,
+    file_kind     VARCHAR(20)  NOT NULL,
+    property_id   INT          NULL,
+    unit_id       INT          NULL,
+    lease_id      INT          NULL,
+    file_name     VARCHAR(255) NOT NULL,                   -- the name on the uploader's computer (shown on screen)
+    stored_name   VARCHAR(100) NOT NULL,                   -- random name in the uploads folder
+    content_type  VARCHAR(50)  NOT NULL,                   -- image/jpeg, image/png, image/webp or application/pdf
+    created_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT pk_uploaded_files PRIMARY KEY (id),
+    CONSTRAINT uq_uploaded_files_stored UNIQUE (stored_name),
+    CONSTRAINT fk_uploaded_files_property FOREIGN KEY (property_id) REFERENCES properties (id)
+        ON DELETE CASCADE ON UPDATE RESTRICT,
+    CONSTRAINT fk_uploaded_files_unit FOREIGN KEY (unit_id) REFERENCES rentable_units (zone_id)
+        ON DELETE CASCADE ON UPDATE RESTRICT,
+    CONSTRAINT fk_uploaded_files_lease FOREIGN KEY (lease_id) REFERENCES lease_contracts (id)
+        ON DELETE CASCADE ON UPDATE RESTRICT,
+    CONSTRAINT ck_uploaded_files_kind CHECK (file_kind IN ('PROPERTY_PHOTO', 'SITE_PLAN', 'UNIT_PHOTO', 'CONTRACT')),
+    CONSTRAINT ck_uploaded_files_owner CHECK (
+        (file_kind IN ('PROPERTY_PHOTO', 'SITE_PLAN') AND property_id IS NOT NULL AND unit_id IS NULL AND lease_id IS NULL)
+        OR (file_kind = 'UNIT_PHOTO' AND unit_id IS NOT NULL AND property_id IS NULL AND lease_id IS NULL)
+        OR (file_kind = 'CONTRACT' AND lease_id IS NOT NULL AND property_id IS NULL AND unit_id IS NULL))
+) ENGINE = InnoDB;
+
+-- ---------------------------------------------------------------------
 -- View used by JdbcLeaseContractDao: lease + the display names
--- (LeaseContract.unitName / propertyName / renterName) and the landlord id.
+-- (LeaseContract.unitName / propertyName / renterName), the landlord id and the unit's first photo.
 -- ---------------------------------------------------------------------
 CREATE VIEW lease_details AS
 SELECT  l.id, l.rentable_unit_id, l.renter_id, l.previous_lease_id,
-        l.start_date, l.end_date, l.monthly_rent, l.status, l.closed_on, l.created_at,
+        l.start_date, l.end_date, l.monthly_rent, l.payment_terms,
+        l.tenant_name, l.tenant_email, l.tenant_phone,
+        l.status, l.closed_on, l.created_at,
         z.name        AS unit_name,
         p.id          AS property_id,
         p.name        AS property_name,
         p.landlord_id AS landlord_id,
-        u.full_name   AS renter_name
+        u.full_name   AS renter_name,
+        u.username    AS renter_username,
+        (SELECT MIN(f.id) FROM uploaded_files f
+         WHERE f.unit_id = l.rentable_unit_id AND f.file_kind = 'UNIT_PHOTO') AS unit_photo_id
 FROM    lease_contracts l
 JOIN    grid_zones  z ON z.id = l.rentable_unit_id
 JOIN    properties  p ON p.id = z.property_id
 JOIN    users       u ON u.id = l.renter_id;
 
 -- ---------------------------------------------------------------------
--- 10. lease_requests  (Java: LeaseRequest) - a renter asks to lease an AVAILABLE unit
+-- 11. lease_requests  (Java: LeaseRequest) - a renter asks to lease an AVAILABLE unit
 --     found on the homepage; the landlord approves or declines it, then creates the lease.
 --     pending_key is calculated: it holds "unit-renter" only while the request is PENDING,
 --     so its UNIQUE rule blocks the same renter from having two open requests on one unit.
@@ -302,13 +355,15 @@ INSERT INTO users (id, username, password_hash, full_name, role) VALUES
     (4, 'paolo.garcia', '$2a$10$QkRkiHaHZpflgYT0WkOVhuISlYhhGCeC2t9ScDzWRnrv2xRsoXUNK', 'Paolo Garcia', 'RENTER'),
     (5, 'liza.mendoza', '$2a$10$ea1UwbTp0KqG6U0SD6VY4.TsfDn1hLQ42/jNonDQi9r3Qsffr86P.', 'Liza Mendoza', 'RENTER');
 
-INSERT INTO properties (id, landlord_id, name, address, property_type, description,
-                        is_exact_size, size_description, area_sqm, status, grid_rows, grid_columns) VALUES
-    (1, 1, 'SpaceGrid Suites Bajada', 'J.P. Laurel Ave, Bajada, Davao City', 'APARTMENT', 'Two-floor apartment near Victoria Plaza with a shared garden.', 1, NULL, 180.00, 'ACTIVE', 4, 6),
-    (2, 1, 'Matina Enclave Residences', 'MacArthur Highway, Matina, Davao City', 'CONDOMINIUM', 'Condo floor still being set up.', 0, 'Half-floor', NULL, 'DRAFT', 3, 3),
-    (3, 2, 'Agdao Market Stalls', 'Lapu-Lapu St, Agdao, Davao City', 'COMMERCIAL', 'Ground-floor stalls with customer parking.', 1, NULL, 96.00, 'ACTIVE', 2, 4),
-    (4, 2, 'Roxas Night Market - Section C', 'Roxas Ave, Poblacion District, Davao City', 'NIGHT_MARKET', 'Evening market booths along a covered walkway.', 1, NULL, 150.00, 'ACTIVE', 3, 4),
-    (5, 1, 'Magsaysay Open Plaza', 'Magsaysay Park, Davao City', 'OPEN_SPACE', 'Open plaza plots for pop-up stalls and events.', 0, 'Open plaza', NULL, 'ACTIVE', 2, 3);
+INSERT INTO properties (id, landlord_id, name, address, city, region, property_type, description,
+                        is_exact_size, size_description, area_sqm, default_rate,
+                        has_parking, has_power_backup, has_security, has_water_access, is_open_24h,
+                        status, grid_rows, grid_columns) VALUES
+    (1, 1, 'SpaceGrid Suites Bajada', 'J.P. Laurel Ave, Bajada', 'Davao City', 'Davao del Sur', 'APARTMENT', 'Two-floor apartment near Victoria Plaza with a shared garden.', 1, NULL, 180.00, 12000.00, 0, 1, 1, 1, 1, 'ACTIVE', 4, 6),
+    (2, 1, 'Matina Enclave Residences', 'MacArthur Highway, Matina', 'Davao City', 'Davao del Sur', 'CONDOMINIUM', 'Condo floor still being set up.', 0, 'Half-floor', NULL, NULL, 1, 0, 1, 1, 0, 'DRAFT', 3, 3),
+    (3, 2, 'Agdao Market Stalls', 'Lapu-Lapu St, Agdao', 'Davao City', 'Davao del Sur', 'COMMERCIAL', 'Ground-floor stalls with customer parking.', 1, NULL, 96.00, 6000.00, 1, 0, 1, 1, 0, 'ACTIVE', 2, 4),
+    (4, 2, 'Roxas Night Market - Section C', 'Roxas Ave, Poblacion District', 'Davao City', 'Davao del Sur', 'NIGHT_MARKET', 'Evening market booths along a covered walkway.', 1, NULL, 150.00, 4500.00, 0, 1, 1, 1, 0, 'ACTIVE', 3, 4),
+    (5, 1, 'Magsaysay Open Plaza', 'Magsaysay Park', 'Davao City', 'Davao del Sur', 'OPEN_SPACE', 'Open plaza plots for pop-up stalls and events.', 0, 'Open plaza', NULL, 2500.00, 0, 0, 0, 1, 1, 'ACTIVE', 2, 3);
 
 -- Property 1 grid (4 x 6):
 --   row 0: [101][101][102][102][103][103]
@@ -437,12 +492,12 @@ INSERT INTO edge_overrides (property_id, row_idx, col_idx, orientation, edge_typ
 -- Lease 3 is a renewal of lease 2 (rent went up); lease 3 ends 2026-11-15 -> EXPIRING_SOON.
 -- Lease 4 is the old lease of the archived Storage Room (kept as history).
 INSERT INTO lease_contracts (id, rentable_unit_id, renter_id, previous_lease_id, start_date, end_date,
-                             monthly_rent, status, closed_on) VALUES
-    (1, 1, 3, NULL, '2026-06-01', '2027-05-31', 12000.00, 'ACTIVE', NULL),
-    (2, 2, 4, NULL, '2025-05-01', '2026-04-30', 12000.00, 'RENEWED', '2026-04-30'),
-    (3, 2, 4, 2, '2026-05-01', '2026-11-15', 12500.00, 'ACTIVE', NULL),
-    (4, 8, 5, NULL, '2025-01-01', '2025-12-31', 7000.00, 'ENDED', '2025-12-31'),
-    (5, 11, 5, NULL, '2026-08-01', '2027-07-31', 6000.00, 'ACTIVE', NULL);
+                             monthly_rent, payment_terms, tenant_name, tenant_email, tenant_phone, status, closed_on) VALUES
+    (1, 1, 3, NULL, '2026-06-01', '2027-05-31', 12000.00, 'MONTHLY_ADVANCE', 'Ana Cruz', 'ana.cruz@example.com', '+63 917 555 0101', 'ACTIVE', NULL),
+    (2, 2, 4, NULL, '2025-05-01', '2026-04-30', 12000.00, 'MONTHLY_ADVANCE', 'Paolo Garcia', 'paolo.garcia@example.com', '+63 917 555 0102', 'RENEWED', '2026-04-30'),
+    (3, 2, 4, 2, '2026-05-01', '2026-11-15', 12500.00, 'MONTHLY_ADVANCE', 'Paolo Garcia', 'paolo.garcia@example.com', '+63 917 555 0102', 'ACTIVE', NULL),
+    (4, 8, 5, NULL, '2025-01-01', '2025-12-31', 7000.00, 'MONTHLY_ADVANCE', 'Liza Mendoza', 'liza.mendoza@example.com', NULL, 'ENDED', '2025-12-31'),
+    (5, 11, 5, NULL, '2026-08-01', '2027-07-31', 6000.00, 'MONTHLY_ADVANCE', 'Liza Mendoza', 'liza.mendoza@example.com', '+63 917 555 0103', 'ACTIVE', NULL);
 
 -- Lease 1: one FAILED card attempt in September, November paid ahead.
 -- Lease 3: October not paid yet -> OVERDUE on the statement.

@@ -39,10 +39,11 @@ public class RentableUnitController {
         this.sessionManager = sessionManager;
     }
 
+    /** The property's units (archived ones are left out). */
     @GetMapping("/properties/{propertyId}/units")
     public List<RentableUnit> list(@PathVariable int propertyId, HttpSession session) {
-        // TODO: get the user from sessionManager, call the service, return the result
-        throw new UnsupportedOperationException("TODO");
+        User landlord = sessionManager.requireRole(session, Role.LANDLORD);
+        return unitService.getUnits(propertyId, landlord);
     }
 
     /** Form fields. electricity / water default to false. */

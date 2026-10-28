@@ -8,6 +8,8 @@ import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.Map;
@@ -26,12 +28,18 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(ex.getHttpStatus()).body(Map.of("error", ex.getMessage()));
     }
 
-    /** Missing or badly formatted request data (e.g. rows=abc, a missing form field, broken JSON). */
+    /** Missing or badly formatted request data (e.g. rows=abc, a missing form field or file, broken JSON). */
     @ExceptionHandler({MissingServletRequestParameterException.class, MethodArgumentTypeMismatchException.class,
-            HttpMessageNotReadableException.class})
+            HttpMessageNotReadableException.class, MissingServletRequestPartException.class})
     public ResponseEntity<Map<String, String>> handleBadRequest(Exception ex) {
         log.debug("Bad request: {}", ex.getMessage());
         return ResponseEntity.status(400).body(Map.of("error", "Some of the submitted data is missing or invalid."));
+    }
+
+    /** An upload bigger than spring.servlet.multipart.max-file-size (application.properties). */
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<Map<String, String>> handleTooLarge(MaxUploadSizeExceededException ex) {
+        return ResponseEntity.status(413).body(Map.of("error", "That file is too big. The limit is 10 MB."));
     }
 
     /** A page or file that doesn't exist (e.g. /favicon.ico): a normal 404, not an error. */

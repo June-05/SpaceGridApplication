@@ -228,6 +228,56 @@ The teammate's landlord mock-ups and the homepage said "Block". The project says
 
 ---
 
+## 2026-10-29 · Landlord pages connected to the project (design change)
+
+### Why
+The teammate's landlord pages (dashboard, units, leases, lease form, property form) only had sample data, and most of the backend behind them was still TODO. They are now real, and the owner approved these new details from the pages: street / city / region, a map pin (placeholder), a default rate per unit, amenities, property photos + site plans + unit photos, tenant contact details (free text, with the renter account still required), payment terms, a contract file and payment status. Dropped from the pages: security deposit and the "Total Units" input (the plotter decides how many units there are).
+
+### Database (`database/spacegrid_db.sql`: re-run it by hand)
+- `properties`: + `city`, `region` (NOT NULL; `address` is now the street), `default_rate` (NULL = none), `has_parking`, `has_power_backup`, `has_security`, `has_water_access`, `is_open_24h`.
+- `lease_contracts`: + `payment_terms` (default `MONTHLY_ADVANCE`), `tenant_name` (NOT NULL), `tenant_email`, `tenant_phone`. `renter_id` stays required.
+- New table `uploaded_files` (id, file_kind, property_id / unit_id / lease_id, file_name, stored_name, content_type, created_at). One table for every upload instead of a column per thing; a CHECK makes sure the owner column matches the kind. It cascades with its property, unit or lease.
+- `lease_details` view: + payment_terms, tenant contact, `renter_username`, `unit_photo_id`.
+- **Bug fix:** `zone_cells` only allowed rows/cols 0–29, so spots past row 30 on a 60 × 60 grid could not be saved. Now 0–59.
+- Sample data: cities/regions, default rates, amenities, tenant contacts.
+
+### New classes
+- `model`: `Amenities` (record), `PaymentTerms` (enum: monthsPerPeriod, inAdvance), `FileKind` (enum), `StoredFile` (entity).
+- `dao`: `StoredFileDao` + `JdbcStoredFileDao`. `UserDao.findRenters(search)`.
+- `service`: `FileService` (saves files in the `uploads/` folder, `spacegrid.upload-dir`; checks types: JPG/PNG/WebP, PDF for site plans and contracts; 10 MB; 10 files per owner).
+- `controller`: `FileController`.
+
+### Changed classes
+- `Property`: city, region, defaultRate, amenities, read-only coverPhotoId; `getFullAddress()`, `getCoverPhotoUrl()`. `updateDetails` refuses ARCHIVED properties; `publish` refuses ARCHIVED.
+- `LeaseContract`: paymentTerms, tenantName/Email/Phone, read-only propertyId / renterUsername / unitPhotoId (`getImageUrl()`); billing periods: `billingPeriodStarts()`, `monthsInPeriod()`, `amountForPeriod()`; `dueDateFor()` follows the payment terms.
+- `RentDue`: + `months`. `PropertyListing`: + `amenities`, `coverPhotoUrl`; its `address` is street, city and region together.
+- `PropertyService`: needs `LeaseContractDao` + `LeaseRequestDao` (archive checks active leases and declines open requests); `publish`/`archive` return the property; + `getProperty(id)`.
+- `LeaseService`: create/renew take payment terms and contact details; `endLease` only from the end date on (before that: terminate); + `getPropertyOfLease`, `findRenters`.
+- `RentableUnitService`: needs `FileService` (deleting a unit removes its photos from disk). `getUnits` leaves archived units out.
+- `SessionManager`: + `currentUserOrNull` (public photos).
+
+### Endpoints
+- Changed: `POST/PUT /api/properties` (+ city, region, defaultRate, parking, powerBackup, security, waterAccess, open24h), `POST /api/properties/{id}/publish` and `/archive` (return the property), `POST /api/leases` (+ paymentTerms, tenantName, tenantEmail, tenantPhone), `POST /api/leases/{id}/renew` (+ optional paymentTerms).
+- New: `GET /api/renters?search=`, `GET /api/leases/{id}/property`, `GET/POST /api/properties/{id}/files`, `GET/POST /api/units/{id}/files`, `GET/POST /api/leases/{id}/files`, `GET/DELETE /api/files/{id}`.
+- TODO bodies now written: properties list/create/update/publish/archive, units list, common areas list, every lease and payment endpoint, register.
+
+### Pages
+- The 5 landlord pages load `format.js` + their `js/pages/*.js` (the inline sample scripts are gone). Real ids in every link: `units.html?propertyId=`, `property-grid.html?id=`, `property-form.html?id=`, `leases.html?propertyId=`, `lease-form.html?unitId= / ?requestId= / ?renew=`.
+- `lease.html`, `renter/pay.html`, `register.html` scripts written. The plotter pre-fills a new unit's rate with the default rate. The homepage shows cover photos and amenities.
+- `api.upload(url, formData)` and `format.escape(text)` added.
+
+### How it was checked
+- Maven build; a live API run on a scratch database (75 checks: roles, owner checks, validation, the quarterly statement, paying in order, declines, renew/end/terminate, file access rules, a spot at (59, 59)).
+- Every page in jsdom against the live server (51 checks: dashboard numbers and modal, inline rate edit, maintenance, property form save/publish, leases payment status, lease form with renter search, renewal, renter lease page, paying, register).
+- The plotter suites (101 + 41 + 28) and the role checks still pass.
+
+### Not done yet / follow-ups
+- Class diagram and ERD (`.drawio`) still show the old fields: add the columns/classes above when the diagrams are next opened in draw.io.
+- Map pin (placeholder only), lease timing markers on the plotter, unit tests.
+- The PR #7 renter-dashboard escaping / try-catch items in CLAUDE.md.
+
+---
+
 ## PROPOSED (not built) · Commercial ready, permits, bigger grid with zoom
 
 Status: **decided, not implemented.** Nothing below exists in the code yet. When a part is built, move it into a dated section above and update the docs listed at the end.

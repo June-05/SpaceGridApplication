@@ -45,6 +45,12 @@ public class SessionManager {
         });
     }
 
+    /** The logged-in user, or null if nobody is logged in (for public pages such as the homepage photos). */
+    public User currentUserOrNull(HttpSession session) {
+        Object value = session.getAttribute(SESSION_KEY);
+        return (value instanceof Integer userId) ? userDao.findById(userId).orElse(null) : null;
+    }
+
     /** The logged-in user if they have this role, otherwise AccessDeniedException (403). */
     public User requireRole(HttpSession session, Role role) {
         User user = currentUser(session);

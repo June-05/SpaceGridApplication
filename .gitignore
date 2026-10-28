@@ -1,1 +1,4 @@
 target/
+
+# Uploaded photos, site plans and contracts (FileService)
+uploads/

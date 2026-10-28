@@ -6,7 +6,8 @@ import java.util.List;
 
 /**
  * Value object: an ACTIVE property as shown on the public homepage. Only AVAILABLE units are included,
- * and availableBlocks is how many there are (one unit = one block). Nothing private is in here.
+ * and availableBlocks is how many there are (the JSON name is kept; the pages say "units"). Nothing private is in here.
+ * address = street, city and region together.
  */
 public record PropertyListing(
         int id,
@@ -16,9 +17,11 @@ public record PropertyListing(
         String description,
         String landlordName,
         LocalDateTime createdAt,
+        Amenities amenities,
+        String coverPhotoUrl,           // first property photo ("/api/files/7"), or null
         List<UnitListing> units) {
 
-    /** Number of AVAILABLE units: the homepage calls them blocks. */
+    /** Number of AVAILABLE units. */
     public int getAvailableBlocks() {
         return units.size();
     }

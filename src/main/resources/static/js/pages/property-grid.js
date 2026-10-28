@@ -1611,6 +1611,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         f.maintenance.disabled = zone.status === 'OCCUPIED';
         $('maintenanceNote').textContent = zone.status === 'OCCUPIED'
           ? 'Occupied units can\'t go under maintenance.' : '';
+      } else if (state.defaultRate != null) {
+        f.rentalRate.value = money(state.defaultRate);   // new unit: start at the property's default rate
       }
       updateUnitPreview();
     } else if (zone) {
@@ -1960,6 +1962,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   function load(property, keepHistory) {
     const first = !state.layout;
     state.layout = gridRenderer.fromProperty(property);
+    state.defaultRate = property.defaultRate;          // pre-fills the rate of a new unit (property form)
     history.saved = gridRenderer.snapshot(state.layout);
     if (!keepHistory) {
       history.undo = [];

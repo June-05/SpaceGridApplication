@@ -66,10 +66,16 @@ public class User extends BaseEntity {
     }
 
     public void changePassword(String newHash) {
-        // TODO: validate and replace passwordHash
+        if (newHash == null || newHash.isBlank()) {
+            throw new ValidationException("Password is required.");
+        }
+        this.passwordHash = newHash;
     }
 
     public void updateFullName(String fullName) {
-        // TODO: validate (not blank) and replace
+        if (fullName == null || fullName.isBlank()) {
+            throw new ValidationException("Full name is required.");
+        }
+        this.fullName = fullName.trim();
     }
 }

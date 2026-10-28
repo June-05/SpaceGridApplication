@@ -3,6 +3,8 @@ package com.techhub.spacegridapplication.controller;
 import com.techhub.spacegridapplication.model.Payment;
 import com.techhub.spacegridapplication.model.PaymentMethod;
 import com.techhub.spacegridapplication.model.RentDue;
+import com.techhub.spacegridapplication.model.Role;
+import com.techhub.spacegridapplication.model.User;
 import com.techhub.spacegridapplication.security.SessionManager;
 import com.techhub.spacegridapplication.service.PaymentService;
 import jakarta.servlet.http.HttpSession;
@@ -13,6 +15,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.List;
 
@@ -34,17 +37,17 @@ public class PaymentController {
 
     @GetMapping("/statement")
     public List<RentDue> statement(@PathVariable int leaseId, HttpSession session) {
-        // TODO: get the user from sessionManager, call the service, return the result
-        throw new UnsupportedOperationException("TODO");
+        User user = sessionManager.currentUser(session);
+        return paymentService.getStatement(leaseId, user, LocalDate.now());
     }
 
     @GetMapping("/payments")
     public List<Payment> history(@PathVariable int leaseId, HttpSession session) {
-        // TODO: get the user from sessionManager, call the service, return the result
-        throw new UnsupportedOperationException("TODO");
+        User user = sessionManager.currentUser(session);
+        return paymentService.getPaymentHistory(leaseId, user);
     }
 
-    /** Form fields: billingMonth (yyyy-MM, e.g. 2026-11), method (GCASH | MAYA | CARD), accountNumber. */
+    /** Renter only. Form fields: billingMonth (yyyy-MM: the first month of the period, e.g. 2026-11), method (GCASH | MAYA | CARD), accountNumber. */
     @PostMapping("/payments")
     public Payment pay(
             @PathVariable int leaseId,
@@ -52,7 +55,7 @@ public class PaymentController {
             @RequestParam PaymentMethod method,
             @RequestParam String accountNumber,
             HttpSession session) {
-        // TODO: get the user from sessionManager, call the service, return the result
-        throw new UnsupportedOperationException("TODO");
+        User renter = sessionManager.requireRole(session, Role.RENTER);
+        return paymentService.payRent(renter, leaseId, billingMonth, method, accountNumber);
     }
 }

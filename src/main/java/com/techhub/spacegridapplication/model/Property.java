@@ -1,8 +1,10 @@
 package com.techhub.spacegridapplication.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.techhub.spacegridapplication.exception.ConflictException;
 import com.techhub.spacegridapplication.exception.ValidationException;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -22,67 +24,80 @@ public class Property extends BaseEntity {
 
     private int landlordId;
     private String name;
-    private String address;
+    private String address;                             // street address
+    private String city;
+    private String region;                              // region / province
     private PropertyType propertyType;
     private String description;
     private Dimensions dimensions;                      // null = no size given
+    private BigDecimal defaultRate;                     // null = none; pre-fills a new unit's rate
+    private Amenities amenities;
     private PropertyStatus status;
     private int gridRows;
     private int gridColumns;
     private List<GridZone> zones;
     private Map<GridEdge, EdgeType> edgeOverrides;      // only manual edits; automatic walls are calculated
+    private Integer coverPhotoId;                       // read-only: first PROPERTY_PHOTO, filled by JdbcPropertyDao
 
     /** New property: starts as DRAFT with a 1 x 1 grid. */
-    public Property(int landlordId, String name, String address, PropertyType propertyType,
-                    String description, Dimensions dimensions) {
-        if (name == null || name.isBlank()) {
-            throw new ValidationException("Property name is required.");
-        }
-        if (address == null || address.isBlank()) {
-            throw new ValidationException("Address is required.");
-        }
-        if (propertyType == null) {
-            throw new ValidationException("Property type is required.");
-        }
+    public Property(int landlordId, String name, String address, String city, String region,
+                    PropertyType propertyType, String description, Dimensions dimensions,
+                    BigDecimal defaultRate, Amenities amenities) {
         this.landlordId = landlordId;
-        this.name = name.trim();
-        this.address = address.trim();
-        this.propertyType = propertyType;
-        this.description = description;
-        this.dimensions = dimensions;
         this.status = PropertyStatus.DRAFT;
         this.gridRows = 1;
         this.gridColumns = 1;
         this.zones = new ArrayList<>();
         this.edgeOverrides = new HashMap<>();
+        setDetails(name, address, city, region, propertyType, description, dimensions, defaultRate, amenities);
     }
 
     /** From database (zones and edge overrides are loaded by JdbcPropertyDao). */
-    public Property(int id, LocalDateTime createdAt, int landlordId, String name, String address,
-                    PropertyType propertyType, String description, Dimensions dimensions, PropertyStatus status,
-                    int gridRows, int gridColumns, List<GridZone> zones, Map<GridEdge, EdgeType> edgeOverrides) {
+    public Property(int id, LocalDateTime createdAt, int landlordId, String name, String address, String city,
+                    String region, PropertyType propertyType, String description, Dimensions dimensions,
+                    BigDecimal defaultRate, Amenities amenities, PropertyStatus status, int gridRows, int gridColumns,
+                    List<GridZone> zones, Map<GridEdge, EdgeType> edgeOverrides, Integer coverPhotoId) {
         super(id, createdAt);
         this.landlordId = landlordId;
         this.name = name;
         this.address = address;
+        this.city = city;
+        this.region = region;
         this.propertyType = propertyType;
         this.description = description;
         this.dimensions = dimensions;
+        this.defaultRate = defaultRate;
+        this.amenities = (amenities != null) ? amenities : Amenities.NONE;
         this.status = status;
         this.gridRows = gridRows;
         this.gridColumns = gridColumns;
         this.zones = (zones != null) ? new ArrayList<>(zones) : new ArrayList<>();
         this.edgeOverrides = (edgeOverrides != null) ? new HashMap<>(edgeOverrides) : new HashMap<>();
+        this.coverPhotoId = coverPhotoId;
     }
 
     // ---------------------------------------------------------------- getters
     public int getLandlordId() { return landlordId; }
     public String getName() { return name; }
     public String getAddress() { return address; }
+    public String getCity() { return city; }
+    public String getRegion() { return region; }
     public PropertyType getPropertyType() { return propertyType; }
     public String getDescription() { return description; }
     public Dimensions getDimensions() { return dimensions; }
+    public BigDecimal getDefaultRate() { return defaultRate; }
+    public Amenities getAmenities() { return amenities; }
     public PropertyStatus getStatus() { return status; }
+
+    /** "J.P. Laurel Ave, Bajada, Davao City, Davao del Sur": street, city and region together. */
+    public String getFullAddress() {
+        return String.join(", ", address, city, region);
+    }
+
+    /** First property photo, for cards and the homepage ("/api/files/7"), or null when there is none. */
+    public String getCoverPhotoUrl() {
+        return StoredFile.urlOf(coverPhotoId);
+    }
     public int getGridRows() { return gridRows; }
     public int getGridColumns() { return gridColumns; }
 
@@ -101,17 +116,58 @@ public class Property extends BaseEntity {
     }
 
     // ---------------------------------------------------------------- details
-    public void updateDetails(String name, String address, PropertyType propertyType,
-                              String description, Dimensions dimensions) {
-        // TODO: validate like the constructor, then replace the fields
+    /** The property form's fields. Not allowed once the property is ARCHIVED. */
+    public void updateDetails(String name, String address, String city, String region, PropertyType propertyType,
+                              String description, Dimensions dimensions, BigDecimal defaultRate, Amenities amenities) {
+        if (status == PropertyStatus.ARCHIVED) {
+            throw new ConflictException(this.name + " is archived and can't be edited.");
+        }
+        setDetails(name, address, city, region, propertyType, description, dimensions, defaultRate, amenities);
     }
 
+    /** DRAFT -> ACTIVE: it shows on the homepage. Not allowed if ARCHIVED. */
     public void publish() {
-        // TODO: status -> ACTIVE (not allowed if ARCHIVED)
+        if (status == PropertyStatus.ARCHIVED) {
+            throw new ConflictException(name + " is archived and can't be published.");
+        }
+        this.status = PropertyStatus.ACTIVE;
     }
 
+    /** -> ARCHIVED: off the homepage and read-only. The service checks there are no ACTIVE leases first. */
     public void archive() {
-        // TODO: status -> ARCHIVED
+        this.status = PropertyStatus.ARCHIVED;
+    }
+
+    /** Checks and sets the form fields (used by the "new" constructor and updateDetails). */
+    private void setDetails(String name, String address, String city, String region, PropertyType propertyType,
+                            String description, Dimensions dimensions, BigDecimal defaultRate, Amenities amenities) {
+        if (name == null || name.isBlank()) {
+            throw new ValidationException("Property name is required.");
+        }
+        if (address == null || address.isBlank()) {
+            throw new ValidationException("Street address is required.");
+        }
+        if (city == null || city.isBlank()) {
+            throw new ValidationException("City is required.");
+        }
+        if (region == null || region.isBlank()) {
+            throw new ValidationException("Region / province is required.");
+        }
+        if (propertyType == null) {
+            throw new ValidationException("Property type is required.");
+        }
+        if (defaultRate != null && defaultRate.signum() < 0) {
+            throw new ValidationException("Default rate can't be negative.");
+        }
+        this.name = name.trim();
+        this.address = address.trim();
+        this.city = city.trim();
+        this.region = region.trim();
+        this.propertyType = propertyType;
+        this.description = (description == null || description.isBlank()) ? null : description.trim();
+        this.dimensions = dimensions;
+        this.defaultRate = defaultRate;
+        this.amenities = (amenities != null) ? amenities : Amenities.NONE;
     }
 
     public boolean isOwnedBy(int userId) {
@@ -135,10 +191,16 @@ public class Property extends BaseEntity {
         }
     }
 
+    /** All units, archived ones included (they keep their lease history). */
     @JsonIgnore
     public List<RentableUnit> getRentableUnits() {
-        // TODO: zones that are RentableUnit (hide ARCHIVED ones if you prefer)
-        throw new UnsupportedOperationException("TODO");
+        List<RentableUnit> units = new ArrayList<>();
+        for (GridZone zone : zones) {
+            if (zone instanceof RentableUnit unit) {
+                units.add(unit);
+            }
+        }
+        return units;
     }
 
     @JsonIgnore
@@ -153,8 +215,13 @@ public class Property extends BaseEntity {
     }
 
     public int countUnitsByStatus(UnitStatus status) {
-        // TODO
-        throw new UnsupportedOperationException("TODO");
+        int count = 0;
+        for (RentableUnit unit : getRentableUnits()) {
+            if (unit.getStatus() == status) {
+                count++;
+            }
+        }
+        return count;
     }
 
     /** Archives a unit: it must have no ACTIVE lease (checked by the service); its spots are cleared. */

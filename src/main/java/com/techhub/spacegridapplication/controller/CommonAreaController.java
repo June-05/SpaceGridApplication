@@ -38,8 +38,8 @@ public class CommonAreaController {
 
     @GetMapping("/properties/{propertyId}/common-areas")
     public List<CommonArea> list(@PathVariable int propertyId, HttpSession session) {
-        // TODO: get the user from sessionManager, call the service, return the result
-        throw new UnsupportedOperationException("TODO");
+        User landlord = sessionManager.requireRole(session, Role.LANDLORD);
+        return commonAreaService.getCommonAreas(propertyId, landlord);
     }
 
     /** Form fields: name, areaType (e.g. WALKWAY), color (optional, "#rrggbb"; leave out for the type's default). */

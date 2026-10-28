@@ -76,12 +76,16 @@ public class RentableUnit extends GridZone {
 
     @JsonIgnore
     public boolean isAvailable() {
-        // TODO
-        throw new UnsupportedOperationException("TODO");
+        return status == UnitStatus.AVAILABLE;
     }
 
+    /** A lease starts: AVAILABLE -> OCCUPIED. */
     public void markOccupied() {
-        // TODO: only from AVAILABLE
+        if (!isAvailable()) {
+            throw new ConflictException(getName() + " is " + status.getLabel().toLowerCase()
+                    + ", so it can't be leased right now.");
+        }
+        this.status = UnitStatus.OCCUPIED;
     }
 
     public void markAvailable() {

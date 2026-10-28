@@ -36,8 +36,7 @@ public class AuthController {
             @RequestParam String password,
             @RequestParam String fullName,
             @RequestParam Role role) {
-        // TODO: get the user from sessionManager, call the service, return the result
-        throw new UnsupportedOperationException("TODO");
+        return authService.register(username, password, fullName, role);   // not logged in yet: register.js logs in next
     }
 
     /** Form fields: username, password. On success, store the user in the session. */

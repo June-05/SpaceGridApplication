@@ -29,6 +29,12 @@ const format = {
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   },
 
+  /** Text typed by users (names, addresses) made safe to put inside innerHTML: "<b>" → "&lt;b&gt;" */
+  escape(text) {
+    return String(text ?? '').replace(/[&<>"']/g, (c) =>
+      ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+  },
+
   badge(prefix, enumName) {
     // <span class="badge state-expiring-soon">Expiring soon</span>
     return `<span class="badge ${this.cssClass(prefix, enumName)}">${this.label(enumName)}</span>`;

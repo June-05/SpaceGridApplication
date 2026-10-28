@@ -94,19 +94,26 @@ Owns its zones and the grid rules that involve more than one zone (no overlaps, 
 + MAX_GRID_SIZE: int = 60   «static»
 - landlordId: int
 - name: String
-- address: String
+- address: String                 // street address
+- city: String
+- region: String                  // region / province
 - propertyType: PropertyType
 - description: String
 - dimensions: Dimensions
+- defaultRate: BigDecimal         // optional; pre-fills a new unit's rate
+- amenities: Amenities
 - status: PropertyStatus
 - gridRows: int
 - gridColumns: int
 - zones: List<GridZone>
 - edgeOverrides: Map<GridEdge, EdgeType>
+- coverPhotoId: Integer {readOnly} // first PROPERTY_PHOTO, filled by the DAO
 
-+ Property(landlordId: int, name: String, address: String, propertyType: PropertyType, description: String, dimensions: Dimensions)
-+ updateDetails(name: String, address: String, propertyType: PropertyType, description: String, dimensions: Dimensions): void
-+ publish(): void
++ Property(landlordId: int, name: String, address: String, city: String, region: String, propertyType: PropertyType, description: String, dimensions: Dimensions, defaultRate: BigDecimal, amenities: Amenities)
++ updateDetails(name: String, address: String, city: String, region: String, propertyType: PropertyType, description: String, dimensions: Dimensions, defaultRate: BigDecimal, amenities: Amenities): void
++ getFullAddress(): String        // "street, city, region"
++ getCoverPhotoUrl(): String      // "/api/files/{id}" or null
++ publish(): void                 // DRAFT -> ACTIVE; not if ARCHIVED
 + archive(): void
 + isOwnedBy(userId: int): boolean
 + addZone(zone: GridZone): void
@@ -130,6 +137,15 @@ Owns its zones and the grid rules that involve more than one zone (no overlaps, 
 + resetEdge(position: GridPosition, side: Side): void
 + resetAllEdges(): void
 - isEnclosedAt(position: GridPosition): boolean
+```
+
+#### `Amenities`, Class · value object (record)
+
+The property form's amenity checkboxes.
+
+```
+parking: boolean, powerBackup: boolean, security: boolean, waterAccess: boolean, open24h: boolean
++ NONE: Amenities   «static»
 ```
 
 #### `PropertyType`, Class · enumeration
@@ -212,9 +228,11 @@ An ACTIVE property as shown on the public homepage, with only its AVAILABLE unit
 
 ```
 id: int, name: String, address: String, propertyType: PropertyType, description: String,
-landlordName: String, createdAt: LocalDateTime, units: List<UnitListing>
+landlordName: String, createdAt: LocalDateTime, amenities: Amenities, coverPhotoUrl: String,
+units: List<UnitListing>
+// address = street, city and region together
 
-+ getAvailableBlocks(): int          // number of units = "blocks"
++ getAvailableBlocks(): int          // number of AVAILABLE units (JSON name kept)
 + getMinRate(): BigDecimal
 + getMaxRate(): BigDecimal
 + isPowerIncluded(): boolean
@@ -346,24 +364,50 @@ Terms are final and can't be edited. To change them: end/terminate and create a 
 - startDate: LocalDate {final}
 - endDate: LocalDate {final}
 - monthlyRent: BigDecimal {final}
+- paymentTerms: PaymentTerms {final}
 - previousLeaseId: Integer {final}
+- tenantName: String {final}       // contact details typed in the lease form
+- tenantEmail: String {final}
+- tenantPhone: String {final}
 - status: LeaseStatus
 - closedOn: LocalDate
 - unitName: String {readOnly}
 - propertyName: String {readOnly}
+- propertyId: Integer {readOnly}
 - renterName: String {readOnly}
+- renterUsername: String {readOnly}
+- unitPhotoId: Integer {readOnly}  // the unit's first photo
 
-+ LeaseContract(unitId: int, renterId: int, startDate: LocalDate, endDate: LocalDate, monthlyRent: BigDecimal, previousLeaseId: Integer)
++ LeaseContract(unitId: int, renterId: int, startDate: LocalDate, endDate: LocalDate, monthlyRent: BigDecimal, paymentTerms: PaymentTerms, tenantName: String, tenantEmail: String, tenantPhone: String, previousLeaseId: Integer)
 + getCurrentState(today: LocalDate): LeaseState
 + daysRemaining(today: LocalDate): long
 + durationInMonths(): long
 + isRentedBy(renterId: int): boolean
 + isRenewal(): boolean
++ getImageUrl(): String                         // "/api/files/{unitPhotoId}" or null
 + billingMonths(): List<YearMonth>
-+ dueDateFor(month: YearMonth): LocalDate
++ billingPeriodStarts(): List<YearMonth>         // every 1st / 3rd / 6th / 12th month, by paymentTerms
++ monthsInPeriod(periodStart: YearMonth): int
++ amountForPeriod(periodStart: YearMonth): BigDecimal
++ dueDateFor(periodStart: YearMonth): LocalDate  // in advance: in the period's first month; in arrears: the month after
 + end(today: LocalDate): void
 + terminate(today: LocalDate): void
 + markRenewed(lastDay: LocalDate): void
+```
+
+#### `PaymentTerms`, Class · enumeration
+
+How often rent is paid, and whether before (in advance) or after (in arrears) the period.
+
+```
+Values: MONTHLY_ADVANCE, MONTHLY_ARREARS, QUARTERLY_ADVANCE, SEMI_ANNUAL_ADVANCE, ANNUAL_ADVANCE
+- label: String
+- monthsPerPeriod: int     // 1, 1, 3, 6, 12
+- inAdvance: boolean
+
++ getLabel(): String
++ getMonthsPerPeriod(): int
++ isInAdvance(): boolean
 ```
 
 #### `LeaseStatus`, Class · enumeration
@@ -439,16 +483,47 @@ Values: UPCOMING, DUE, OVERDUE, PAID
 
 #### `RentDue`, Class · value object
 
-One line of a renter's rent statement.
+One line of a renter's rent statement: one billing period.
 
 ```
-- billingMonth: YearMonth
+- billingMonth: YearMonth    // first month of the period
 - dueDate: LocalDate
-- amountDue: BigDecimal
+- amountDue: BigDecimal      // monthlyRent x months
 - status: DueStatus
+- months: int                // 1, 3, 6 or 12 (the last period can be shorter)
 
-+ RentDue(billingMonth: YearMonth, dueDate: LocalDate, amountDue: BigDecimal, status: DueStatus)
++ RentDue(billingMonth: YearMonth, dueDate: LocalDate, amountDue: BigDecimal, status: DueStatus, months: int)
 + isPayable(): boolean
+```
+
+#### `FileKind`, Class · enumeration
+
+```
+Values: PROPERTY_PHOTO, SITE_PLAN, UNIT_PHOTO, CONTRACT
+- label: String
+- imageOnly: boolean      // photos: images only; site plans: image or PDF; contracts: PDF (FileService)
+
++ getLabel(): String
++ isImageOnly(): boolean
+```
+
+#### `StoredFile`, Class · entity · extends `BaseEntity`
+
+An uploaded file. The bytes are in the uploads folder under storedName; exactly one owner id is set, matching the kind.
+
+```
+- kind: FileKind {final}
+- propertyId: Integer {final}    // PROPERTY_PHOTO, SITE_PLAN
+- unitId: Integer {final}        // UNIT_PHOTO
+- leaseId: Integer {final}       // CONTRACT
+- fileName: String {final}       // shown on screen
+- storedName: String {final}     // hidden from JSON
+- contentType: String {final}
+
++ StoredFile(kind: FileKind, ownerId: int, fileName: String, storedName: String, contentType: String)
++ getUrl(): String               // "/api/files/{id}"
++ isImage(): boolean
++ urlOf(fileId: Integer): String   «static»
 ```
 
 #### `PaymentResult`, Class · value object
@@ -551,6 +626,7 @@ Generic interface shared by all DAOs.
 ```
 + findByUsername(username: String): Optional<User>
 + existsByUsername(username: String): boolean
++ findRenters(search: String): List<User>      // RENTER accounts matching username or name, at most 20
 ```
 
 #### `JdbcUserDao`, Class · repository · implements `UserDao`
@@ -679,6 +755,24 @@ Reads the `lease_request_details` view; writes `lease_requests`. `update` change
 + «all PaymentDao methods»
 ```
 
+#### `StoredFileDao`, Interface · interface · extends `CrudDao<StoredFile>`
+
+```
++ findByOwner(kind: FileKind, ownerId: int): List<StoredFile>   // ownerId = property, unit or lease id
+```
+
+#### `JdbcStoredFileDao`, Class · repository · implements `StoredFileDao`
+
+Table `uploaded_files`. Files are never updated (upload a new one instead).
+
+```
+- jdbcTemplate: JdbcTemplate
+- rowMapper: RowMapper<StoredFile>
+
++ JdbcStoredFileDao(jdbcTemplate: JdbcTemplate)
++ «all StoredFileDao methods»
+```
+
 ### Package `service`
 
 #### `AuthService`, Class · service
@@ -695,15 +789,18 @@ Reads the `lease_request_details` view; writes `lease_requests`. `update` change
 
 ```
 - propertyDao: PropertyDao
+- leaseDao: LeaseContractDao
+- leaseRequestDao: LeaseRequestDao
 
 + getListings(): List<PropertyListing>                  // public homepage, no login
 + getListing(propertyId: int): PropertyListing           // NotFoundException if not ACTIVE or nothing available
 + getPropertiesForLandlord(landlord: User, search: String, type: PropertyType): List<Property>
++ getProperty(propertyId: int): Property                 // no owner check: only after the caller checked access
 + getOwnedProperty(propertyId: int, landlord: User): Property
-+ createProperty(landlord: User, name: String, address: String, type: PropertyType, description: String, dimensions: Dimensions): Property
-+ updateProperty(propertyId: int, landlord: User, name: String, address: String, type: PropertyType, description: String, dimensions: Dimensions): Property
-+ publishProperty(propertyId: int, landlord: User): void
-+ archiveProperty(propertyId: int, landlord: User): void
++ createProperty(landlord: User, name: String, address: String, city: String, region: String, type: PropertyType, description: String, dimensions: Dimensions, defaultRate: BigDecimal, amenities: Amenities): Property
++ updateProperty(propertyId: int, landlord: User, name: String, address: String, city: String, region: String, type: PropertyType, description: String, dimensions: Dimensions, defaultRate: BigDecimal, amenities: Amenities): Property
++ publishProperty(propertyId: int, landlord: User): Property
++ archiveProperty(propertyId: int, landlord: User): Property   // 409 while a unit has an ACTIVE lease
 + saveGridLayout(propertyId: int, landlord: User, rows: int, cols: int, spotsByZone: Map<Integer, List<GridPosition>>): Property
 + saveEdgeOverrides(propertyId: int, landlord: User, edgesByType: Map<EdgeType, List<GridEdge>>): Property
 ```
@@ -729,6 +826,7 @@ Reads the `lease_request_details` view; writes `lease_requests`. `update` change
 - leaseDao: LeaseContractDao
 - leaseRequestDao: LeaseRequestDao
 - propertyService: PropertyService
+- fileService: FileService          // deleteUnit removes its photos from disk
 
 + removalCheck(unitId: int, landlord: User): UnitRemovalCheck
 + getUnitDetails(unitId: int, landlord: User): UnitDetails
@@ -762,14 +860,16 @@ Reads the `lease_request_details` view; writes `lease_requests`. `update` change
 - userDao: UserDao
 - propertyService: PropertyService
 
-+ createLease(landlord: User, unitId: int, renterUsername: String, startDate: LocalDate, endDate: LocalDate, monthlyRent: BigDecimal): LeaseContract
-+ renewLease(leaseId: int, landlord: User, newStartDate: LocalDate, newEndDate: LocalDate, newMonthlyRent: BigDecimal): LeaseContract
-+ endLease(leaseId: int, landlord: User): void
++ createLease(landlord: User, unitId: int, renterUsername: String, startDate: LocalDate, endDate: LocalDate, monthlyRent: BigDecimal, paymentTerms: PaymentTerms, tenantName: String, tenantEmail: String, tenantPhone: String): LeaseContract
++ renewLease(leaseId: int, landlord: User, newStartDate: LocalDate, newEndDate: LocalDate, newMonthlyRent: BigDecimal, paymentTerms: PaymentTerms): LeaseContract   // paymentTerms null = keep
++ endLease(leaseId: int, landlord: User): void            // only from the end date on
 + terminateLease(leaseId: int, landlord: User): void
 + getLeasesForLandlord(landlord: User): List<LeaseContract>
 + getLeasesForProperty(propertyId: int, landlord: User): List<LeaseContract>
 + getLeasesForRenter(renter: User): List<LeaseContract>
 + getLeaseFor(leaseId: int, user: User): LeaseContract
++ getPropertyOfLease(leaseId: int, user: User): Property     // lease.html's read-only grid
++ findRenters(search: String): List<User>
 ```
 
 #### `PaymentService`, Class · service
@@ -782,6 +882,26 @@ Reads the `lease_request_details` view; writes `lease_requests`. `update` change
 + getStatement(leaseId: int, user: User, today: LocalDate): List<RentDue>
 + payRent(renter: User, leaseId: int, billingMonth: YearMonth, method: PaymentMethod, accountNumber: String): Payment
 + getPaymentHistory(leaseId: int, user: User): List<Payment>
+```
+
+#### `FileService`, Class · service
+
+Saves uploads in the uploads folder (`spacegrid.upload-dir`) and checks who may upload, see and delete them.
+
+```
++ MAX_FILES_PER_OWNER: int = 10   «static»
+- fileDao: StoredFileDao
+- propertyDao: PropertyDao
+- unitDao: RentableUnitDao
+- leaseDao: LeaseContractDao
+- uploadDir: Path
+
++ upload(landlord: User, kind: FileKind, ownerId: int, file: MultipartFile): StoredFile   // a CONTRACT replaces the old one
++ list(kind: FileKind, ownerId: int, user: User): List<StoredFile>                     // user null = not logged in
++ get(fileId: int, user: User): StoredFile
++ pathOf(file: StoredFile): Path
++ delete(fileId: int, landlord: User): void
++ deleteFilesFromDisk(kind: FileKind, ownerId: int): void
 ```
 
 ### Package `controller`
@@ -889,8 +1009,10 @@ Reads the `lease_request_details` view; writes `lease_requests`. `update` change
 + list(): List<LeaseContract>
 + get(id): LeaseContract
 + listForProperty(propertyId): List<LeaseContract>
-+ create(unitId, renterUsername, startDate, endDate, monthlyRent): LeaseContract
-+ renew(id, newStartDate, newEndDate, newMonthlyRent): LeaseContract
++ property(id): Property
++ renters(search): List<User>
++ create(unitId, renterUsername, startDate, endDate, monthlyRent, paymentTerms, tenantName, tenantEmail, tenantPhone): LeaseContract
++ renew(id, newStartDate, newEndDate, newMonthlyRent, paymentTerms): LeaseContract
 + end(id): void
 + terminate(id): void
 ```
@@ -899,6 +1021,8 @@ Reads the `lease_request_details` view; writes `lease_requests`. `update` change
 |---|---|
 | `GET /api/leases` | `list (landlord: all theirs, renter: own)` |
 | `GET /api/leases/{id}` | `get` |
+| `GET /api/leases/{id}/property` | `property (landlord or the lease's renter)` |
+| `GET /api/renters?search=` | `renters (landlord only)` |
 | `GET /api/properties/{propertyId}/leases` | `listForProperty` |
 | `POST /api/leases` | `create` |
 | `POST /api/leases/{id}/renew` | `renew` |
@@ -921,6 +1045,35 @@ Reads the `lease_request_details` view; writes `lease_requests`. `update` change
 | `GET /api/leases/{leaseId}/statement` | `statement` |
 | `GET /api/leases/{leaseId}/payments` | `history` |
 | `POST /api/leases/{leaseId}/payments` | `pay` |
+
+#### `FileController`, Class · controller
+
+Multipart uploads with one `file` field (pages use `api.upload`).
+
+```
+- fileService: FileService
+- sessionManager: SessionManager
+
++ uploadForProperty(propertyId, kind, file): StoredFile
++ listForProperty(propertyId, kind): List<StoredFile>
++ uploadForUnit(unitId, file): StoredFile
++ listForUnit(unitId): List<StoredFile>
++ uploadContract(leaseId, file): StoredFile
++ listForLease(leaseId): List<StoredFile>
++ show(id): ResponseEntity<Resource>
++ delete(id): void
+```
+
+| Endpoint | Method |
+|---|---|
+| `POST /api/properties/{propertyId}/files` (kind = PROPERTY_PHOTO or SITE_PLAN) | `uploadForProperty` |
+| `GET /api/properties/{propertyId}/files?kind=` | `listForProperty` |
+| `POST /api/units/{unitId}/files` | `uploadForUnit` |
+| `GET /api/units/{unitId}/files` | `listForUnit` |
+| `POST /api/leases/{leaseId}/files` | `uploadContract` |
+| `GET /api/leases/{leaseId}/files` | `listForLease` |
+| `GET /api/files/{id}` | `show (public for photos of ACTIVE properties)` |
+| `DELETE /api/files/{id}` | `delete` |
 
 #### `BrowseController`, Class · controller
 
@@ -990,6 +1143,7 @@ Page routes: `/`, `/home`, `/browse` → `homepage.html`; `/login`, `/register`,
 + login(session: HttpSession, user: User): void
 + logout(session: HttpSession): void
 + currentUser(session: HttpSession): User
++ currentUserOrNull(session: HttpSession): User          // null = nobody logged in (public files)
 + requireRole(session: HttpSession, role: Role): User
 ```
 

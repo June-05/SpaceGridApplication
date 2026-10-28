@@ -27,8 +27,7 @@ public class CommonAreaService {
     }
 
     public List<CommonArea> getCommonAreas(int propertyId, User landlord) {
-        // TODO
-        throw new UnsupportedOperationException("TODO");
+        return propertyService.getOwnedProperty(propertyId, landlord).getCommonAreas();
     }
 
     /** color is optional ("#rrggbb"); when given it must not be used by another common area of the property. */

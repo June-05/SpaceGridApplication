@@ -1,12 +1,33 @@
 /*
- * register.js — script for register.html
+ * register.js — script for register.html (public page: no login check)
  *
- * 1. On form submit:
- *      await api.form('POST', '/api/auth/register', { username, password, fullName, role });
- * 2. Then go to /login.html (or log in right away with api.form('POST', '/api/auth/login', ...)).
- * 3. Errors: "Username is already taken." (409), "Password must be at least 8 characters." (400).
+ * 1. On submit: POST /api/auth/register { username, password, fullName, role }
+ * 2. Then log in right away (POST /api/auth/login) and go to the right dashboard (auth.home).
+ * 3. Errors are shown under the form: "Username is already taken." (409), "Password must be at least 8 characters." (400).
  */
-document.addEventListener('DOMContentLoaded', async () => {
-  // (public page: no login check)
-  // TODO
+document.addEventListener('DOMContentLoaded', () => {
+  const form = document.getElementById('registerForm');
+  const error = document.getElementById('error');
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    error.textContent = '';
+    const button = form.querySelector('button');
+    button.disabled = true;
+    const username = form.elements.username.value.trim();
+    const password = form.elements.password.value;
+    try {
+      await api.form('POST', '/api/auth/register', {
+        username,
+        password,
+        fullName: form.elements.fullName.value.trim(),
+        role: form.elements.role.value
+      });
+      const user = await api.form('POST', '/api/auth/login', { username, password });
+      location.href = auth.home(user);
+    } catch (err) {
+      error.textContent = err.message;
+      button.disabled = false;
+    }
+  });
 });

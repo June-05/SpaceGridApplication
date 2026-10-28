@@ -6,13 +6,15 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.YearMonth;
 
-/** Value object: one line of a renter's rent statement. Built by PaymentService.getStatement(). */
-public record RentDue(YearMonth billingMonth, LocalDate dueDate, BigDecimal amountDue, DueStatus status) {
+/**
+ * Value object: one line of a renter's rent statement. Built by PaymentService.getStatement().
+ * billingMonth = first month of the billing period; months = how many months it covers (1, 3, 6 or 12).
+ */
+public record RentDue(YearMonth billingMonth, LocalDate dueDate, BigDecimal amountDue, DueStatus status, int months) {
 
-    /** True if this month can be paid (status is not PAID). */
+    /** True if this period can be paid (status is not PAID). */
     @JsonIgnore
     public boolean isPayable() {
-        // TODO
-        throw new UnsupportedOperationException("TODO");
+        return status != DueStatus.PAID;
     }
 }

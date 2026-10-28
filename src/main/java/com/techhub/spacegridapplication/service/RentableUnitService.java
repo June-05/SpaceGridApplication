@@ -6,6 +6,7 @@ import com.techhub.spacegridapplication.dao.RentableUnitDao;
 import com.techhub.spacegridapplication.exception.ConflictException;
 import com.techhub.spacegridapplication.exception.NotFoundException;
 import com.techhub.spacegridapplication.model.Dimensions;
+import com.techhub.spacegridapplication.model.FileKind;
 import com.techhub.spacegridapplication.model.Property;
 import com.techhub.spacegridapplication.model.RentableUnit;
 import com.techhub.spacegridapplication.model.UnitDetails;
@@ -27,21 +28,27 @@ public class RentableUnitService {
     private final LeaseContractDao leaseDao;
     private final LeaseRequestDao leaseRequestDao;
     private final PropertyService propertyService;
+    private final FileService fileService;
 
     public RentableUnitService(
             RentableUnitDao unitDao,
             LeaseContractDao leaseDao,
             LeaseRequestDao leaseRequestDao,
-            PropertyService propertyService) {
+            PropertyService propertyService,
+            FileService fileService) {
         this.unitDao = unitDao;
         this.leaseDao = leaseDao;
         this.leaseRequestDao = leaseRequestDao;
         this.propertyService = propertyService;
+        this.fileService = fileService;
     }
 
+    /** The property's units, without archived ones (they left the grid and the lists; their history stays). */
     public List<RentableUnit> getUnits(int propertyId, User landlord) {
-        // TODO
-        throw new UnsupportedOperationException("TODO");
+        propertyService.getOwnedProperty(propertyId, landlord);
+        return unitDao.findByPropertyId(propertyId).stream()
+                .filter(unit -> !unit.isArchived())
+                .toList();
     }
 
     @Transactional
@@ -140,6 +147,7 @@ public class RentableUnitService {
             throw new ConflictException(check.reason());
         }
         leaseRequestDao.declineOpenByUnitId(unitId);  // the renters still see them, marked declined
+        fileService.deleteFilesFromDisk(FileKind.UNIT_PHOTO, unitId);   // their rows go with the unit (CASCADE)
         unitDao.deleteById(unitId);
     }
 

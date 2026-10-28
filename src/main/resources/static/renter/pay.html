@@ -28,6 +28,7 @@
       <div class="pay-card-header">
         <h2>Rent Payment</h2>
         <p class="subtitle">Simulated Payment Gateway</p>
+        <p id="amountInfo" class="subtitle"></p>
       </div>
 
       <form id="payForm" novalidate>
@@ -53,6 +54,8 @@
 
         <button class="btn btn-primary btn-block pay-btn" type="submit">Complete Payment</button>
         <p id="error" class="error" aria-live="polite"></p>
+        <!-- shown after a successful payment (pay.js) -->
+        <p id="result" aria-live="polite" style="color: #15803d; font-weight: 600;"></p>
       </form>
     </div>
   </main>

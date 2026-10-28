@@ -1,6 +1,7 @@
 package com.techhub.spacegridapplication.dao.jdbc;
 
 import com.techhub.spacegridapplication.dao.PropertyDao;
+import com.techhub.spacegridapplication.model.Amenities;
 import com.techhub.spacegridapplication.model.CommonArea;
 import com.techhub.spacegridapplication.model.CommonAreaType;
 import com.techhub.spacegridapplication.model.Dimensions;
@@ -14,15 +15,20 @@ import com.techhub.spacegridapplication.model.PropertyStatus;
 import com.techhub.spacegridapplication.model.PropertyListing;
 import com.techhub.spacegridapplication.model.PropertyType;
 import com.techhub.spacegridapplication.model.RentableUnit;
+import com.techhub.spacegridapplication.model.StoredFile;
 import com.techhub.spacegridapplication.model.UnitListing;
 import com.techhub.spacegridapplication.model.UnitStatus;
 
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
+import org.springframework.jdbc.support.GeneratedKeyHolder;
+import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.stereotype.Repository;
 
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -50,9 +56,21 @@ public class JdbcPropertyDao implements PropertyDao {
             ORDER BY z.id
             """;
 
+    /** Every property column, plus the id of its first property photo (NULL if it has none). */
+    private static final String SELECT_PROPERTIES = """
+            SELECT p.*,
+                   (SELECT MIN(f.id) FROM uploaded_files f
+                    WHERE f.property_id = p.id AND f.file_kind = 'PROPERTY_PHOTO') AS cover_photo_id
+            FROM properties p
+            """;
+
     /** Homepage: ACTIVE properties with the landlord's name. The optional "AND p.id = ?" is added by loadListings. */
     private static final String LISTINGS_SQL = """
-            SELECT p.id, p.name, p.address, p.property_type, p.description, p.created_at,
+            SELECT p.id, p.name, CONCAT_WS(', ', p.address, p.city, p.region) AS address,
+                   p.property_type, p.description, p.created_at,
+                   p.has_parking, p.has_power_backup, p.has_security, p.has_water_access, p.is_open_24h,
+                   (SELECT MIN(f.id) FROM uploaded_files f
+                    WHERE f.property_id = p.id AND f.file_kind = 'PROPERTY_PHOTO') AS cover_photo_id,
                    usr.full_name AS landlord_name
             FROM properties p
             JOIN users usr ON usr.id = p.landlord_id
@@ -80,43 +98,102 @@ public class JdbcPropertyDao implements PropertyDao {
                     rs.getInt("landlord_id"),
                     rs.getString("name"),
                     rs.getString("address"),
+                    rs.getString("city"),
+                    rs.getString("region"),
                     PropertyType.valueOf(rs.getString("property_type")),
                     rs.getString("description"),
                     readDimensions(rs),
+                    rs.getBigDecimal("default_rate"),
+                    readAmenities(rs),
                     PropertyStatus.valueOf(rs.getString("status")),
                     rs.getInt("grid_rows"),
                     rs.getInt("grid_columns"),
                     loadZones(id),
-                    loadEdgeOverrides(id));
+                    loadEdgeOverrides(id),
+                    rs.getObject("cover_photo_id", Integer.class));
         };
     }
 
     @Override
     public Optional<Property> findById(int id) {
-        return jdbcTemplate.query("SELECT * FROM properties WHERE id = ?", rowMapper, id).stream().findFirst();
+        return jdbcTemplate.query(SELECT_PROPERTIES + " WHERE p.id = ?", rowMapper, id).stream().findFirst();
     }
 
-    /** INSERT, then entity.assignId(generated key) (use a KeyHolder). */
+    /** INSERT, then entity.assignId(generated key). A new property has no zones yet. */
     @Override
     public Property save(Property entity) {
-        // TODO: SQL with jdbcTemplate
-        throw new UnsupportedOperationException("TODO");
+        Dimensions size = entity.getDimensions();
+        Amenities amenities = entity.getAmenities();
+        KeyHolder keys = new GeneratedKeyHolder();
+        jdbcTemplate.update(connection -> {
+            PreparedStatement ps = connection.prepareStatement("""
+                    INSERT INTO properties (landlord_id, name, address, city, region, property_type, description,
+                                            is_exact_size, size_description, area_sqm, default_rate,
+                                            has_parking, has_power_backup, has_security, has_water_access, is_open_24h,
+                                            status, grid_rows, grid_columns)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """, Statement.RETURN_GENERATED_KEYS);
+            ps.setInt(1, entity.getLandlordId());
+            ps.setString(2, entity.getName());
+            ps.setString(3, entity.getAddress());
+            ps.setString(4, entity.getCity());
+            ps.setString(5, entity.getRegion());
+            ps.setString(6, entity.getPropertyType().name());
+            ps.setString(7, entity.getDescription());
+            ps.setObject(8, size == null ? null : size.exact());
+            ps.setString(9, size == null ? null : size.description());
+            ps.setBigDecimal(10, size == null ? null : size.areaSqm());
+            ps.setBigDecimal(11, entity.getDefaultRate());
+            ps.setBoolean(12, amenities.parking());
+            ps.setBoolean(13, amenities.powerBackup());
+            ps.setBoolean(14, amenities.security());
+            ps.setBoolean(15, amenities.waterAccess());
+            ps.setBoolean(16, amenities.open24h());
+            ps.setString(17, entity.getStatus().name());
+            ps.setInt(18, entity.getGridRows());
+            ps.setInt(19, entity.getGridColumns());
+            return ps;
+        }, keys);
+        entity.assignId(keys.getKey().intValue());
+        return entity;
     }
 
+    /** Saves the form fields and the status. The grid is saved separately (saveGridLayout / saveEdgeOverrides). */
     @Override
     public void update(Property entity) {
-        // TODO: SQL with jdbcTemplate
+        Dimensions size = entity.getDimensions();
+        Amenities amenities = entity.getAmenities();
+        jdbcTemplate.update("""
+                UPDATE properties
+                SET name = ?, address = ?, city = ?, region = ?, property_type = ?, description = ?,
+                    is_exact_size = ?, size_description = ?, area_sqm = ?, default_rate = ?,
+                    has_parking = ?, has_power_backup = ?, has_security = ?, has_water_access = ?, is_open_24h = ?,
+                    status = ?
+                WHERE id = ?
+                """,
+                entity.getName(), entity.getAddress(), entity.getCity(), entity.getRegion(),
+                entity.getPropertyType().name(), entity.getDescription(),
+                size == null ? null : size.exact(),
+                size == null ? null : size.description(),
+                size == null ? null : size.areaSqm(),
+                entity.getDefaultRate(),
+                amenities.parking(), amenities.powerBackup(), amenities.security(),
+                amenities.waterAccess(), amenities.open24h(),
+                entity.getStatus().name(),
+                entity.getId());
     }
 
+    /** Zones, spots, edges and files go with it (ON DELETE CASCADE); a property with leases can't be deleted (RESTRICT). */
     @Override
     public void deleteById(int id) {
-        // TODO: SQL with jdbcTemplate
+        jdbcTemplate.update("DELETE FROM properties WHERE id = ?", id);
     }
 
+    /** Newest first. */
     @Override
     public List<Property> findByLandlordId(int landlordId) {
-        // TODO: SQL with jdbcTemplate
-        throw new UnsupportedOperationException("TODO");
+        return jdbcTemplate.query(SELECT_PROPERTIES + " WHERE p.landlord_id = ? ORDER BY p.created_at DESC, p.id DESC",
+                rowMapper, landlordId);
     }
 
     /** UPDATE grid size, DELETE + INSERT zone_cells (service method is @Transactional). */
@@ -184,6 +261,8 @@ public class JdbcPropertyDao implements PropertyDao {
                 rs.getString("description"),
                 rs.getString("landlord_name"),
                 rs.getTimestamp("created_at").toLocalDateTime(),
+                readAmenities(rs),
+                StoredFile.urlOf(rs.getObject("cover_photo_id", Integer.class)),
                 unitsByProperty.getOrDefault(rs.getInt("id"), List.of()));
         List<PropertyListing> listings = (propertyId == null)
                 ? jdbcTemplate.query(sql, mapper)
@@ -191,7 +270,12 @@ public class JdbcPropertyDao implements PropertyDao {
         return listings.stream().filter(listing -> !listing.units().isEmpty()).toList();
     }
 
-    /** Units + common areas of a property (with their spots), for the from-database constructor. */
+    /** Reads the five amenity columns. */
+    private static Amenities readAmenities(ResultSet rs) throws SQLException {
+        return new Amenities(rs.getBoolean("has_parking"), rs.getBoolean("has_power_backup"),
+                rs.getBoolean("has_security"), rs.getBoolean("has_water_access"), rs.getBoolean("is_open_24h"));
+    }
+
     /** Reads is_exact_size / size_description / area_sqm into a Dimensions (null when no size was given). */
     static Dimensions readDimensions(ResultSet rs) throws SQLException {
         boolean exact = rs.getBoolean("is_exact_size");
@@ -201,6 +285,7 @@ public class JdbcPropertyDao implements PropertyDao {
         return new Dimensions(exact, rs.getString("size_description"), rs.getBigDecimal("area_sqm"));
     }
 
+    /** Units + common areas of a property (with their spots), for the from-database constructor. */
     private List<GridZone> loadZones(int propertyId) {
         // spots of every zone in this property: zone id -> its positions
         Map<Integer, Set<GridPosition>> spots = new HashMap<>();

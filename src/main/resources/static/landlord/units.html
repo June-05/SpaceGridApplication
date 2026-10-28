@@ -34,13 +34,7 @@
                 </a>
                 <div class="flex items-center gap-2">
                     <span class="text-slate-400 text-sm">Viewing:</span>
-                    <select id="propertySelector" class="text-sm font-semibold text-slate-900 bg-transparent border-none focus:outline-none cursor-pointer">
-                        <option value="clark">Clark Global City Commercial Hub</option>
-                        <option value="bgc">BGC Night Market Stalls</option>
-                        <option value="makati">Makati Corporate Tower Retail</option>
-                        <option value="ayala">Ayala Triangle Open Plaza</option>
-                        <option value="subic">Subic Bay Commercial Lots</option>
-                    </select>
+                    <select id="propertySelector" class="text-sm font-semibold text-slate-900 bg-transparent border-none focus:outline-none cursor-pointer"></select>
                     <i class="fa-solid fa-chevron-down text-xs text-slate-400"></i>
                 </div>
                 <div class="flex-1 max-w-md hidden md:block">
@@ -51,11 +45,11 @@
                 </div>
             </div>
             <div class="flex items-center gap-2">
-                <a href="property-form.html" class="flex items-center gap-2 px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-semibold transition border border-slate-200">
+                <a id="editPropertyLink" href="property-form.html" class="flex items-center gap-2 px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-semibold transition border border-slate-200">
                     <i class="fa-solid fa-pen-to-square text-slate-500 text-xs"></i>
                     <span>Edit Property Details</span>
                 </a>
-                <a href="property-grid.html?id=1" class="flex items-center gap-2 px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl text-xs font-semibold transition border border-indigo-100">
+                <a id="gridLink" href="property-grid.html" class="flex items-center gap-2 px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl text-xs font-semibold transition border border-indigo-100">
                     <i class="fa-solid fa-grip text-indigo-500 text-xs"></i>
                     <span>View/Edit Grid Layout</span>
                 </a>
@@ -68,7 +62,7 @@
         <!-- Page Header -->
         <div class="mb-6">
             <h1 class="text-2xl font-extrabold text-slate-900 tracking-tight">Unit Management</h1>
-            <p class="text-sm text-slate-500 mt-0.5">Manage individual units, assign tenants, and update rental status</p>
+            <p class="text-sm text-slate-500 mt-0.5">Manage individual units, their rates, photos and rental status</p>
         </div>
 
         <!-- Stats Bar -->
@@ -121,16 +115,16 @@
 
         <!-- Filter Pills -->
         <div class="flex items-center gap-2 mb-6 flex-wrap">
-            <button onclick="setFilter('all')" class="filter-pill active px-4 py-2 bg-indigo-600 text-white text-xs font-semibold rounded-xl transition">
+            <button data-filter="all" class="filter-pill active px-4 py-2 bg-indigo-600 text-white text-xs font-semibold rounded-xl transition">
                 All Units (<span id="countAll">0</span>)
             </button>
-            <button onclick="setFilter('Occupied')" class="filter-pill px-4 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-semibold rounded-xl transition">
+            <button data-filter="OCCUPIED" class="filter-pill px-4 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-semibold rounded-xl transition">
                 Occupied (<span id="countOccupied">0</span>)
             </button>
-            <button onclick="setFilter('Vacant')" class="filter-pill px-4 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-semibold rounded-xl transition">
+            <button data-filter="AVAILABLE" class="filter-pill px-4 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-semibold rounded-xl transition">
                 Vacant (<span id="countVacant">0</span>)
             </button>
-            <button onclick="setFilter('Maintenance')" class="filter-pill px-4 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-semibold rounded-xl transition">
+            <button data-filter="UNDER_MAINTENANCE" class="filter-pill px-4 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-semibold rounded-xl transition">
                 Maintenance (<span id="countMaintenance">0</span>)
             </button>
         </div>
@@ -146,7 +140,7 @@
 
     <!-- Unit Quick Edit Modal -->
     <div id="editModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div class="bg-white rounded-2xl max-w-md w-full border border-slate-200 shadow-2xl overflow-hidden">
+        <div class="bg-white rounded-2xl max-w-md w-full border border-slate-200 shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto">
             <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
                 <div class="flex items-center gap-2">
                     <div class="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center">
@@ -162,13 +156,13 @@
                 </button>
             </div>
             <div class="p-6 space-y-4">
-                <input type="hidden" id="modalUnitId">
                 <div>
                     <label class="block text-xs font-bold text-slate-700 mb-1.5">Status</label>
+                    <!-- Occupied comes from a lease, so it can't be picked here -->
                     <select id="modalStatus" class="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-600 cursor-pointer">
-                        <option value="Occupied">Occupied</option>
-                        <option value="Vacant">Vacant</option>
-                        <option value="Maintenance">Maintenance</option>
+                        <option value="AVAILABLE">Vacant (available to lease)</option>
+                        <option value="UNDER_MAINTENANCE">Under maintenance</option>
+                        <option value="OCCUPIED" disabled>Occupied (has a lease)</option>
                     </select>
                 </div>
                 <div>
@@ -177,12 +171,22 @@
                         <span class="absolute left-3.5 top-2.5 text-slate-400 text-sm">₱</span>
                         <input id="modalRent" type="number" min="0" step="any" class="w-full pl-8 pr-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-600">
                     </div>
+                    <p class="text-xs text-slate-500 mt-1">A current lease keeps its own rent; the new rate is for new leases.</p>
                 </div>
                 <div>
-                    <label class="block text-xs font-bold text-slate-700 mb-1.5">Assign Tenant (if occupied)</label>
-                    <input id="modalTenant" type="text" placeholder="e.g. Juan Dela Cruz" class="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-600">
-                    <p class="text-xs text-slate-500 mt-1">Leave empty if vacant or in maintenance</p>
+                    <label class="block text-xs font-bold text-slate-700 mb-1.5">Current Tenant</label>
+                    <!-- Tenants come from leases: see the lease or create one -->
+                    <div id="modalTenant" class="px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl text-slate-700"></div>
                 </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1.5">Unit Photos</label>
+                    <div id="modalPhotos" class="grid grid-cols-3 gap-2"></div>
+                    <input id="modalPhotoInput" type="file" accept="image/jpeg,image/png,image/webp" multiple class="hidden">
+                    <button type="button" onclick="document.getElementById('modalPhotoInput').click()" class="mt-2 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition">
+                        <i class="fa-solid fa-camera mr-1"></i>Add Photos
+                    </button>
+                </div>
+                <p id="modalError" class="hidden text-xs font-semibold text-rose-600"></p>
                 <div class="pt-4 flex items-center gap-3">
                     <button onclick="closeEditModal()" class="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition">Cancel</button>
                     <button onclick="saveUnitEdit()" class="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl transition">Save Changes</button>
@@ -191,167 +195,7 @@
         </div>
     </div>
 
-    <script>
-        let units = [
-            { id: 1, code: "Unit A-01", sqft: 25, status: "Occupied", tenant: "Maria Rodriguez", rent: 25000 },
-            { id: 2, code: "Unit A-02", sqft: 25, status: "Occupied", tenant: "Miguel Torres", rent: 28000 },
-            { id: 3, code: "Unit A-03", sqft: 30, status: "Vacant", tenant: null, rent: 30000 },
-            { id: 4, code: "Unit A-04", sqft: 25, status: "Occupied", tenant: "Ana Santos", rent: 25000 },
-            { id: 5, code: "Unit B-01", sqft: 20, status: "Vacant", tenant: null, rent: 20000 },
-            { id: 6, code: "Unit B-02", sqft: 20, status: "Maintenance", tenant: null, rent: 20000 },
-            { id: 7, code: "Unit B-03", sqft: 25, status: "Occupied", tenant: "Carlos Mendoza", rent: 25000 },
-            { id: 8, code: "Unit B-04", sqft: 30, status: "Vacant", tenant: null, rent: 32000 },
-            { id: 9, code: "Unit C-01", sqft: 35, status: "Occupied", tenant: "Roberto Cruz", rent: 35000 },
-            { id: 10, code: "Unit C-02", sqft: 35, status: "Vacant", tenant: null, rent: 35000 },
-            { id: 11, code: "Unit C-03", sqft: 25, status: "Maintenance", tenant: null, rent: 28000 },
-            { id: 12, code: "Unit C-04", sqft: 25, status: "Vacant", tenant: null, rent: 28000 }
-        ];
-
-        let currentFilter = 'all';
-        let currentSearch = '';
-
-        function updateStats() {
-            const total = units.length;
-            const occupied = units.filter(u => u.status === 'Occupied').length;
-            const vacant = units.filter(u => u.status === 'Vacant').length;
-            const maintenance = units.filter(u => u.status === 'Maintenance').length;
-            const occupancy = total > 0 ? Math.round((occupied / total) * 100) : 0;
-            const potentialIncome = units.reduce((sum, u) => sum + (u.status !== 'Maintenance' ? u.rent : 0), 0);
-
-            document.getElementById('statTotal').textContent = total;
-            document.getElementById('statOccupancy').textContent = occupancy + '%';
-            document.getElementById('statVacant').textContent = vacant;
-            document.getElementById('statIncome').textContent = '₱' + potentialIncome.toLocaleString('en-PH');
-
-            document.getElementById('countAll').textContent = total;
-            document.getElementById('countOccupied').textContent = occupied;
-            document.getElementById('countVacant').textContent = vacant;
-            document.getElementById('countMaintenance').textContent = maintenance;
-        }
-
-        function setFilter(filter) {
-            currentFilter = filter;
-            document.querySelectorAll('.filter-pill').forEach(pill => {
-                pill.classList.remove('bg-indigo-600', 'text-white');
-                pill.classList.add('bg-white', 'border', 'border-slate-200', 'text-slate-700', 'hover:bg-slate-50');
-            });
-            event.target.classList.remove('bg-white', 'border', 'border-slate-200', 'text-slate-700', 'hover:bg-slate-50');
-            event.target.classList.add('bg-indigo-600', 'text-white');
-            renderGrid();
-        }
-
-        document.getElementById('unitSearch').addEventListener('input', function() {
-            currentSearch = this.value.toLowerCase();
-            renderGrid();
-        });
-
-        function renderGrid() {
-            const grid = document.getElementById('blockGrid');
-            const emptyState = document.getElementById('emptyState');
-            grid.innerHTML = '';
-
-            let filtered = units.filter(unit => {
-                const matchesFilter = currentFilter === 'all' || unit.status === currentFilter;
-                const matchesSearch = !currentSearch || unit.code.toLowerCase().includes(currentSearch);
-                return matchesFilter && matchesSearch;
-            });
-
-            if (filtered.length === 0) {
-                emptyState.classList.remove('hidden');
-                return;
-            }
-
-            emptyState.classList.add('hidden');
-
-            filtered.forEach(unit => {
-                let statusBadge = '';
-                let statusColor = '';
-                if (unit.status === 'Occupied') {
-                    statusBadge = 'Occupied';
-                    statusColor = 'bg-emerald-100 text-emerald-700';
-                } else if (unit.status === 'Vacant') {
-                    statusBadge = 'Vacant';
-                    statusColor = 'bg-blue-100 text-blue-700';
-                } else if (unit.status === 'Maintenance') {
-                    statusBadge = 'Maintenance';
-                    statusColor = 'bg-amber-100 text-amber-700';
-                }
-
-                const card = document.createElement('div');
-                card.className = 'bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs hover:shadow-md transition';
-                card.innerHTML = `
-                    <div class="p-4">
-                        <div class="flex items-start justify-between mb-3">
-                            <div>
-                                <h3 class="text-base font-bold text-slate-900">${unit.code}</h3>
-                                <p class="text-xs text-slate-500">${unit.sqft} sq.m.</p>
-                            </div>
-                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${statusColor}">${statusBadge}</span>
-                        </div>
-                        <div class="mb-3">
-                            ${unit.status === 'Occupied' && unit.tenant ? 
-                                `<p class="text-xs text-slate-500 mb-1">Current Tenant</p>
-                                 <p class="text-sm font-semibold text-slate-900">${unit.tenant}</p>` :
-                                `<p class="text-xs text-slate-500 mb-1">Monthly Rent</p>
-                                 <p class="text-sm font-bold text-indigo-600">₱${unit.rent.toLocaleString('en-PH')}</p>`
-                            }
-                        </div>
-                        <div class="flex items-center gap-2">
-                            <button onclick="openEditModal(${unit.id})" class="flex-1 py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-semibold rounded-xl transition border border-slate-200 flex items-center justify-center gap-2">
-                                <i class="fa-solid fa-pen text-xs"></i>
-                                Quick Edit
-                            </button>
-                            <a href="lease-form.html" class="flex-1 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 text-xs font-semibold rounded-xl transition border border-indigo-100 flex items-center justify-center gap-2">
-                                <i class="fa-solid fa-file-contract text-xs"></i>
-                                Create Lease
-                            </a>
-                        </div>
-                    </div>
-                `;
-                grid.appendChild(card);
-            });
-        }
-
-        function openEditModal(id) {
-            const unit = units.find(u => u.id === id);
-            if (!unit) return;
-
-            document.getElementById('modalUnitId').value = unit.id;
-            document.getElementById('modalBlockCode').textContent = unit.code + ' • ' + unit.sqft + ' sq.m.';
-            document.getElementById('modalStatus').value = unit.status;
-            document.getElementById('modalRent').value = unit.rent;
-            document.getElementById('modalTenant').value = unit.tenant || '';
-
-            document.getElementById('editModal').classList.remove('hidden');
-        }
-
-        function closeEditModal() {
-            document.getElementById('editModal').classList.add('hidden');
-        }
-
-        function saveUnitEdit() {
-            const id = parseInt(document.getElementById('modalUnitId').value);
-            const unit = units.find(u => u.id === id);
-            if (!unit) return;
-
-            unit.status = document.getElementById('modalStatus').value;
-            unit.rent = parseFloat(document.getElementById('modalRent').value) || 0;
-            unit.tenant = document.getElementById('modalTenant').value.trim() || null;
-
-            if (unit.status === 'Vacant' || unit.status === 'Maintenance') {
-                unit.tenant = null;
-            }
-
-            updateStats();
-            renderGrid();
-            closeEditModal();
-            alert('Unit updated successfully!');
-        }
-
-        document.addEventListener('DOMContentLoaded', function() {
-            updateStats();
-            renderGrid();
-        });
-    </script>
+    <script src="/js/common/format.js"></script>
+    <script src="/js/pages/units.js"></script>
 </body>
 </html>
