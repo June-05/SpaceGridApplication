@@ -210,6 +210,14 @@ How the merge was resolved:
 
 ---
 
+## 2026-10-29 · Landlord pages: login landing, role separation, plotter button (UI only, no design change)
+
+- **Login landing:** `login.js` follows `?next=` only when it fits the role (`fitsRole`): landlords only for `/landlord/...` pages, renters for anything else. A landlord who logs in from the homepage now lands on `/landlord/dashboard.html`, not the homepage. The homepage's guest "Log in" link is plain `/login.html` (the "Log in to request" link still returns renters to the listing).
+- **Accounts stay separate:** removed "Switch to Renter View" from `landlord/dashboard.html`. All 5 mock-up pages load `api.js` + `auth.js` and call `auth.requireLogin('LANDLORD')` in `<head>`, so a renter or guest is sent away. The dashboard's Log Out calls `auth.logout()` (it used to just open `../index.html`, leaving the session logged in).
+- **Plotter button:** "Edit Grid Layout" → **"View/Edit Grid Layout"**, linking to `property-grid.html?id=1` without `&mode=edit`, so the plotter opens in View (its first state). The id is still a placeholder until the page is wired.
+
+---
+
 ## PROPOSED (not built) · Commercial ready, permits, bigger grid with zoom
 
 Status: **decided, not implemented.** Nothing below exists in the code yet. When a part is built, move it into a dated section above and update the docs listed at the end.
