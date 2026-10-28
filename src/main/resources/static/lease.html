@@ -7,124 +7,130 @@
   <link rel="stylesheet" href="/css/base.css">
   <link rel="stylesheet" href="/css/grid.css">
   <link rel="stylesheet" href="/css/zones.css">
+  <link rel="stylesheet" href="/css/renter-css/lease.css">
 </head>
-<body class="dashboard-page">
-  <!--
-    LEASE DETAILS  (both roles; open as /lease.html?id=5)
-    Controllers: LeaseController, PaymentController, PropertyController
-      GET  /api/leases/{id}            lease (includes currentState, daysRemaining, unitName, propertyName, renterName)
-      GET  /api/leases/{id}/statement  month-by-month RentDue list
-      GET  /api/leases/{id}/payments   payment history
-      GET  /api/properties/{propertyId} (landlord) to draw the unit's location with grid-renderer.js
-      Landlord buttons: POST /api/leases/{id}/end, /terminate; "Renew" links to /landlord/lease-form.html?renew={id}
-      Renter: a "Pay" link per payable month → /renter/pay.html?leaseId={id}&month=2026-11
-    Script: js/pages/lease.js
-  -->
+<body class="dashboard-page lease-page-body">
+
   <header class="topbar">
-    <a href="javascript:history.back()" id="backLink" class="back-link">← Back</a>
-    <div class="titles">
-      <h1 id="propertyName">Sunset Apartments</h1>
-      <p class="subtitle" id="unitName">Unit 105 Overview</p>
+    <div class="topbar-left">
+      <a href="javascript:history.back()" id="backLink" class="back-link">← Back</a>
+      <div class="titles">
+        <h1 id="propertyName">Sunset Apartments</h1>
+        <p class="subtitle" id="unitName">Unit 105 Overview</p>
+      </div>
     </div>
     <div class="topbar-actions">
       <button id="btnLogout" class="btn" type="button">Log out</button>
     </div>
   </header>
 
-  <main class="container">
-    <!-- LEASE SUMMARY CARD -->
-    <section class="card">
-      <div class="lease-header">
-        <h2>Lease Summary</h2>
-        <span id="currentState" class="badge badge-active">ACTIVE</span>
-      </div>
+  <main class="lease-layout-wrapper">
+    
+    <!-- LEFT COLUMN: LEASE SUMMARY (PURPLE BOX IN CANVA) -->
+    <aside class="lease-col-left">
+      <section class="card summary-card">
+        <div class="summary-card-header">
+          <h2>Lease Summary</h2>
+          <span id="currentState" class="badge badge-active">ACTIVE</span>
+        </div>
 
-      <div class="details-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; margin-top: 1rem;">
-        <div>
+        <div class="summary-card-body">
           <p><strong>Property Name:</strong> <span id="valProperty">Sunset Apartments</span></p>
           <p><strong>Unit Name:</strong> <span id="valUnit">Unit 105</span></p>
-        </div>
-        <div>
+
+          <div class="summary-spacer"></div>
+
           <p><strong>Renter Name:</strong> <span id="valRenter">John Doe</span></p>
           <p><strong>Days Remaining:</strong> <span id="daysRemaining">180 days</span></p>
         </div>
-      </div>
 
-      <!-- LANDLORD ACTION BUTTONS -->
-      <div id="landlordActions" class="button-group" style="margin-top: 1.5rem;">
-        <a id="btnRenew" href="/landlord/lease-form.html?renew=1" class="btn btn-primary">Renew Lease</a>
-        <button id="btnEnd" class="btn" type="button">End Lease</button>
-        <button id="btnTerminate" class="btn btn-danger" type="button">Terminate Lease</button>
-      </div>
-    </section>
+        <!-- LANDLORD ACTION BUTTONS -->
+        <div id="landlordActions" class="summary-card-actions">
+          <div class="btn-group-row">
+            <a id="btnRenew" href="/landlord/lease-form.html?renew=1" class="btn btn-primary">Renew Lease</a>
+            <button id="btnEnd" class="btn" type="button">End Lease</button>
+          </div>
+          <button id="btnTerminate" class="btn" type="button">Terminate Lease</button>
+        </div>
+      </section>
+    </aside>
 
-    <!-- PROPERTY GRID / UNIT LOCATION -->
-    <section class="card" style="margin-top: 2rem;">
-      <h2>Unit Location</h2>
-      <div id="gridHost" class="grid-host" style="margin-top: 1rem;"></div>
-    </section>
+    <!-- RIGHT COLUMN CONTAINER (BLACK BOXES IN CANVA) -->
+    <div class="lease-col-right">
+      
+      <!-- TOP RIGHT: UNIT LOCATION (FULL WIDTH OF RIGHT SIDE) -->
+      <section class="card location-card">
+        <h2>Unit Location</h2>
+        <div id="gridHost" class="grid-host"></div>
+      </section>
 
-    <!-- MONTH-BY-MONTH STATEMENT TABLE -->
-    <section class="card" style="margin-top: 2rem;">
-      <h2>Month-by-Month Statement</h2>
-      <div class="table-responsive">
-        <table class="table">
-          <thead>
-            <tr>
-              <th>Billing Month</th>
-              <th>Amount Due</th>
-              <th>Status</th>
-              <th>Action</th>
-            </tr>
-          </thead>
-          <tbody id="statementTable">
-            <!-- Sample Rows for Live Server & User Manual Screenshots -->
-            <tr>
-              <td>2026-11</td>
-              <td>₱8,500.00</td>
-              <td><span class="badge badge-warning">DUE</span></td>
-              <td>
-                <a href="/renter/pay.html?leaseId=1&month=2026-11" class="btn btn-sm btn-primary">Pay Rent</a>
-              </td>
-            </tr>
-            <tr>
-              <td>2026-10</td>
-              <td>₱8,500.00</td>
-              <td><span class="badge badge-active">PAID</span></td>
-              <td><span class="text-muted">Cleared</span></td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
+      <!-- BOTTOM RIGHT: EQUAL 50/50 SPLIT TABLES -->
+      <div class="tables-row">
+        
+        <!-- MONTH-BY-MONTH STATEMENT TABLE -->
+        <section class="card table-card">
+          <h2>Month-by-Month Statement</h2>
+          <div class="table-scroll-container">
+            <table class="lease-table">
+              <thead>
+                <tr>
+                  <th>Billing Month</th>
+                  <th>Amount Due</th>
+                  <th>Status</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="statementTable">
+                <tr>
+                  <td>2026-11</td>
+                  <td>₱8,500.00</td>
+                  <td><span class="badge badge-warning">DUE</span></td>
+                  <td>
+                    <a href="/renter/pay.html?leaseId=1&month=2026-11" class="btn btn-sm btn-primary">Pay Rent</a>
+                  </td>
+                </tr>
+                <tr>
+                  <td>2026-10</td>
+                  <td>₱8,500.00</td>
+                  <td><span class="badge badge-active">PAID</span></td>
+                  <td><span class="text-muted">Cleared</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
 
-    <!-- PAYMENT HISTORY TABLE -->
-    <section class="card" style="margin-top: 2rem;">
-      <h2>Payment History</h2>
-      <div class="table-responsive">
-        <table class="table">
-          <thead>
-            <tr>
-              <th>Payment Date</th>
-              <th>Billing Month</th>
-              <th>Method</th>
-              <th>Amount Paid</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody id="paymentHistoryTable">
-            <!-- Sample Row for Screenshots -->
-            <tr>
-              <td>2026-10-02</td>
-              <td>2026-10</td>
-              <td>GCASH</td>
-              <td>₱8,500.00</td>
-              <td><span class="badge badge-active">COMPLETED</span></td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
+        <!-- PAYMENT HISTORY TABLE -->
+        <section class="card table-card">
+          <h2>Payment History</h2>
+          <div class="table-scroll-container">
+            <table class="lease-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Month</th>
+                  <th>Method</th>
+                  <th>Amount</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="paymentHistoryTable">
+                <tr>
+                  <td>2026-10-02</td>
+                  <td>2026-10</td>
+                  <td>GCASH</td>
+                  <td>₱8,500.00</td>
+                  <td><span class="badge badge-active">COMPLETED</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+      </div> <!-- /.tables-row -->
+
+    </div> <!-- /.lease-col-right -->
+
   </main>
 
   <script src="/js/common/api.js"></script>

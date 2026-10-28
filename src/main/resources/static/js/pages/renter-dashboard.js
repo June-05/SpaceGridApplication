@@ -19,32 +19,18 @@ document.addEventListener('DOMContentLoaded', async () => {
   await loadRenterLeases();
 });
 
-// Fallback preview data for offline testing
-const MOCK_LEASES = [
-  {
-    id: 1,
-    propertyName: "Sunset Apartments",
-    imageUrl: null, // Replace with image path when backend provides URLs
-    unitName: "Unit 105",
-    currentState: "ACTIVE",
-    nextAmountDue: 8500.00,
-    daysRemaining: 12
-  }
-];
-
 async function loadRenterLeases() {
   const container = document.getElementById('leases');
   if (!container) return;
 
   let leases = [];
-  let isMock = false;
 
   try {
     leases = await api.get('/api/leases');
   } catch (err) {
-    console.warn('/api/leases endpoint not ready or failed. Using fallback preview card.', err);
-    leases = MOCK_LEASES;
-    isMock = true;
+    console.error('Failed to fetch leases:', err);
+    container.innerHTML = '<p class="error-data">Unable to load leases. Please try again later.</p>';
+    return;
   }
 
   if (!leases || leases.length === 0) {
@@ -56,26 +42,20 @@ async function loadRenterLeases() {
     leases.map(async (lease) => {
       let nextDueFormatted = '₱0.00';
 
-      if (isMock) {
-        nextDueFormatted = typeof format !== 'undefined' && format.currency 
-          ? format.currency(lease.nextAmountDue) 
-          : `₱${Number(lease.nextAmountDue).toLocaleString('en-PH', { minimumFractionDigits: 2 })}`;
-      } else {
-        try {
-          const statement = await api.get(`/api/leases/${lease.id}/statement`);
-          if (Array.isArray(statement)) {
-            const dueItem = statement.find(
-              (item) => item.status === 'OVERDUE' || item.status === 'DUE'
-            );
-            if (dueItem) {
-              nextDueFormatted = typeof format !== 'undefined' && format.currency 
-                ? format.currency(dueItem.amount) 
-                : `₱${Number(dueItem.amount).toLocaleString('en-PH', { minimumFractionDigits: 2 })}`;
-            }
+      try {
+        const statement = await api.get(`/api/leases/${lease.id}/statement`);
+        if (Array.isArray(statement)) {
+          const dueItem = statement.find(
+            (item) => item.status === 'OVERDUE' || item.status === 'DUE'
+          );
+          if (dueItem) {
+            nextDueFormatted = typeof format !== 'undefined' && format.currency 
+              ? format.currency(dueItem.amount) 
+              : `₱${Number(dueItem.amount).toLocaleString('en-PH', { minimumFractionDigits: 2 })}`;
           }
-        } catch (err) {
-          console.warn(`Unable to fetch statement for lease ID ${lease.id}:`, err);
         }
+      } catch (err) {
+        console.warn(`Unable to fetch statement for lease ID ${lease.id}:`, err);
       }
 
       const stateBadge = (lease.currentState || 'ACTIVE').toUpperCase();
