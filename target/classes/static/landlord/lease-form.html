@@ -3,20 +3,86 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Lease · SpaceGrid</title>
+  <title>Lease Form · SpaceGrid</title>
   <link rel="stylesheet" href="/css/base.css">
 </head>
-<body>
+<body class="card-page">
   <!--
-    CREATE / RENEW LEASE
-      New:   POST /api/leases               form fields: unitId, renterUsername, startDate, endDate, monthlyRent
-      Renew: POST /api/leases/{id}/renew    (open as ?renew=5) form fields: newStartDate, newEndDate, newMonthlyRent
-    Dates: <input type="date"> already sends yyyy-MM-dd, which the controller expects.
-    Unit list for the <select>: GET /api/properties/{propertyId}/units (only AVAILABLE units)
+    ADD / EDIT LEASE  (no ?id = add, ?id=5 = edit)
+      GET  /api/leases/{id}            fill the form when editing
+      POST /api/leases                 add   (form fields below)
+      PUT  /api/leases/{id}            edit  (same fields)
+      POST /api/leases/{id}/activate   POST /api/leases/{id}/archive
+    Form field names: propertyName, unitName, renterName, startDate, endDate, monthlyRent, leaseTerms, confirmTerms
     Script: js/pages/lease-form.js
   -->
-  <main>
-    <!-- TODO: lease form -->
+  <header class="topbar">
+    <a href="/landlord/dashboard.html" class="back-link">← Dashboard</a>
+    <div class="titles">
+      <h1 id="pageTitle">Lease Form</h1>
+      <p class="subtitle">Configure and manage tenant lease details</p>
+    </div>
+    <div class="topbar-actions">
+      <button id="btnLogout" class="btn" type="button">Log out</button>
+    </div>
+  </header>
+
+  <main class="card">
+    <form id="leaseForm" novalidate>
+      <label class="field">
+        <span>Property Name</span>
+        <select name="propertyName" id="propertyName" required>
+          <option value="" disabled selected>Select Property</option>
+          <option value="sunset-apartments">Sunset Apartments</option>
+          <option value="ocean-view">Ocean View Residences</option>
+          <option value="pine-heights">Pine Heights Tower</option>
+        </select>
+      </label>
+
+      <label class="field">
+        <span>Unit Name / Number</span>
+        <input name="unitName" id="unitName" placeholder="e.g. Unit 105" required>
+      </label>
+
+      <label class="field">
+        <span>Renter Name</span>
+        <input name="renterName" id="renterName" placeholder="e.g. John Doe" required>
+      </label>
+
+      <label class="field">
+        <span>Start Date</span>
+        <input name="startDate" id="startDate" type="date" required>
+      </label>
+
+      <label class="field">
+        <span>End Date</span>
+        <input name="endDate" id="endDate" type="date" required>
+      </label>
+
+      <label class="field">
+        <span>Monthly Rent (PHP)</span>
+        <input name="monthlyRent" id="monthlyRent" type="number" min="0" step="0.01" placeholder="e.g. 8500.00" required>
+      </label>
+
+      <label class="field">
+        <span>Special Terms / Notes (optional)</span>
+        <textarea name="leaseTerms" id="leaseTerms" rows="3" placeholder="Enter special agreement notes or conditions..."></textarea>
+      </label>
+
+      <label class="check">
+        <input name="confirmTerms" id="confirmTerms" type="checkbox" required> I confirm all lease details are accurate
+      </label>
+
+      <button id="btnSave" class="btn btn-primary btn-block" type="submit">Save Lease</button>
+    </form>
+
+    <div id="statusActions" class="status-actions">
+      <h3>Lease Actions</h3>
+      <div class="button-group">
+        <button id="btnActivate" class="btn btn-success" type="button">Activate Lease</button>
+        <button id="btnArchive" class="btn btn-danger" type="button">Archive Lease</button>
+      </div>
+    </div>
   </main>
 
   <script src="/js/common/api.js"></script>
