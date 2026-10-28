@@ -94,7 +94,7 @@ The plotter works end to end against the real database.
 - `SpaceGrid-Phase2-ERD.drawio` (schema in `database/spacegrid_db.sql`).
 - `SpaceGrid-Phase3-FileStructure.md`: the page list with each page's endpoints.
 - `HOW-TO-CONNECT.md`: matching pages to controllers (`@RequestParam` vs `@RequestBody`, date/enum formats).
-- The final project document (.docx) must be updated if the design changes.
+- Create a .md file logging if the design changes.
 
 ## Working with me
 - I'm a student. Explain changes simply, and keep code readable rather than clever.
