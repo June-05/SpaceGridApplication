@@ -12,11 +12,12 @@
 <body class="plotter-page">
   <!--
     GRID PLOTTER  (/landlord/property-grid.html?id=1)
-      GET  /api/properties/{id}                    property + zones (with positions) + edgesByType
-      PUT  /api/properties/{id}/grid?rows=&cols=   JSON {"zoneId": [{"row":0,"col":0}, ...]}
-      PUT  /api/properties/{id}/edges              JSON {"DOOR": [{"row":2,"col":0,"orientation":"HORIZONTAL"}]}
-      POST /api/properties/{id}/units              form: name, rentalRate, electricity, water, exactSize, areaSqm
-      POST /api/properties/{id}/common-areas       form: name, areaType
+      GET  /api/properties/{id}                                property + zones (with positions) + edgesByType
+      PUT  /api/properties/{id}/grid?rows=&cols=               JSON {"zoneId": [{"row":0,"col":0}, ...]}
+      PUT  /api/properties/{id}/edges                          JSON {"DOOR": [{"row":2,"col":0,"orientation":"HORIZONTAL"}]}
+      POST /api/properties/{id}/units                          form: name, rentalRate, electricity, water, exactSize, areaSqm
+      POST /api/properties/{id}/common-areas                   form: name, areaType, color (optional "#rrggbb")
+      PUT  /api/properties/{id}/common-areas/{areaId}/color    form: color
     The grid fills the window; the toolbar, panel and buttons float on top (plotter.css).
     Keyboard shortcuts: press ? on the page, or see SHORTCUTS in /js/pages/property-grid.js.
   -->
@@ -29,8 +30,6 @@
     <symbol id="i-rect" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="2"/><path d="M8 9h8v6H8z" stroke-dasharray="2 2"/></symbol>
     <symbol id="i-eraser" viewBox="0 0 24 24"><path d="M15.5 3.5l5 5L10 19H5.5l-3-3zM8.5 10.5l5 5M10 19h11"/></symbol>
     <symbol id="i-wall" viewBox="0 0 24 24"><path d="M3 5h18v14H3zM3 12h18M9 5v7M15 12v7"/></symbol>
-    <symbol id="i-door" viewBox="0 0 24 24"><path d="M6 21V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v17M3 21h18M14.5 12.5v.01"/></symbol>
-    <symbol id="i-window" viewBox="0 0 24 24"><path d="M4 4h16v16H4zM12 4v16M4 12h16"/></symbol>
     <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 14L4 9l5-5M4 9h11a5 5 0 0 1 0 10h-4"/></symbol>
     <symbol id="i-redo" viewBox="0 0 24 24"><path d="M15 14l5-5-5-5M20 9H9a5 5 0 0 0 0 10h4"/></symbol>
     <symbol id="i-more" viewBox="0 0 24 24"><path d="M5 12h.01M12 12h.01M19 12h.01" stroke-width="3.2"/></symbol>
@@ -38,12 +37,14 @@
     <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
     <symbol id="i-chevron" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
     <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
-    <symbol id="i-grid" viewBox="0 0 24 24"><path d="M4 4h16v16H4zM4 10h16M4 15h16M10 4v16M15 4v16"/></symbol>
+    <symbol id="i-resize" viewBox="0 0 24 24"><path d="M4 4h10v10H4zM14 9h6v11H9v-6M17 17l3 3M20 17v3h-3"/></symbol>
     <symbol id="i-spots" viewBox="0 0 24 24"><path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4z"/><path d="M13 13h7v7h-7z" stroke-dasharray="2 2"/></symbol>
   </svg>
 
-  <!-- THE CANVAS: the whole window -->
-  <main id="gridHost" class="grid-host pl-canvas mode-spots tool-hand" aria-label="Property grid"></main>
+  <!-- THE CANVAS: the whole window. The world is bigger than the window, so the grid can always be moved around. -->
+  <main id="gridHost" class="grid-host pl-canvas mode-spots tool-hand" aria-label="Property grid">
+    <div id="gridWorld" class="pl-world"></div>
+  </main>
 
   <!-- top-left: back + property name -->
   <header class="pl-float pl-title">
@@ -75,7 +76,7 @@
     <button id="btnLogout" class="menu-item is-danger" type="button" role="menuitem">Log out</button>
   </div>
 
-  <!-- floating panel: zones (Spots) or legend (Walls & doors). Drag by the header. -->
+  <!-- floating panel: zones (Spots) or wall types (Walls). Drag by the header. -->
   <aside id="panel" class="pl-float pl-panel" aria-labelledby="panelTitle">
     <div id="panelHead" class="pl-panel-head">
       <h2 id="panelTitle">Zones</h2>
@@ -83,75 +84,38 @@
         <svg class="ico"><use href="#i-chevron"/></svg>
       </button>
     </div>
+    <!-- stays in place while the list below scrolls -->
+    <div id="panelTop" class="pl-panel-top">
+      <div class="add-buttons">
+        <button id="btnAddUnit" class="btn" type="button"><svg class="ico"><use href="#i-plus"/></svg> Unit</button>
+        <button id="btnAddArea" class="btn" type="button"><svg class="ico"><use href="#i-plus"/></svg> Common area</button>
+      </div>
+      <input id="zoneFilter" class="panel-filter" type="search" placeholder="Filter zones…" aria-label="Filter zones" hidden>
+    </div>
     <div class="pl-panel-body">
-      <!-- Spots mode -->
       <section id="spotTools" class="panel-section">
-        <p class="panel-help">Pick a zone (or press 1–9), then paint with the Brush or Rectangle.</p>
-        <input id="zoneFilter" class="panel-filter" type="search" placeholder="Filter zones…" aria-label="Filter zones" hidden>
         <div id="zoneList" class="zone-list"></div>
-
-        <div class="add-buttons">
-          <button id="btnAddUnit" class="btn" type="button">+ Unit</button>
-          <button id="btnAddArea" class="btn" type="button">+ Common area</button>
-        </div>
-
-        <div id="addUnitBox" class="add-form" hidden>
-          <h4>New unit</h4>
-          <form id="addUnitForm" novalidate>
-            <label class="field"><span>Unit name</span><input name="name" maxlength="100" placeholder="e.g. Booth 12" required></label>
-            <label class="field"><span>Monthly rate (₱)</span><input name="rentalRate" type="number" min="0" step="0.01" required></label>
-            <label class="field"><span>Area in sqm (optional)</span><input name="areaSqm" type="number" min="0.01" step="0.01"></label>
-            <label class="check"><input name="electricity" type="checkbox"> Includes electricity</label>
-            <label class="check"><input name="water" type="checkbox"> Includes water</label>
-            <div class="form-actions">
-              <button class="btn" type="button" data-cancel>Cancel</button>
-              <button class="btn btn-primary" type="submit">Add unit</button>
-            </div>
-          </form>
-        </div>
-
-        <div id="addAreaBox" class="add-form" hidden>
-          <h4>New common area</h4>
-          <form id="addAreaForm" novalidate>
-            <label class="field"><span>Name</span><input name="name" maxlength="100" placeholder="e.g. Hallway" required></label>
-            <label class="field"><span>Type</span>
-              <select name="areaType">
-                <option value="WALKWAY">Walkway</option>
-                <option value="GRASS">Grass</option>
-                <option value="BATHROOM">Bathroom</option>
-                <option value="KITCHEN">Kitchen</option>
-                <option value="LAUNDRY">Laundry</option>
-                <option value="LOBBY">Lobby</option>
-                <option value="PARKING">Parking</option>
-                <option value="STAIRS">Stairs</option>
-              </select>
-            </label>
-            <div class="form-actions">
-              <button class="btn" type="button" data-cancel>Cancel</button>
-              <button class="btn btn-primary" type="submit">Add area</button>
-            </div>
-          </form>
-        </div>
       </section>
-
-      <!-- Walls & doors mode -->
       <section id="edgeTools" class="panel-section" hidden>
-        <p class="panel-help">Walls appear on their own around units and rooms. Pick a tool in the toolbar (1 Wall, 2 Door, 3 Window, E Eraser), then click or drag along the lines.</p>
-        <ul class="legend">
-          <li><span class="swatch swatch-wall"></span> Wall</li>
-          <li><span class="swatch swatch-door"></span> Door</li>
-          <li><span class="swatch swatch-window"></span> Window</li>
-          <li><span class="swatch swatch-open"></span> Erased wall (an opening)</li>
-        </ul>
+        <div id="edgeList" class="zone-list"></div>
+        <p class="panel-help">Walls appear on their own around units and rooms. Erase one to make an opening; it then shows as a dashed grey line.</p>
         <button id="btnResetEdges" class="btn btn-block" type="button">Reset all to automatic</button>
       </section>
     </div>
   </aside>
 
-  <!-- bottom-left: grid size + numbers -->
+  <!-- color picker for a common area (opened from its swatch in the list) -->
+  <div id="colorPop" class="pl-popover color-pop" role="dialog" aria-label="Pick a color" hidden>
+    <h3 id="colorTitle">Color</h3>
+    <div id="colorPalette" class="palette"></div>
+    <label class="custom-color">Custom <input id="colorCustom" type="color" aria-label="Custom color"></label>
+    <p id="colorNote" class="size-note" aria-live="polite"></p>
+  </div>
+
+  <!-- bottom-left: resize + numbers -->
   <div class="pl-float pl-status">
-    <button id="btnSize" class="text-btn" type="button" data-tip="Grid size" data-key="G" aria-haspopup="dialog" aria-expanded="false">
-      <svg class="ico"><use href="#i-grid"/></svg><span id="sizeLabel">– × –</span>
+    <button id="btnSize" class="text-btn resize-btn" type="button" data-tip="Resize the grid (or drag its edges)" data-key="G" aria-haspopup="dialog" aria-expanded="false">
+      <svg class="ico"><use href="#i-resize"/></svg>Resize grid<span id="sizeLabel" class="size-chip">– × –</span>
     </button>
     <span id="summary" class="pl-stats"></span>
   </div>
@@ -172,16 +136,18 @@
       </div>
     </div>
     <p id="sizeNote" class="size-note" aria-live="polite"></p>
+    <p class="size-tip">Tip: you can also drag the grid's right or bottom edge.</p>
     <div class="size-actions">
       <button id="btnSizeCancel" class="btn" type="button">Cancel</button>
       <button id="btnResize" class="btn btn-primary" type="button">Apply</button>
     </div>
   </div>
 
-  <!-- hint just above the toolbar -->
+  <!-- hint and the short "Rectangle" / "Brush" label just above the toolbar -->
   <p id="hint" class="pl-tip" aria-live="polite"></p>
+  <p id="flash" class="pl-flash" aria-hidden="true"></p>
 
-  <!-- bottom-center toolbar -->
+  <!-- bottom-center toolbar: always Spots | Walls · Hand · Brush/Rectangle · Eraser · Preview -->
   <div id="toolbar" class="pl-float pl-toolbar" role="toolbar" aria-label="Plotter tools">
     <div class="pl-modes" role="group" aria-label="Mode">
       <button class="text-btn is-active" type="button" data-mode="spots" data-tip="Spots" data-key="S" aria-pressed="true">
@@ -192,24 +158,16 @@
       </button>
     </div>
     <span class="pl-sep"></span>
-
-    <div id="spotToolBtns" class="pl-tools" role="group" aria-label="Spot tools">
-      <button class="icon-btn" type="button" data-tool="hand" data-tip="Hand: move around" data-key="H" aria-label="Hand"><svg class="ico"><use href="#i-hand"/></svg></button>
-      <button class="icon-btn" type="button" data-tool="brush" data-tip="Brush" data-key="B" aria-label="Brush"><svg class="ico"><use href="#i-brush"/></svg></button>
-      <button class="icon-btn" type="button" data-tool="rect" data-tip="Rectangle" data-key="R" aria-label="Rectangle"><svg class="ico"><use href="#i-rect"/></svg></button>
-      <button class="icon-btn" type="button" data-tool="erase" data-tip="Eraser" data-key="E" aria-label="Eraser"><svg class="ico"><use href="#i-eraser"/></svg></button>
-      <button id="zoneChip" class="zone-chip is-empty" type="button" data-tip="Current zone" data-key="1–9">
-        <span id="zoneChipSwatch" class="swatch"></span><span id="zoneChipName" class="zone-chip-name">Pick a zone</span>
-      </button>
-    </div>
-
-    <div id="edgeToolBtns" class="pl-tools" role="group" aria-label="Wall tools" hidden>
-      <button class="icon-btn" type="button" data-edge="hand" data-tip="Hand: move around" data-key="H" aria-label="Hand"><svg class="ico"><use href="#i-hand"/></svg></button>
-      <button class="icon-btn" type="button" data-edge="WALL" data-tip="Wall" data-key="1" aria-label="Wall"><svg class="ico"><use href="#i-wall"/></svg></button>
-      <button class="icon-btn" type="button" data-edge="DOOR" data-tip="Door" data-key="2" aria-label="Door"><svg class="ico"><use href="#i-door"/></svg></button>
-      <button class="icon-btn" type="button" data-edge="WINDOW" data-tip="Window" data-key="3" aria-label="Window"><svg class="ico"><use href="#i-window"/></svg></button>
-      <button class="icon-btn" type="button" data-edge="erase" data-tip="Eraser" data-key="E" aria-label="Eraser"><svg class="ico"><use href="#i-eraser"/></svg></button>
-    </div>
+    <button class="icon-btn" type="button" data-tool="hand" data-tip="Hand: move around" data-key="H" aria-label="Hand"><svg class="ico"><use href="#i-hand"/></svg></button>
+    <button id="btnDraw" class="icon-btn draw-btn" type="button" data-tool="draw" data-tip="Brush · click again for Rectangle" data-key="B" aria-label="Brush">
+      <svg class="ico"><use id="drawIcon" href="#i-brush"/></svg><span class="cycle-badge" aria-hidden="true">⇄</span>
+    </button>
+    <button class="icon-btn" type="button" data-tool="erase" data-tip="Eraser" data-key="E" aria-label="Eraser"><svg class="ico"><use href="#i-eraser"/></svg></button>
+    <span class="pl-sep"></span>
+    <button id="preview" class="pl-preview" type="button" data-tip="Show it in the panel" aria-label="Selection">
+      <span id="previewSwatch" class="swatch"></span>
+      <span class="preview-text"><span id="previewName" class="preview-name">Nothing selected</span><span id="previewMeta" class="preview-meta"></span></span>
+    </button>
   </div>
 
   <!-- bottom-right: zoom -->
@@ -225,11 +183,64 @@
     <button class="menu-item" type="button" role="menuitem" data-zoom="2">200%</button>
   </div>
 
+  <!-- add a unit / common area (saved on the server at once) -->
+  <dialog id="addDialog" class="pl-dialog add-dialog" aria-labelledby="addTitle">
+    <div class="pl-dialog-head">
+      <h2 id="addTitle">New unit</h2>
+      <button class="icon-btn" type="button" data-close aria-label="Close"><svg class="ico"><use href="#i-close"/></svg></button>
+    </div>
+    <div class="pl-dialog-body add-body">
+      <form id="addUnitForm" class="add-form" novalidate>
+        <label class="field"><span>Unit name</span><input name="name" maxlength="100" placeholder="e.g. Booth 12" required></label>
+        <label class="field"><span>Monthly rate (₱)</span><input name="rentalRate" type="number" min="0" step="0.01" required></label>
+        <label class="field"><span>Area in sqm (optional)</span><input name="areaSqm" type="number" min="0.01" step="0.01"></label>
+        <label class="check"><input name="electricity" type="checkbox"> Includes electricity</label>
+        <label class="check"><input name="water" type="checkbox"> Includes water</label>
+        <div class="preview-block">
+          <div id="unitPreview" class="zone-preview"><span class="zone-preview-label">New unit</span></div>
+          <p class="panel-help">Units are colored by their status: green while available, red when leased, amber under maintenance.</p>
+        </div>
+        <div class="form-actions">
+          <button class="btn" type="button" data-close>Cancel</button>
+          <button class="btn btn-primary" type="submit">Add unit</button>
+        </div>
+      </form>
+
+      <form id="addAreaForm" class="add-form" novalidate hidden>
+        <label class="field"><span>Name</span><input name="name" maxlength="100" placeholder="e.g. Hallway" required></label>
+        <label class="field"><span>Type</span>
+          <select name="areaType">
+            <option value="WALKWAY">Walkway</option>
+            <option value="GRASS">Grass</option>
+            <option value="BATHROOM">Bathroom</option>
+            <option value="KITCHEN">Kitchen</option>
+            <option value="LAUNDRY">Laundry</option>
+            <option value="LOBBY">Lobby</option>
+            <option value="PARKING">Parking</option>
+            <option value="STAIRS">Stairs</option>
+          </select>
+        </label>
+        <div class="field"><span>Color</span>
+          <div id="areaPalette" class="palette"></div>
+          <label class="custom-color">Custom <input id="areaCustom" type="color" aria-label="Custom color"></label>
+          <p id="areaColorNote" class="size-note" aria-live="polite"></p>
+        </div>
+        <div class="preview-block">
+          <div id="areaPreview" class="zone-preview"><span class="zone-preview-label">New area</span></div>
+        </div>
+        <div class="form-actions">
+          <button class="btn" type="button" data-close>Cancel</button>
+          <button class="btn btn-primary" type="submit">Add common area</button>
+        </div>
+      </form>
+    </div>
+  </dialog>
+
   <!-- keyboard shortcuts (filled from SHORTCUTS in property-grid.js) -->
   <dialog id="shortcutsDialog" class="pl-dialog" aria-labelledby="shortcutsTitle">
     <div class="pl-dialog-head">
       <h2 id="shortcutsTitle">Keyboard shortcuts</h2>
-      <button id="btnShortcutsClose" class="icon-btn" type="button" aria-label="Close"><svg class="ico"><use href="#i-close"/></svg></button>
+      <button class="icon-btn" type="button" data-close aria-label="Close"><svg class="ico"><use href="#i-close"/></svg></button>
     </div>
     <div id="shortcutsBody" class="pl-dialog-body"></div>
   </dialog>

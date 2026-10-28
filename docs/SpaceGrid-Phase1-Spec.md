@@ -280,12 +280,16 @@ Values: AVAILABLE, OCCUPIED, UNDER_MAINTENANCE, ARCHIVED
 
 #### `CommonArea`, Class · entity · extends `GridZone`
 
-A non-rentable zone (walkway, grass, shared bathroom...). isRentable() is false; isEnclosed() follows areaType.isIndoor().
+A non-rentable zone (walkway, grass, shared bathroom...). isRentable() is false; isEnclosed() follows areaType.isIndoor(). getColor() is the picked color, else the type's default.
 
 ```
 - areaType: CommonAreaType
+- customColor: String            // "#rrggbb" picked by the landlord, null = the type's default
 
 + CommonArea(propertyId: int, name: String, areaType: CommonAreaType)
++ CommonArea(propertyId: int, name: String, areaType: CommonAreaType, color: String)
++ getCustomColor(): String
++ changeColor(color: String): void          // checks "#rrggbb", stores lower-case
 + changeType(areaType: CommonAreaType): void
 + isRentable(): boolean
 + isEnclosed(): boolean
@@ -599,6 +603,7 @@ Reads the `lease_request_details` view; writes `lease_requests`. `update` change
 
 ```
 + findByPropertyId(propertyId: int): List<CommonArea>
++ updateColor(zoneId: int, color: String): void
 ```
 
 #### `JdbcCommonAreaDao`, Class · repository · implements `CommonAreaDao`
@@ -714,7 +719,9 @@ Reads the `lease_request_details` view; writes `lease_requests`. `update` change
 - propertyService: PropertyService
 
 + getCommonAreas(propertyId: int, landlord: User): List<CommonArea>
-+ addCommonArea(propertyId: int, landlord: User, name: String, areaType: CommonAreaType): CommonArea
++ addCommonArea(propertyId: int, landlord: User, name: String, areaType: CommonAreaType, color: String): CommonArea
++ changeColor(propertyId: int, areaId: int, landlord: User, color: String): CommonArea
+- checkColorFree(property: Property, self: CommonArea, color: String): void   // unique in the property, not a unit status color
 + updateCommonArea(areaId: int, landlord: User, name: String, areaType: CommonAreaType): CommonArea
 + deleteCommonArea(areaId: int, landlord: User): void
 ```
@@ -827,7 +834,8 @@ Reads the `lease_request_details` view; writes `lease_requests`. `update` change
 - sessionManager: SessionManager
 
 + list(propertyId): List<CommonArea>
-+ create(propertyId, name, areaType): CommonArea
++ create(propertyId, name, areaType, color?): CommonArea
++ changeColor(propertyId, areaId, color): CommonArea
 + update(id, name, areaType): CommonArea
 + delete(id): void
 ```
@@ -836,6 +844,7 @@ Reads the `lease_request_details` view; writes `lease_requests`. `update` change
 |---|---|
 | `GET /api/properties/{propertyId}/common-areas` | `list` |
 | `POST /api/properties/{propertyId}/common-areas` | `create` |
+| `PUT /api/properties/{propertyId}/common-areas/{areaId}/color` | `changeColor` |
 | `PUT /api/common-areas/{id}` | `update` |
 | `DELETE /api/common-areas/{id}` | `delete` |
 

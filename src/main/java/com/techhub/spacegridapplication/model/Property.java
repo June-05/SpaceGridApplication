@@ -140,8 +140,13 @@ public class Property extends BaseEntity {
 
     @JsonIgnore
     public List<CommonArea> getCommonAreas() {
-        // TODO
-        throw new UnsupportedOperationException("TODO");
+        List<CommonArea> areas = new ArrayList<>();
+        for (GridZone zone : zones) {
+            if (zone instanceof CommonArea area) {
+                areas.add(area);
+            }
+        }
+        return areas;
     }
 
     public int countUnitsByStatus(UnitStatus status) {

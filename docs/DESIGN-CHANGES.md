@@ -105,6 +105,30 @@ No change to classes, tables, endpoints or saved data.
 
 ---
 
+## 2026-10-28 · Plotter fixes + common-area colors (design change)
+
+**Design change (approved): common areas can have their own color.** Units keep their status colors.
+- Table `common_areas`: new column `color CHAR(7) NULL` (`#rrggbb`, NULL = the type's default) with a CHECK. **Re-run `spacegrid_db.sql`.**
+- `CommonArea`: field `customColor`, a "new" constructor with a color, `getCustomColor()`, `changeColor(color)`; `getColor()` = picked color, else the type default. JSON gains `customColor`.
+- `CommonAreaDao.updateColor(zoneId, color)`; `JdbcPropertyDao` reads `c.color`.
+- `CommonAreaService.addCommonArea(..., color)` and `changeColor(propertyId, areaId, landlord, color)`. Rule: the color must differ from every other common area's color in the same property and from the 4 unit status colors → 409 ("That color is already used by Patio."). Other properties may reuse it.
+- Endpoints: `POST /api/properties/{id}/common-areas` takes an optional `color`; new `PUT /api/properties/{id}/common-areas/{areaId}/color` (form field `color`).
+- `Property.getCommonAreas()` (was a TODO) is now implemented, because the color rule needs it.
+
+**Plotter (UI only):**
+- Panning works even when the grid is small: the grid sits in a "world" with half a window of room on every side.
+- The toolbar is always **Spots | Walls · Hand · Brush/Rectangle · Eraser · Preview**, so it no longer shifts between modes. The tools are shared by both modes: in Walls mode the Brush draws the Wall/Door/Window picked in the panel, the **Rectangle draws it all around an area**, and Eraser + Shift + drag clears every line in an area.
+- **Brush/Rectangle** is one button: clicking it again (or B) switches between them, with the icon swapping, a ⇄ badge, a big "Rectangle"/"Brush" label flashing above the toolbar and the hint changing. R goes straight to Rectangle.
+- **Preview** (was the current-zone chip): shows what is selected; with the Hand it shows what is under the mouse (zone, status/type, rate, spot count, or the line's wall/door/window). Clicking it opens the panel and scrolls to + flashes the selected item.
+- Panel: **+ Unit / + Common area** sit at the top and stay put; the lists scroll under them. Both lists start with the **Eraser**; the Walls list is Eraser, Wall, Door, Window (same look as zones). A common area's swatch opens a color picker.
+- **Add dialogs** (popups) with a live preview tile. Common areas get a 16-color palette (status colors left out): colors already used are disabled ("Used by Walkway"), plus a custom color; the type's default is suggested when it is free.
+- **Resize**: drag handles on the grid's right edge, bottom edge and corner (live "rows × cols" badge, shrink still asks, one undo step); the bottom-left button is now a tinted "Resize grid · 24 × 30".
+- Not changed: the words "Zones" and "spots" (the rename was dropped).
+
+**Checked:** Maven build + tests; live API run on a scratch copy of the database (create with/without color, duplicates in the same property → 409, same color in another property → 200, status color → 409, bad hex → 400, other landlord → 403, area of another property / a unit id → 404, the DB CHECK); Node tests of the rectangle line helpers and the earlier renderer tests; a jsdom run of the real page (43 checks). Not tried in a real browser: the look of the dialogs, palette, handles and flash label.
+
+---
+
 ## PROPOSED (not built) · Commercial ready, permits, bigger grid with zoom
 
 Status: **decided, not implemented.** Nothing below exists in the code yet. When a part is built, move it into a dated section above and update the docs listed at the end.

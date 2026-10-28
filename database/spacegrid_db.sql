@@ -109,11 +109,13 @@ CREATE TABLE rentable_units (
 CREATE TABLE common_areas (
     zone_id    INT         NOT NULL,                       -- same id as grid_zones.id
     area_type  VARCHAR(20) NOT NULL,
+    color      CHAR(7)     NULL,                           -- '#rrggbb' picked by the landlord; NULL = the type's default
     CONSTRAINT pk_common_areas PRIMARY KEY (zone_id),
     CONSTRAINT fk_common_areas_zone FOREIGN KEY (zone_id) REFERENCES grid_zones (id)
         ON DELETE CASCADE ON UPDATE RESTRICT,
     CONSTRAINT ck_common_areas_type CHECK (area_type IN
-        ('WALKWAY', 'GRASS', 'BATHROOM', 'KITCHEN', 'LAUNDRY', 'LOBBY', 'PARKING', 'STAIRS'))
+        ('WALKWAY', 'GRASS', 'BATHROOM', 'KITCHEN', 'LAUNDRY', 'LOBBY', 'PARKING', 'STAIRS')),
+    CONSTRAINT ck_common_areas_color CHECK (color IS NULL OR color REGEXP '^#[0-9a-f]{6}$')
 ) ENGINE = InnoDB;
 
 -- ---------------------------------------------------------------------
@@ -348,13 +350,14 @@ INSERT INTO rentable_units (zone_id, rental_rate, is_exact_size, size_descriptio
     (19, 3000.00, 0, 'Large plot', NULL, 0, 0, 'AVAILABLE'),
     (20, 2200.00, 0, 'Small plot', NULL, 0, 0, 'AVAILABLE');
 
-INSERT INTO common_areas (zone_id, area_type) VALUES
-    (4, 'WALKWAY'),
-    (5, 'BATHROOM'),
-    (7, 'GRASS'),
-    (10, 'LOBBY'),
-    (13, 'PARKING'),
-    (18, 'WALKWAY');
+-- color NULL = the type's default color. The night market walkway shows a picked color.
+INSERT INTO common_areas (zone_id, area_type, color) VALUES
+    (4, 'WALKWAY', NULL),
+    (5, 'BATHROOM', NULL),
+    (7, 'GRASS', NULL),
+    (10, 'LOBBY', NULL),
+    (13, 'PARKING', NULL),
+    (18, 'WALKWAY', '#fde68a');
 
 INSERT INTO zone_cells (property_id, row_idx, col_idx, zone_id) VALUES
     (1, 0, 0, 1),

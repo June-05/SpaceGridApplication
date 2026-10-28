@@ -137,6 +137,22 @@ const gridRenderer = {
     return true;
   },
 
+  /** The lines around the cells top..bottom × left..right, as [orientation, r, c] (a walled box). */
+  rectOutlineEdges(top, left, bottom, right) {
+    const lines = [];
+    for (let c = left; c <= right; c++) lines.push(['HORIZONTAL', top, c], ['HORIZONTAL', bottom + 1, c]);
+    for (let r = top; r <= bottom; r++) lines.push(['VERTICAL', r, left], ['VERTICAL', r, right + 1]);
+    return lines;
+  },
+
+  /** Every line inside or on the outline of that rectangle (used to erase an area). */
+  rectAllEdges(top, left, bottom, right) {
+    const lines = [];
+    for (let r = top; r <= bottom + 1; r++) for (let c = left; c <= right; c++) lines.push(['HORIZONTAL', r, c]);
+    for (let r = top; r <= bottom; r++) for (let c = left; c <= right + 1; c++) lines.push(['VERTICAL', r, c]);
+    return lines;
+  },
+
   /**
    * Draws the grid into container.
    * options: { mode: 'view' | 'spots' | 'edges', brushZoneId, highlightZoneId, minCell, maxCell,

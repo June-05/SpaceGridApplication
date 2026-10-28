@@ -42,7 +42,7 @@ public class JdbcPropertyDao implements PropertyDao {
     private static final String ZONES_SQL = """
             SELECT z.id, z.created_at, z.property_id, z.zone_kind, z.name,
                    u.rental_rate, u.is_exact_size, u.size_description, u.area_sqm,
-                   u.includes_electricity, u.includes_water, u.status, c.area_type
+                   u.includes_electricity, u.includes_water, u.status, c.area_type, c.color
             FROM grid_zones z
             LEFT JOIN rentable_units u ON u.zone_id = z.id
             LEFT JOIN common_areas c ON c.zone_id = z.id
@@ -221,7 +221,7 @@ public class JdbcPropertyDao implements PropertyDao {
                         UnitStatus.valueOf(rs.getString("status")));
             }
             return new CommonArea(zoneId, createdAt, propertyId, name, positions,
-                    CommonAreaType.valueOf(rs.getString("area_type")));
+                    CommonAreaType.valueOf(rs.getString("area_type")), rs.getString("color"));
         }, propertyId);
     }
 

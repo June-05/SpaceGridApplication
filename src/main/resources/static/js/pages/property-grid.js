@@ -6,13 +6,18 @@
  * 3. "Save" sends two requests, in this order:
  *      api.json('PUT', `/api/properties/${id}/grid?rows=&cols=`, { "zoneId": [{row, col}] })
  *      api.json('PUT', `/api/properties/${id}/edges`, { "DOOR": [{row, col, orientation}] })
- * 4. Add a unit / common area:     api.form('POST', `/api/properties/${id}/units`, {...})
- *                                  api.form('POST', `/api/properties/${id}/common-areas`, {...})
+ * 4. Add a unit / common area (saved at once, from the add dialog):
+ *      api.form('POST', `/api/properties/${id}/units`, {...})
+ *      api.form('POST', `/api/properties/${id}/common-areas`, { name, areaType, color })
+ * 5. Change a common area's color (saved at once):
+ *      api.form('PUT', `/api/properties/${id}/common-areas/${areaId}/color`, { color })
  *
- * Screen: the grid fills the window; toolbar (bottom), Zones panel (floating, floating-panel.js), size and zoom
- * controls float on top. Every keyboard shortcut is in SHORTCUTS below (the "?" dialog is built from the same list).
- * Undo / redo keep snapshots of the size, spots and edge overrides (gridRenderer.snapshot); adding a zone is
- * saved on the server at once and is not undone.
+ * Screen: the grid fills the window; toolbar (bottom), Zones panel (floating, floating-panel.js), resize and zoom
+ * controls float on top. The toolbar is the same in both modes: Spots | Walls · Hand · Brush/Rectangle · Eraser ·
+ * Preview. In Spots mode the tools paint the chosen zone; in Walls mode they draw the chosen Wall, Door or Window.
+ * Every keyboard shortcut is in SHORTCUTS below (the "?" dialog is built from the same list).
+ * Undo / redo keep snapshots of the size, spots and edge overrides (gridRenderer.snapshot); adding a zone or
+ * changing a color is saved on the server at once and is not undone.
  */
 document.addEventListener('DOMContentLoaded', async () => {
   const user = await auth.requireLogin('LANDLORD');
@@ -23,41 +28,65 @@ document.addEventListener('DOMContentLoaded', async () => {
   const ZOOM_KEY = 'spacegrid.gridZoom';
   const PANEL_KEY = 'spacegrid.zonesPanel';
   const HISTORY_LIMIT = 100;
-  const SPOT_TOOLS = { hand: 'Hand', brush: 'Brush', rect: 'Rectangle', [ERASER]: 'Eraser' };
-  const EDGE_TOOLS = { hand: 'Hand', WALL: 'Wall', DOOR: 'Door', WINDOW: 'Window', [ERASER]: 'Eraser' };
-  const EDGE_BY_DIGIT = { 1: 'WALL', 2: 'DOOR', 3: 'WINDOW' };
+  const TOOL_NAMES = { hand: 'Hand', brush: 'Brush', rect: 'Rectangle', [ERASER]: 'Eraser' };
+  const EDGE_TYPES = [
+    { type: 'WALL', name: 'Wall', meta: 'A solid wall' },
+    { type: 'DOOR', name: 'Door', meta: 'A gap people walk through' },
+    { type: 'WINDOW', name: 'Window', meta: 'A wall you can see through' }
+  ];
+  // Same as the defaultColor values in CommonAreaType.java and UnitStatus.java.
+  const TYPE_COLORS = {
+    WALKWAY: '#d6d3d1', GRASS: '#86efac', BATHROOM: '#bae6fd', KITCHEN: '#fde68a',
+    LAUNDRY: '#ddd6fe', LOBBY: '#fbcfe8', PARKING: '#9ca3af', STAIRS: '#a8a29e'
+  };
+  const INDOOR_TYPES = ['BATHROOM', 'KITCHEN', 'LAUNDRY', 'LOBBY', 'STAIRS'];
+  const STATUS_COLORS = { '#16a34a': 'available units', '#dc2626': 'occupied units', '#f59e0b': 'units under maintenance', '#9ca3af': 'archived units' };
+  const UNIT_PREVIEW_COLOR = '#16a34a';
+  // Colors offered for common areas (the unit status colors are left out on purpose).
+  const PALETTE = ['#d6d3d1', '#86efac', '#bae6fd', '#fde68a', '#ddd6fe', '#fbcfe8', '#a8a29e', '#fecaca',
+    '#fed7aa', '#d9f99d', '#99f6e4', '#a5f3fc', '#c7d2fe', '#f5d0fe', '#e7e5e4', '#cbd5e1'];
 
   const $ = (id) => document.getElementById(id);
   const el = {
-    name: $('propertyName'), host: $('gridHost'), hint: $('hint'), summary: $('summary'), sizeLabel: $('sizeLabel'),
+    name: $('propertyName'), host: $('gridHost'), world: $('gridWorld'), hint: $('hint'), flash: $('flash'),
+    summary: $('summary'), sizeLabel: $('sizeLabel'),
     btnSave: $('btnSave'), saveState: $('saveState'), btnUndo: $('btnUndo'), btnRedo: $('btnRedo'),
-    panelTitle: $('panelTitle'), spotTools: $('spotTools'), edgeTools: $('edgeTools'),
-    zoneList: $('zoneList'), zoneFilter: $('zoneFilter'), zoneChip: $('zoneChip'),
-    zoneChipSwatch: $('zoneChipSwatch'), zoneChipName: $('zoneChipName'),
-    spotToolBtns: $('spotToolBtns'), edgeToolBtns: $('edgeToolBtns'),
+    panelTitle: $('panelTitle'), panelTop: $('panelTop'), spotTools: $('spotTools'), edgeTools: $('edgeTools'),
+    zoneList: $('zoneList'), edgeList: $('edgeList'), zoneFilter: $('zoneFilter'),
+    btnDraw: $('btnDraw'), drawIcon: $('drawIcon'),
+    preview: $('preview'), previewSwatch: $('previewSwatch'), previewName: $('previewName'), previewMeta: $('previewMeta'),
     sizePop: $('sizePop'), rows: $('inpRows'), cols: $('inpCols'), sizeNote: $('sizeNote'), btnSize: $('btnSize'),
     zoomPop: $('zoomPop'), zoomLabel: $('zoomLabel'), btnZoomMenu: $('btnZoomMenu'),
     menuPop: $('menuPop'), btnMenu: $('btnMenu'),
-    addUnitBox: $('addUnitBox'), addAreaBox: $('addAreaBox'),
-    dialog: $('shortcutsDialog'), toast: $('toast')
+    colorPop: $('colorPop'), colorTitle: $('colorTitle'), colorPalette: $('colorPalette'), colorCustom: $('colorCustom'),
+    colorNote: $('colorNote'),
+    addDialog: $('addDialog'), addTitle: $('addTitle'), addUnitForm: $('addUnitForm'), addAreaForm: $('addAreaForm'),
+    unitPreview: $('unitPreview'), areaPreview: $('areaPreview'), areaPalette: $('areaPalette'),
+    areaCustom: $('areaCustom'), areaColorNote: $('areaColorNote'),
+    shortcutsDialog: $('shortcutsDialog'), toast: $('toast')
   };
 
   const propertyId = Number(new URLSearchParams(location.search).get('id'));
   const state = {
     layout: null,
     mode: 'spots',             // 'spots' | 'edges'
-    tool: 'hand',              // spots tool: hand | brush | rect | erase
-    edgeTool: 'hand',          // edges tool: hand | WALL | DOOR | WINDOW | erase
-    zoneId: null,              // the zone the Brush / Rectangle paint with
+    tool: 'hand',              // hand | brush | rect | erase (the same tools in both modes)
+    lastDraw: 'brush',         // what the Brush/Rectangle button goes back to
+    zoneId: null,              // Spots: the zone the Brush / Rectangle paint with
+    edgeType: 'WALL',          // Walls: what the Brush / Rectangle draw (WALL, DOOR, WINDOW)
     zoom: loadZoom(),          // a cell size in px, or 'fit'
     painting: false,           // dragging the brush or eraser over spots
-    edgePainting: false,       // dragging a wall/door/window/eraser tool along lines
+    edgePainting: false,       // dragging along lines in Walls mode
     lastEdgeKey: null,         // the line the drag touched last (so one line is not applied twice in a row)
     rect: null,                // { r0, c0, r1, c1, erase } while a rectangle is being dragged
     stroke: null,              // snapshot taken when a drag starts (becomes one undo step)
+    resizing: null,            // { dir, rows, cols } while a resize handle is dragged
+    hover: null,               // what the Hand is over: { r, c } or { line: [orientation, r, c] }
     space: false,              // space bar held down: drag to pan
     pan: null,                 // { x, y, left, top } while panning
     openPop: null,             // { pop, anchor } of the open popover
+    addColor: null,            // color chosen in the add-common-area dialog
+    addColorPicked: false,     // true once the user picked a color (then changing the type keeps it)
     dirty: false,
     saving: false,
     saved: false               // true after a save, until the next change
@@ -95,6 +124,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     toastTimer = setTimeout(() => el.toast.classList.remove('is-visible'), 3500);
   }
 
+  /** A short big label above the toolbar, e.g. "Rectangle" after switching tools. */
+  let flashTimer;
+  function flash(text) {
+    el.flash.textContent = text;
+    el.flash.classList.add('is-visible');
+    clearTimeout(flashTimer);
+    flashTimer = setTimeout(() => el.flash.classList.remove('is-visible'), 900);
+  }
+
   const visibleZones = () => state.layout.zones.filter(z => !(z.rentable && z.status === 'ARCHIVED'));
   /** Units first, then common areas: the order of the list and of the 1–9 keys. */
   const orderedZones = () => [...visibleZones().filter(z => z.rentable), ...visibleZones().filter(z => !z.rentable)];
@@ -103,9 +141,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     for (const id of state.layout.cells.values()) counts.set(id, (counts.get(id) || 0) + 1);
     return counts;
   };
-  const activeTool = () => (state.mode === 'edges' ? state.edgeTool : state.tool);
   const currentZone = () => (state.zoneId == null ? null : gridRenderer.zoneById(state.layout, state.zoneId));
-  const busy = () => state.painting || state.edgePainting || Boolean(state.rect) || Boolean(state.pan);
+  const edgeInfo = (type) => EDGE_TYPES.find(t => t.type === type);
+  const isDrawTool = () => state.tool === 'brush' || state.tool === 'rect';
+  const busy = () => state.painting || state.edgePainting || Boolean(state.rect) || Boolean(state.pan) || Boolean(state.resizing);
+  const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+  const stage = () => el.world.querySelector('.grid-stage');
 
   // ------------------------------------------------------------------ undo / redo
   /** Call after an edit with the snapshot taken before it. Returns true if the edit changed anything. */
@@ -141,20 +182,26 @@ document.addEventListener('DOMContentLoaded', async () => {
     el.btnRedo.disabled = !history.redo.length;
   }
 
-  // ------------------------------------------------------------------ zoom
+  // ------------------------------------------------------------------ zoom and view
   const clampCell = (n) => Math.max(CELL_MIN, Math.min(CELL_MAX, Math.round(n)));
 
-  /** Spot size that makes the whole grid fit the canvas (inside its padding, so the floating parts don't cover it). */
+  /** Spot size that makes the whole grid fit the window, leaving room for the floating parts around it. */
   function fitCell() {
     const L = state.layout;
-    const cs = getComputedStyle(el.host);
-    const pad = (side) => parseFloat(cs[`padding${side}`]) || 0;
-    const width = el.host.clientWidth - pad('Left') - pad('Right');
-    const height = el.host.clientHeight - pad('Top') - pad('Bottom');
+    const narrow = window.innerWidth < 760;
+    const width = el.host.clientWidth - (narrow ? 48 : 200);
+    const height = el.host.clientHeight - (narrow ? 210 : 214);
     return Math.max(CELL_MIN, Math.min(CELL_FIT_MAX, Math.floor(Math.min(width / L.cols, height / L.rows))));
   }
 
   const currentCell = () => (typeof state.zoom === 'number' ? state.zoom : fitCell());
+
+  /** Scrolls so the grid is in the middle of the window. */
+  function centerView() {
+    const host = el.host;
+    host.scrollLeft = (host.scrollWidth - host.clientWidth) / 2;
+    host.scrollTop = (host.scrollHeight - host.clientHeight) / 2;
+  }
 
   /** value = a cell size in px or 'fit'. (ax, ay) = a screen point that stays in place (default: the middle). */
   function setZoom(value, ax, ay) {
@@ -168,6 +215,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     state.zoom = value === 'fit' ? 'fit' : clampCell(value);
     saveZoom();
     render();
+    if (state.zoom === 'fit') { centerView(); return; }
     host.scrollLeft = fx * host.scrollWidth - mx;
     host.scrollTop = fy * host.scrollHeight - my;
   }
@@ -180,6 +228,23 @@ document.addEventListener('DOMContentLoaded', async () => {
     setZoom(next, ax, ay);
   }
 
+  /** The cell under a screen point, or null outside the grid (clamp = keep it inside, for dragging). */
+  function cellAtPoint(x, y, clamp) {
+    const s = stage();
+    if (!s) return null;
+    const box = s.getBoundingClientRect();
+    const cell = currentCell();
+    let r = Math.floor((y - box.top) / cell), c = Math.floor((x - box.left) / cell);
+    const L = state.layout;
+    if (clamp) {
+      r = Math.max(0, Math.min(L.rows - 1, r));
+      c = Math.max(0, Math.min(L.cols - 1, c));
+    } else if (r < 0 || c < 0 || r >= L.rows || c >= L.cols) {
+      return null;
+    }
+    return { r, c };
+  }
+
   // ------------------------------------------------------------------ rendering
   // Painting by dragging calls scheduleRender() for every spot; the grid is drawn at most once per frame.
   let renderFrame = 0;
@@ -190,14 +255,16 @@ document.addEventListener('DOMContentLoaded', async () => {
   function render() {
     const L = state.layout;
     if (!L) return;
-    gridRenderer.render(el.host, L, {
+    gridRenderer.render(el.world, L, {
       mode: state.mode,
-      brushZoneId: state.mode === 'spots' && state.tool !== ERASER ? state.zoneId : null,
+      brushZoneId: state.mode === 'spots' && isDrawTool() ? state.zoneId : null,
       cell: currentCell()
     });
+    addResizeHandles();
     el.host.classList.toggle('mode-spots', state.mode === 'spots');
     el.host.classList.toggle('mode-edges', state.mode === 'edges');
-    el.host.classList.toggle('tool-hand', activeTool() === 'hand');
+    el.host.classList.toggle('tool-hand', state.tool === 'hand');
+    el.host.classList.toggle('tool-rect', state.tool === 'rect');
     renderToolbar();
     renderPanel();
     renderStatus();
@@ -213,21 +280,88 @@ document.addEventListener('DOMContentLoaded', async () => {
       b.classList.toggle('is-active', b.dataset.mode === state.mode);
       b.setAttribute('aria-pressed', String(b.dataset.mode === state.mode));
     });
-    el.spotToolBtns.hidden = state.mode !== 'spots';
-    el.edgeToolBtns.hidden = state.mode !== 'edges';
-    el.spotToolBtns.querySelectorAll('[data-tool]').forEach(b => {
-      b.classList.toggle('is-active', b.dataset.tool === state.tool);
-      b.setAttribute('aria-pressed', String(b.dataset.tool === state.tool));
+    document.querySelectorAll('#toolbar [data-tool]').forEach(b => {
+      const active = b.dataset.tool === 'draw' ? isDrawTool() : b.dataset.tool === state.tool;
+      b.classList.toggle('is-active', active);
+      b.setAttribute('aria-pressed', String(active));
     });
-    el.edgeToolBtns.querySelectorAll('[data-edge]').forEach(b => {
-      b.classList.toggle('is-active', b.dataset.edge === state.edgeTool);
-      b.setAttribute('aria-pressed', String(b.dataset.edge === state.edgeTool));
-    });
-    const zone = currentZone();
-    el.zoneChip.classList.toggle('is-empty', !zone);
-    el.zoneChipName.textContent = zone ? zone.name : 'Pick a zone';
-    el.zoneChipSwatch.className = 'swatch' + (zone ? ' ' + zone.cssClasses : '');
-    el.zoneChipSwatch.style.setProperty('--zone-color', zone ? zone.color : '#e2e8f0');
+    // the Brush/Rectangle button shows the shape it will use
+    const shape = state.tool === 'rect' || (!isDrawTool() && state.lastDraw === 'rect') ? 'rect' : 'brush';
+    el.drawIcon.setAttribute('href', shape === 'rect' ? '#i-rect' : '#i-brush');
+    el.btnDraw.dataset.tip = shape === 'rect' ? 'Rectangle · click again for Brush' : 'Brush · click again for Rectangle';
+    el.btnDraw.dataset.key = shape === 'rect' ? 'R' : 'B';
+    el.btnDraw.setAttribute('aria-label', TOOL_NAMES[shape]);
+    renderPreview();
+  }
+
+  function setSwatch(sw, kind) {
+    sw.className = 'swatch';
+    sw.style.removeProperty('--zone-color');
+    if (!kind) { sw.classList.add('swatch-none'); return; }
+    if (kind.zone) {
+      sw.className = 'swatch ' + kind.zone.cssClasses;
+      sw.style.setProperty('--zone-color', kind.zone.color);
+    } else {
+      sw.classList.add(`swatch-${kind.cls}`);
+    }
+  }
+
+  function zoneMeta(zone, count) {
+    const cells = plural(count, 'spot');
+    return zone.rentable
+      ? `${format.label(zone.status)} · ${format.peso(zone.rentalRate)}/mo · ${cells}`
+      : `${format.label(zone.areaType)} · ${cells}`;
+  }
+
+  /** The Preview item: what the Hand is over, else what is selected. */
+  function renderPreview() {
+    let swatch = null, name = 'Nothing selected', meta = '', empty = false, hovering = false;
+    if (state.tool === 'hand' && state.hover) {
+      hovering = true;
+      if (state.hover.line) {
+        const [o, r, c] = state.hover.line;
+        const edge = gridRenderer.edgeAt(state.layout, o, r, c);
+        const type = edge ? edge.type : null;
+        swatch = type ? { cls: type.toLowerCase() } : null;
+        name = !type ? 'No wall' : type === 'OPEN' ? 'Erased wall' : `${edgeInfo(type).name}${edge.auto ? ' (automatic)' : ''}`;
+        meta = `${o === 'HORIZONTAL' ? 'Line above' : 'Line left of'} row ${r + 1}, column ${c + 1}`;
+      } else {
+        const { r, c } = state.hover;
+        const zone = gridRenderer.zoneAt(state.layout, r, c);
+        if (zone) {
+          swatch = { zone };
+          name = zone.name;
+          meta = zoneMeta(zone, spotCounts().get(zone.id) || 0);
+        } else {
+          name = 'Empty spot';
+          meta = `Row ${r + 1}, column ${c + 1}`;
+        }
+      }
+    } else if (state.tool === ERASER) {
+      swatch = { cls: 'erase' };
+      name = 'Eraser';
+      meta = state.mode === 'edges' ? 'Removes walls, doors and windows' : 'Clears spots';
+    } else if (state.mode === 'edges') {
+      const t = edgeInfo(state.edgeType);
+      swatch = { cls: t.type.toLowerCase() };
+      name = t.name;
+      meta = state.tool === 'hand' ? 'Selected · pick Brush to draw' : t.meta;
+    } else {
+      const zone = currentZone();
+      if (zone) {
+        swatch = { zone };
+        name = zone.name;
+        meta = state.tool === 'hand' ? 'Selected · pick Brush to paint' : zoneMeta(zone, spotCounts().get(zone.id) || 0);
+      } else {
+        empty = true;
+        meta = 'Pick a zone in the panel or press 1–9';
+      }
+    }
+    setSwatch(el.previewSwatch, swatch);
+    el.previewName.textContent = name;
+    el.previewMeta.textContent = meta;
+    el.preview.classList.toggle('is-empty', empty);
+    el.preview.classList.toggle('is-hover', hovering);
   }
 
   function renderStatus() {
@@ -237,52 +371,83 @@ document.addEventListener('DOMContentLoaded', async () => {
     el.sizeLabel.textContent = `${L.rows} × ${L.cols}`;
     el.summary.textContent = `${L.cells.size}/${L.rows * L.cols} spots · `
       + `${units.filter(u => counts.has(u.id)).length}/${units.length} units placed · `
-      + `${L.overrides.size} wall edit${L.overrides.size === 1 ? '' : 's'}`;
+      + `${plural(L.overrides.size, 'wall edit')}`;
   }
 
   function hintText() {
-    const zone = currentZone();
-    if (state.mode === 'edges') {
-      if (state.edgeTool === 'hand') return 'Hand: drag to move around. Tools: 1 Wall · 2 Door · 3 Window · E Eraser · ? for all keys';
-      return `${EDGE_TOOLS[state.edgeTool]}: click or drag along the lines between spots. Esc for the Hand.`;
+    if (state.tool === 'hand') {
+      return state.mode === 'edges'
+        ? 'Hand: drag to move around, hover to inspect. Pick Wall, Door or Window in the panel, then B to draw · ? for all keys'
+        : 'Hand: drag to move around, hover to inspect. Pick a zone (1–9), then B to paint · ? for all keys';
     }
-    if (state.tool === 'hand') return 'Hand: drag to move around. Tools: B Brush · R Rectangle · E Eraser · 1–9 zones · ? for all keys';
+    if (state.mode === 'edges') {
+      if (state.tool === ERASER) return 'Eraser: click or drag along lines. Shift + drag clears every line in an area.';
+      const t = edgeInfo(state.edgeType).name;
+      return state.tool === 'rect'
+        ? `${t} rectangle: drag over spots to draw a ${t.toLowerCase()} all around them.`
+        : `${t}: click or drag along the lines between spots. Shift + drag = rectangle.`;
+    }
     if (state.tool === ERASER) return 'Eraser: click or drag to clear spots. Shift + drag = rectangle.';
-    if (!zone) return `${SPOT_TOOLS[state.tool]}: pick a zone first (1–9 or the Zones panel), or Alt + click a placed spot.`;
-    if (state.tool === 'rect') return `Rectangle · ${zone.name}: drag to fill an area.`;
+    const zone = currentZone();
+    if (!zone) return `${TOOL_NAMES[state.tool]}: pick a zone first (1–9 or the panel), or Alt + click a placed spot.`;
+    if (state.tool === 'rect') return `Rectangle · ${zone.name}: drag to fill an area. Click the button again for the Brush.`;
     return `Brush · ${zone.name}: click or drag across spots. Shift + drag = rectangle · Alt + click = pick a zone.`;
   }
 
-  function zoneItem(zone, index, count) {
+  // ---- panel lists
+  function listItem({ key, keyLabel, swatch, name, meta, badge, warn, selected, colorZone }) {
     const btn = document.createElement('button');
     btn.type = 'button';
-    btn.className = 'zone-item' + (state.zoneId === zone.id ? ' is-selected' : '');
-    btn.dataset.zone = zone.id;
-    const key = document.createElement('span');
-    key.className = 'zone-key';
-    key.textContent = index < 9 ? String(index + 1) : '';
+    btn.className = 'zone-item' + (selected ? ' is-selected' : '');
+    Object.assign(btn.dataset, key);
+    const k = document.createElement('span');
+    k.className = 'zone-key';
+    k.textContent = keyLabel || '';
     const sw = document.createElement('span');
-    sw.className = 'swatch ' + zone.cssClasses;
-    sw.style.setProperty('--zone-color', zone.color);
+    setSwatch(sw, swatch);
+    let swatchEl = sw;
+    if (colorZone) {                                  // a common area: the swatch opens the color picker
+      swatchEl = document.createElement('span');
+      swatchEl.className = 'swatch-btn';
+      swatchEl.setAttribute('role', 'button');
+      swatchEl.tabIndex = 0;
+      swatchEl.dataset.color = colorZone.id;
+      swatchEl.title = `Change the color of ${colorZone.name}`;
+      swatchEl.appendChild(sw);
+    }
     const text = document.createElement('span');
     text.className = 'zone-text';
     text.innerHTML = '<span class="zone-name"></span><span class="zone-meta"></span>';
-    text.children[0].textContent = zone.name;
-    text.children[1].textContent = zone.rentable
-      ? `${format.label(zone.status)} · ${format.peso(zone.rentalRate)}/mo`
-      : format.label(zone.areaType);
-    const badge = document.createElement('span');
-    badge.className = 'badge' + (count ? '' : ' badge-warn');
-    badge.textContent = count ? `${count} spot${count === 1 ? '' : 's'}` : 'Not placed';
-    btn.append(key, sw, text, badge);
+    text.children[0].textContent = name;
+    text.children[1].textContent = meta;
+    btn.append(k, swatchEl, text);
+    if (badge) {
+      const b = document.createElement('span');
+      b.className = 'badge' + (warn ? ' badge-warn' : '');
+      b.textContent = badge;
+      btn.appendChild(b);
+    }
     return btn;
   }
 
   function renderPanel() {
-    el.panelTitle.textContent = state.mode === 'edges' ? 'Walls & doors' : 'Zones';
-    el.spotTools.hidden = state.mode !== 'spots';
-    el.edgeTools.hidden = state.mode !== 'edges';
-    if (state.mode !== 'spots') return;
+    const spots = state.mode === 'spots';
+    el.panelTitle.textContent = spots ? 'Zones' : 'Walls & doors';
+    el.panelTop.hidden = !spots;
+    el.spotTools.hidden = !spots;
+    el.edgeTools.hidden = spots;
+    const eraser = listItem({
+      key: { eraser: '1' }, keyLabel: 'E', swatch: { cls: 'erase' }, name: 'Eraser',
+      meta: spots ? 'Clear spots' : 'Remove walls, doors and windows', selected: state.tool === ERASER
+    });
+
+    if (!spots) {
+      el.edgeList.replaceChildren(eraser, ...EDGE_TYPES.map((t, i) => listItem({
+        key: { edge: t.type }, keyLabel: String(i + 1), swatch: { cls: t.type.toLowerCase() }, name: t.name, meta: t.meta,
+        selected: state.tool !== ERASER && state.edgeType === t.type
+      })));
+      return;
+    }
 
     const zones = orderedZones();
     el.zoneFilter.hidden = zones.length <= 8;
@@ -290,17 +455,26 @@ document.addEventListener('DOMContentLoaded', async () => {
     const counts = spotCounts();
     const heading = (t) => { const h = document.createElement('h3'); h.textContent = t; return h; };
     const note = (t) => Object.assign(document.createElement('p'), { className: 'empty-note', textContent: t });
-    const list = [];
     const units = zones.filter(z => z.rentable);
     const areas = zones.filter(z => !z.rentable);
     const shown = (z) => !filter || z.name.toLowerCase().includes(filter);
+    const zoneRow = (z, index) => {
+      const n = counts.get(z.id) || 0;
+      return listItem({
+        key: { zone: z.id }, keyLabel: index < 9 ? String(index + 1) : '', swatch: { zone: z }, name: z.name,
+        meta: z.rentable ? `${format.label(z.status)} · ${format.peso(z.rentalRate)}/mo` : format.label(z.areaType),
+        badge: n ? plural(n, 'spot') : 'Not placed', warn: !n,
+        selected: state.tool !== ERASER && state.zoneId === z.id,
+        colorZone: z.rentable ? null : z
+      });
+    };
 
-    list.push(heading(`Units (${units.length})`));
+    const list = [eraser, heading(`Units (${units.length})`)];
     if (!units.length) list.push(note('No units yet. Add one with + Unit.'));
-    units.forEach((z, i) => { if (shown(z)) list.push(zoneItem(z, i, counts.get(z.id) || 0)); });
+    units.forEach((z, i) => { if (shown(z)) list.push(zoneRow(z, i)); });
     list.push(heading(`Common areas (${areas.length})`));
     if (!areas.length) list.push(note('Walkways, grass, shared rooms…'));
-    areas.forEach((z, i) => { if (shown(z)) list.push(zoneItem(z, units.length + i, counts.get(z.id) || 0)); });
+    areas.forEach((z, i) => { if (shown(z)) list.push(zoneRow(z, units.length + i)); });
     if (filter && !zones.some(shown)) list.push(note('No zone matches the filter.'));
     el.zoneList.replaceChildren(...list);
   }
@@ -310,34 +484,80 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (state.mode === mode) return;
     cancelRect();
     state.mode = mode;
+    state.hover = null;
     render();
   }
 
   function setTool(tool) {
     cancelRect();
-    state.mode = 'spots';
+    if (tool === 'brush' || tool === 'rect') state.lastDraw = tool;
     state.tool = tool;
     render();
   }
 
-  function setEdgeTool(tool) {
-    state.mode = 'edges';
-    state.edgeTool = tool;
-    render();
+  /** The Brush/Rectangle button and the B key: switch between the two, or pick the last one used. */
+  function cycleDraw() {
+    const next = state.tool === 'brush' ? 'rect' : state.tool === 'rect' ? 'brush' : state.lastDraw;
+    const switching = isDrawTool();
+    setTool(next);
+    flash(TOOL_NAMES[next]);
+    if (switching) {
+      el.btnDraw.classList.remove('is-switching');
+      void el.btnDraw.offsetWidth;                   // restart the little animation
+      el.btnDraw.classList.add('is-switching');
+    }
   }
 
-  /** Choose the zone to paint with. Coming from the Hand or the Eraser switches to the Brush. */
+  /** Picking something to draw with switches the Hand or the Eraser to the Brush (Rectangle stays Rectangle). */
+  function drawWithSelection() {
+    if (!isDrawTool()) {
+      state.tool = state.lastDraw;
+      flash(TOOL_NAMES[state.tool]);
+    }
+  }
+
   function pickZone(id) {
     if (!gridRenderer.zoneById(state.layout, id)) return;
+    cancelRect();
     state.zoneId = id;
     state.mode = 'spots';
-    if (state.tool === 'hand' || state.tool === ERASER) state.tool = 'brush';
+    drawWithSelection();
     render();
   }
 
   function pickZoneByNumber(n) {
     const zone = orderedZones()[n - 1];
     if (zone) pickZone(zone.id); else toast(`There is no zone ${n}.`);
+  }
+
+  function pickEdgeType(type) {
+    cancelRect();
+    state.edgeType = type;
+    state.mode = 'edges';
+    drawWithSelection();
+    render();
+  }
+
+  /** Preview click: open the panel and show the selected item there. */
+  function locateSelection() {
+    if (panel.isMinimized()) panel.setMinimized(false);
+    let selector = null;
+    if (state.tool === ERASER) selector = '[data-eraser]';
+    else if (state.mode === 'edges') selector = `[data-edge="${state.edgeType}"]`;
+    else if (state.zoneId != null) selector = `[data-zone="${state.zoneId}"]`;
+    if (!selector) return;
+    const list = state.mode === 'edges' ? el.edgeList : el.zoneList;   // both lists have an Eraser
+    let item = list.querySelector(selector);
+    if (!item && el.zoneFilter.value) {               // hidden by the filter: clear it
+      el.zoneFilter.value = '';
+      renderPanel();
+      item = list.querySelector(selector);
+    }
+    if (!item) return;
+    if (item.scrollIntoView) item.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    item.classList.remove('is-flash');
+    void item.offsetWidth;
+    item.classList.add('is-flash');
   }
 
   // ------------------------------------------------------------------ editing
@@ -354,21 +574,23 @@ document.addEventListener('DOMContentLoaded', async () => {
     return true;
   }
 
-  /** Applies the chosen wall/door/window/eraser tool to one line. The rules live in gridRenderer.applyEdgeTool. */
+  const edgeToolNow = () => (state.tool === ERASER ? ERASER : state.edgeType);
+
+  /** Applies the Wall/Door/Window or the Eraser to one line. The rules live in gridRenderer.applyEdgeTool. */
   function applyEdge(handle) {
     const orientation = handle.dataset.orientation, r = Number(handle.dataset.row), c = Number(handle.dataset.col);
     const key = gridRenderer.edgeKey(orientation, r, c);
     if (key === state.lastEdgeKey) return;          // still on the same line during a drag
     state.lastEdgeKey = key;
-    if (gridRenderer.applyEdgeTool(state.layout, state.edgeTool, orientation, r, c)) scheduleRender();
+    if (gridRenderer.applyEdgeTool(state.layout, edgeToolNow(), orientation, r, c)) scheduleRender();
   }
 
   const cellFrom = (target) => {
     const cell = target && target.closest ? target.closest('.cell') : null;
-    return cell && el.host.contains(cell) ? cell : null;
+    return cell && el.world.contains(cell) ? cell : null;
   };
 
-  // ---- rectangle: drag from one spot to another, everything in between gets the zone (or is erased)
+  // ---- rectangle: Spots → fill (or erase) the cells; Walls → draw the outline (or erase every line inside)
   function rectBounds() {
     const { r0, c0, r1, c1 } = state.rect;
     return { top: Math.min(r0, r1), bottom: Math.max(r0, r1), left: Math.min(c0, c1), right: Math.max(c0, c1) };
@@ -380,7 +602,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     previewFrame = requestAnimationFrame(() => {
       previewFrame = 0;
       const b = state.rect ? rectBounds() : null;
-      el.host.querySelectorAll('.cell').forEach(cell => {
+      el.world.querySelectorAll('.cell').forEach(cell => {
         const r = Number(cell.dataset.row), c = Number(cell.dataset.col);
         cell.classList.toggle('is-preview', Boolean(b) && r >= b.top && r <= b.bottom && c >= b.left && c <= b.right);
       });
@@ -392,6 +614,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     const b = rectBounds();
     const erase = state.rect.erase;
     state.rect = null;
+    if (state.mode === 'edges') {
+      const L = state.layout;
+      const lines = erase
+        ? gridRenderer.rectAllEdges(b.top, b.left, b.bottom, b.right)
+        : gridRenderer.rectOutlineEdges(b.top, b.left, b.bottom, b.right);
+      for (const [o, r, c] of lines) {
+        const inside = o === 'HORIZONTAL' ? r <= L.rows && c < L.cols : r < L.rows && c <= L.cols;
+        if (inside) gridRenderer.applyEdgeTool(L, erase ? ERASER : state.edgeType, o, r, c);
+      }
+      return;
+    }
     for (let r = b.top; r <= b.bottom; r++) for (let c = b.left; c <= b.right; c++) paint(r, c, erase);
   }
 
@@ -413,13 +646,60 @@ document.addEventListener('DOMContentLoaded', async () => {
     el.host.classList.remove('is-panning');
   }
 
+  // ---- resize by dragging the grid's right edge, bottom edge or corner
+  function addResizeHandles() {
+    const s = stage();
+    if (!s) return;
+    for (const dir of ['right', 'bottom', 'corner']) {
+      const h = document.createElement('div');
+      h.className = `resize-handle rh-${dir}`;
+      h.dataset.resize = dir;
+      h.title = dir === 'right' ? 'Drag to add or remove columns' : dir === 'bottom' ? 'Drag to add or remove rows' : 'Drag to resize';
+      s.appendChild(h);
+    }
+  }
+
+  function moveResize(x, y) {
+    const R = state.resizing;
+    const box = stage().getBoundingClientRect();
+    const cell = currentCell();
+    if (R.dir !== 'bottom') R.cols = Math.max(1, Math.min(MAX, Math.round((x - box.left) / cell)));
+    if (R.dir !== 'right') R.rows = Math.max(1, Math.min(MAX, Math.round((y - box.top) / cell)));
+    drawSizeOutline(R.rows, R.cols, `${R.rows} × ${R.cols}`);
+  }
+
+  function endResize() {
+    const { rows, cols } = state.resizing;
+    state.resizing = null;
+    removeSizePreview();
+    if (rows !== state.layout.rows || cols !== state.layout.cols) applyResize(rows, cols);
+  }
+
   el.host.addEventListener('pointerdown', (e) => {
     if (!state.layout) return;
     closePopover();
-    if (e.button === 1 || (e.button === 0 && (state.space || activeTool() === 'hand'))) { startPan(e); return; }
+    const handle = e.target.closest('.resize-handle');
+    if (handle && e.button === 0) {
+      e.preventDefault();
+      state.resizing = { dir: handle.dataset.resize, rows: state.layout.rows, cols: state.layout.cols };
+      moveResize(e.clientX, e.clientY);
+      return;
+    }
+    if (e.button === 1 || (e.button === 0 && (state.space || state.tool === 'hand'))) { startPan(e); return; }
     if (e.button > 0) return;
+    const erase = state.tool === ERASER;
+    const asRect = state.tool === 'rect' || (e.shiftKey && (state.tool === 'brush' || erase));
 
     if (state.mode === 'edges') {
+      if (asRect) {
+        const at = cellAtPoint(e.clientX, e.clientY, false);
+        if (!at) return;
+        e.preventDefault();
+        state.stroke = gridRenderer.snapshot(state.layout);
+        state.rect = { r0: at.r, c0: at.c, r1: at.r, c1: at.c, erase };
+        schedulePreview();
+        return;
+      }
       const h = e.target.closest('.edge-handle');
       if (!h) return;
       e.preventDefault();
@@ -431,14 +711,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     const cell = cellFrom(e.target);
-    if (!cell) return;
-    const r = Number(cell.dataset.row), c = Number(cell.dataset.col);
-    const under = gridRenderer.zoneAt(state.layout, r, c);
+    const at = cell ? { r: Number(cell.dataset.row), c: Number(cell.dataset.col) } : cellAtPoint(e.clientX, e.clientY, false);
+    if (!at) return;
+    const under = gridRenderer.zoneAt(state.layout, at.r, at.c);
     if (e.altKey) {                                  // eyedropper
       if (under) pickZone(under.id); else toast('That spot is empty.');
       return;
     }
-    const erase = state.tool === ERASER;
     if (!erase && state.zoneId == null) {
       if (under) { pickZone(under.id); toast(`Picked ${under.name}. Paint with it now.`); }
       else toast('Pick a zone first: press 1–9 or use the Zones panel.');
@@ -447,41 +726,53 @@ document.addEventListener('DOMContentLoaded', async () => {
     e.preventDefault();
     if (e.target.hasPointerCapture && e.target.hasPointerCapture(e.pointerId)) e.target.releasePointerCapture(e.pointerId);
     state.stroke = gridRenderer.snapshot(state.layout);
-    if (state.tool === 'rect' || e.shiftKey) {
-      state.rect = { r0: r, c0: c, r1: r, c1: c, erase };
+    if (asRect) {
+      state.rect = { r0: at.r, c0: at.c, r1: at.r, c1: at.c, erase };
       schedulePreview();
       return;
     }
     state.painting = true;
-    if (paint(r, c, erase)) scheduleRender();
+    if (paint(at.r, at.c, erase)) scheduleRender();
   });
 
   el.host.addEventListener('pointermove', (e) => {
+    if (state.resizing) { moveResize(e.clientX, e.clientY); return; }
     if (state.pan) {
       el.host.scrollLeft = state.pan.left - (e.clientX - state.pan.x);
       el.host.scrollTop = state.pan.top - (e.clientY - state.pan.y);
       return;
     }
+    if (state.tool === 'hand' && state.layout) {      // hover inspect for the Preview
+      const h = state.mode === 'edges' && e.target.closest ? e.target.closest('.edge-handle') : null;
+      const hover = h
+        ? { line: [h.dataset.orientation, Number(h.dataset.row), Number(h.dataset.col)] }
+        : cellAtPoint(e.clientX, e.clientY, false);
+      if (JSON.stringify(hover) !== JSON.stringify(state.hover)) { state.hover = hover; renderPreview(); }
+      return;
+    }
     if (state.edgePainting) {
       const under = document.elementFromPoint(e.clientX, e.clientY);
       const h = under && under.closest ? under.closest('.edge-handle') : null;
-      if (h && el.host.contains(h)) applyEdge(h);
+      if (h && el.world.contains(h)) applyEdge(h);
       return;
     }
-    if (!state.painting && !state.rect) return;
-    const cell = cellFrom(document.elementFromPoint(e.clientX, e.clientY));
-    if (!cell) return;
-    const r = Number(cell.dataset.row), c = Number(cell.dataset.col);
     if (state.rect) {
-      if (state.rect.r1 !== r || state.rect.c1 !== c) { state.rect.r1 = r; state.rect.c1 = c; schedulePreview(); }
-    } else if (paint(r, c, state.tool === ERASER)) {
-      scheduleRender();
+      const at = cellAtPoint(e.clientX, e.clientY, true);
+      if (at && (state.rect.r1 !== at.r || state.rect.c1 !== at.c)) { state.rect.r1 = at.r; state.rect.c1 = at.c; schedulePreview(); }
+      return;
     }
+    if (!state.painting) return;
+    const cell = cellFrom(document.elementFromPoint(e.clientX, e.clientY));
+    if (cell && paint(Number(cell.dataset.row), Number(cell.dataset.col), state.tool === ERASER)) scheduleRender();
+  });
+  el.host.addEventListener('pointerleave', () => {
+    if (state.hover) { state.hover = null; renderPreview(); }
   });
 
   /** End of a drag: one undo step for the whole stroke / rectangle. */
   window.addEventListener('pointerup', () => {
     stopPan();
+    if (state.resizing) { endResize(); return; }
     finishRect();
     state.painting = false;
     state.edgePainting = false;
@@ -496,9 +787,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (state.stroke) gridRenderer.restore(state.layout, state.stroke);   // throw the half-done stroke away
     state.stroke = null;
     state.rect = null;
+    state.resizing = null;
     state.painting = false;
     state.edgePainting = false;
     state.lastEdgeKey = null;
+    removeSizePreview();
     if (state.layout) render();
   });
 
@@ -520,16 +813,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }, { passive: false });
 
-  // ------------------------------------------------------------------ popovers (size, zoom, menu)
-  /** Opens pop next to anchor. place: 'above-start' | 'above-end' | 'below-end'. */
+  // ------------------------------------------------------------------ popovers (size, zoom, menu, color)
+  /** Opens pop next to anchor. place: 'above-start' | 'above-end' | 'below-end' | 'left'. */
   function openPopover(pop, anchor, place) {
-    if (state.openPop && state.openPop.pop === pop) { closePopover(); return; }
+    if (state.openPop && state.openPop.pop === pop && state.openPop.anchor === anchor) { closePopover(); return; }
     closePopover();
     pop.hidden = false;
     const a = anchor.getBoundingClientRect();
     const w = pop.offsetWidth, h = pop.offsetHeight;
-    let left = place.endsWith('end') ? a.right - w : a.left;
-    let top = place.startsWith('above') ? a.top - h - 8 : a.bottom + 8;
+    let left, top;
+    if (place === 'left') {
+      left = a.left - w - 10;
+      top = a.top - 10;
+    } else {
+      left = place.endsWith('end') ? a.right - w : a.left;
+      top = place.startsWith('above') ? a.top - h - 8 : a.bottom + 8;
+    }
     left = Math.max(8, Math.min(left, window.innerWidth - w - 8));
     top = Math.max(8, Math.min(top, window.innerHeight - h - 8));
     pop.style.left = `${left}px`;
@@ -580,7 +879,20 @@ document.addEventListener('DOMContentLoaded', async () => {
   const validSize = (n) => Number.isInteger(n) && n >= 1 && n <= MAX;
 
   function removeSizePreview() {
-    el.host.querySelectorAll('.size-preview').forEach(p => p.remove());
+    el.world.querySelectorAll('.size-preview').forEach(p => p.remove());
+  }
+
+  function drawSizeOutline(rows, cols, label) {
+    removeSizePreview();
+    const s = stage();
+    if (!s) return;
+    const cell = currentCell();
+    const outline = document.createElement('div');
+    outline.className = 'size-preview';
+    outline.style.width = `${cols * cell}px`;
+    outline.style.height = `${rows * cell}px`;
+    if (label) outline.dataset.label = label;
+    s.appendChild(outline);
   }
 
   /** Dashed outline of the new size on the grid + a note on what it would remove. */
@@ -600,25 +912,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     } else {
       const { cellsOut, edgesOut } = resizeLoss(rows, cols);
       if (cellsOut.length || edgesOut.length) {
-        note.textContent = `Shrinking removes ${cellsOut.length} spot${cellsOut.length === 1 ? '' : 's'}`
-          + ` and ${edgesOut.length} wall edit${edgesOut.length === 1 ? '' : 's'}.`;
+        note.textContent = `Shrinking removes ${plural(cellsOut.length, 'spot')} and ${plural(edgesOut.length, 'wall edit')}.`;
         note.classList.add('is-warn');
       } else {
         note.textContent = `New size: ${rows} × ${cols}.`;
       }
     }
-    const stage = el.host.querySelector('.grid-stage');
-    if (!stage) return;
-    const cell = currentCell();
-    const outline = document.createElement('div');
-    outline.className = 'size-preview';
-    outline.style.width = `${cols * cell}px`;
-    outline.style.height = `${rows * cell}px`;
-    stage.appendChild(outline);
+    drawSizeOutline(rows, cols);
   }
 
-  function applyResize() {
-    const rows = Number(el.rows.value), cols = Number(el.cols.value);
+  function applyResize(rows, cols) {
     const L = state.layout;
     if (!validSize(rows) || !validSize(cols)) {
       toast(`Rows and columns must be whole numbers from 1 to ${MAX}.`, true);
@@ -628,7 +931,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     const { cellsOut, edgesOut } = resizeLoss(rows, cols);
     if ((cellsOut.length || edgesOut.length) &&
         !confirm(`Resizing to ${rows} × ${cols} removes ${cellsOut.length} spot(s) and ${edgesOut.length} wall/door edit(s).`
-          + '\n\nYou can undo this with Ctrl+Z. Continue?')) return;
+          + '\n\nYou can undo this with Ctrl+Z. Continue?')) {
+      render();
+      return;
+    }
     const before = gridRenderer.snapshot(L);
     cellsOut.forEach(k => L.cells.delete(k));
     edgesOut.forEach(k => L.overrides.delete(k));
@@ -641,7 +947,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   el.btnSize.addEventListener('click', openSizePop);
   $('btnSizeCancel').addEventListener('click', closePopover);
-  $('btnResize').addEventListener('click', applyResize);
+  $('btnResize').addEventListener('click', () => applyResize(Number(el.rows.value), Number(el.cols.value)));
   el.sizePop.addEventListener('click', (e) => {
     const btn = e.target.closest('[data-step]');
     if (!btn) return;
@@ -653,7 +959,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
   [el.rows, el.cols].forEach(input => {
     input.addEventListener('input', updateSizePreview);
-    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); applyResize(); } });
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); applyResize(Number(el.rows.value), Number(el.cols.value)); }
+    });
   });
 
   // ---- zoom
@@ -679,31 +987,103 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
   $('btnLogout').addEventListener('click', () => auth.logout());
 
-  // ------------------------------------------------------------------ toolbar and panel
-  document.querySelectorAll('[data-mode]').forEach(btn => btn.addEventListener('click', () => setMode(btn.dataset.mode)));
-  el.spotToolBtns.addEventListener('click', (e) => {
-    const btn = e.target.closest('[data-tool]');
-    if (btn) setTool(btn.dataset.tool);
-  });
-  el.edgeToolBtns.addEventListener('click', (e) => {
-    const btn = e.target.closest('[data-edge]');
-    if (btn) setEdgeTool(btn.dataset.edge);
-  });
-  el.zoneChip.addEventListener('click', () => {
-    if (panel.isMinimized()) panel.setMinimized(false);
-    if (!el.zoneFilter.hidden) el.zoneFilter.focus();
-  });
+  // ------------------------------------------------------------------ colors of common areas
+  /** color → who uses it, for the common areas other than exceptId (plus the unit status colors). */
+  function usedColors(exceptId) {
+    const used = new Map(Object.entries(STATUS_COLORS));
+    for (const z of state.layout.zones) {
+      if (!z.rentable && z.id !== exceptId && z.color) used.set(z.color.toLowerCase(), z.name);
+    }
+    return used;
+  }
+
+  const firstFreeColor = (used, preferred) =>
+    (preferred && !used.has(preferred) ? preferred : PALETTE.find(c => !used.has(c)) || null);
+
+  /** Fills a palette: used colors are disabled with "Used by …". onPick(color) is called with a free color. */
+  function renderPalette(container, selected, used, onPick) {
+    container.replaceChildren(...PALETTE.map(color => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'color-opt' + (color === selected ? ' is-selected' : '');
+      b.style.backgroundColor = color;
+      const by = used.get(color);
+      b.disabled = Boolean(by);
+      b.title = by ? `Used by ${by}` : color;
+      b.setAttribute('aria-label', by ? `${color}, used by ${by}` : color);
+      b.addEventListener('click', () => onPick(color));
+      return b;
+    }));
+  }
+
+  function setPreviewTile(tile, color, name, openAir) {
+    tile.style.setProperty('--zone-color', color || '#e2e8f0');
+    tile.classList.toggle('is-open-air', Boolean(openAir));
+    tile.querySelector('.zone-preview-label').textContent = name;
+  }
+
+  // ---- change the color of an existing common area (opened from its swatch in the list)
+  let colorZoneId = null;
+  function openColorPop(zoneId, anchor) {
+    const zone = gridRenderer.zoneById(state.layout, zoneId);
+    if (!zone) return;
+    colorZoneId = zoneId;
+    el.colorTitle.textContent = `Color of ${zone.name}`;
+    el.colorNote.textContent = '';
+    el.colorCustom.value = zone.color;
+    renderPalette(el.colorPalette, zone.color.toLowerCase(), usedColors(zoneId), saveZoneColor);
+    openPopover(el.colorPop, anchor, 'left');
+  }
+
+  async function saveZoneColor(color) {
+    const zone = gridRenderer.zoneById(state.layout, colorZoneId);
+    if (!zone) return;
+    const by = usedColors(zone.id).get(color.toLowerCase());
+    if (by) { el.colorNote.textContent = `That color is already used by ${by}.`; return; }
+    try {
+      const saved = await api.form('PUT', `/api/properties/${propertyId}/common-areas/${zone.id}/color`, { color });
+      zone.color = saved.color;
+      zone.cssClasses = saved.cssClasses;
+      closePopover();
+      render();
+      toast(`${zone.name} is now ${saved.color}. (Saved; colors are not undone.)`);
+    } catch (err) {
+      el.colorNote.textContent = err.message;          // e.g. "That color is already used by Walkway."
+    }
+  }
+  el.colorCustom.addEventListener('change', () => saveZoneColor(el.colorCustom.value));
   el.zoneList.addEventListener('click', (e) => {
-    const btn = e.target.closest('[data-zone]');
-    if (btn) pickZone(Number(btn.dataset.zone));
+    const swatch = e.target.closest('[data-color]');
+    if (swatch) { e.stopPropagation(); openColorPop(Number(swatch.dataset.color), swatch); return; }
+    const item = e.target.closest('.zone-item');
+    if (!item) return;
+    if (item.dataset.eraser) setTool(ERASER);
+    else pickZone(Number(item.dataset.zone));
+  });
+  el.zoneList.addEventListener('keydown', (e) => {
+    const swatch = e.target.closest('[data-color]');
+    if (swatch && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); e.stopPropagation(); openColorPop(Number(swatch.dataset.color), swatch); }
+  });
+  el.edgeList.addEventListener('click', (e) => {
+    const item = e.target.closest('.zone-item');
+    if (!item) return;
+    if (item.dataset.eraser) setTool(ERASER);
+    else pickEdgeType(item.dataset.edge);
   });
   el.zoneFilter.addEventListener('input', () => state.layout && renderPanel());
+
+  // ------------------------------------------------------------------ toolbar
+  document.querySelectorAll('[data-mode]').forEach(btn => btn.addEventListener('click', () => setMode(btn.dataset.mode)));
+  document.querySelectorAll('#toolbar [data-tool]').forEach(btn => btn.addEventListener('click', () => {
+    if (btn.dataset.tool === 'draw') cycleDraw(); else setTool(btn.dataset.tool);
+  }));
+  el.preview.addEventListener('click', locateSelection);
 
   function resetEdges() {
     if (!state.layout) return;
     const count = state.layout.overrides.size;
     if (!count) { toast('Nothing to reset: every wall is already automatic.'); return; }
-    if (!confirm(`Reset all ${count} wall, door and window edit${count === 1 ? '' : 's'} back to the automatic walls?\n\n`
+    if (!confirm(`Reset all ${plural(count, 'wall, door and window edit')} back to the automatic walls?\n\n`
         + 'Doors, windows and walls you drew, and walls you erased, will go back to how SpaceGrid draws them by itself. '
         + 'You can undo this with Ctrl+Z; it only becomes permanent when you press Save.')) return;
     const before = gridRenderer.snapshot(state.layout);
@@ -713,18 +1093,66 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
   $('btnResetEdges').addEventListener('click', resetEdges);
 
-  // ---- add unit / common area (saved on the server at once)
-  function showAddForm(box) {
-    [el.addUnitBox, el.addAreaBox].forEach(b => { b.hidden = b !== box || !b.hidden; });
-    if (!box.hidden) box.querySelector('input').focus();
+  // ------------------------------------------------------------------ add unit / common area (dialog, saved at once)
+  function openAddDialog(kind) {
+    if (!state.layout) return;
+    closePopover();
+    const unit = kind === 'unit';
+    el.addTitle.textContent = unit ? 'New unit' : 'New common area';
+    el.addUnitForm.hidden = !unit;
+    el.addAreaForm.hidden = unit;
+    el.addUnitForm.reset();
+    el.addAreaForm.reset();
+    el.areaColorNote.textContent = '';
+    state.addColorPicked = false;
+    if (unit) {
+      setPreviewTile(el.unitPreview, UNIT_PREVIEW_COLOR, 'New unit', false);
+    } else {
+      suggestAreaColor();
+    }
+    el.addDialog.showModal();
+    (unit ? el.addUnitForm : el.addAreaForm).elements.name.focus();
   }
-  $('btnAddUnit').addEventListener('click', () => showAddForm(el.addUnitBox));
-  $('btnAddArea').addEventListener('click', () => showAddForm(el.addAreaBox));
-  document.querySelectorAll('.add-form [data-cancel]').forEach(btn => btn.addEventListener('click', () => {
-    const box = btn.closest('.add-form');
-    box.querySelector('form').reset();
-    box.hidden = true;
-  }));
+
+  function suggestAreaColor() {
+    const type = el.addAreaForm.elements.areaType.value;
+    state.addColor = firstFreeColor(usedColors(null), TYPE_COLORS[type]);
+    renderAreaColor();
+  }
+
+  function renderAreaColor() {
+    const f = el.addAreaForm.elements;
+    const used = usedColors(null);
+    renderPalette(el.areaPalette, state.addColor, used, (color) => {
+      state.addColor = color;
+      state.addColorPicked = true;
+      el.areaColorNote.textContent = '';
+      renderAreaColor();
+    });
+    if (state.addColor) el.areaCustom.value = state.addColor;
+    if (!state.addColor) el.areaColorNote.textContent = 'Every color in the list is used; pick a custom one.';
+    setPreviewTile(el.areaPreview, state.addColor, f.name.value.trim() || 'New area', !INDOOR_TYPES.includes(f.areaType.value));
+  }
+
+  $('btnAddUnit').addEventListener('click', () => openAddDialog('unit'));
+  $('btnAddArea').addEventListener('click', () => openAddDialog('area'));
+  document.querySelectorAll('dialog [data-close]').forEach(btn => btn.addEventListener('click', () => btn.closest('dialog').close()));
+  document.querySelectorAll('dialog').forEach(d => d.addEventListener('click', (e) => { if (e.target === d) d.close(); }));
+  el.addUnitForm.elements.name.addEventListener('input', () =>
+    setPreviewTile(el.unitPreview, UNIT_PREVIEW_COLOR, el.addUnitForm.elements.name.value.trim() || 'New unit', false));
+  el.addAreaForm.elements.name.addEventListener('input', renderAreaColor);
+  el.addAreaForm.elements.areaType.addEventListener('change', () => {
+    if (state.addColorPicked) renderAreaColor(); else suggestAreaColor();
+  });
+  el.areaCustom.addEventListener('input', () => {
+    const color = el.areaCustom.value.toLowerCase();
+    const by = usedColors(null).get(color);
+    if (by) { el.areaColorNote.textContent = `That color is already used by ${by}.`; return; }
+    el.areaColorNote.textContent = '';
+    state.addColor = color;
+    state.addColorPicked = true;
+    renderAreaColor();
+  });
 
   async function addZone(form, url, fields) {
     const btn = form.querySelector('button[type=submit]');
@@ -732,9 +1160,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {
       const zone = await api.form('POST', url, fields);
       state.layout.zones.push({ ...zone, positions: [] });
-      form.reset();
-      form.closest('.add-form').hidden = true;
-      state.tool = 'brush';
+      el.addDialog.close();
       pickZone(zone.id);                            // ready to place
       toast(`${zone.name} added. Click or drag spots to place it.`);
     } catch (err) {
@@ -744,24 +1170,25 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  $('addUnitForm').addEventListener('submit', (e) => {
+  el.addUnitForm.addEventListener('submit', (e) => {
     e.preventDefault();
-    const f = e.target;
-    const name = f.elements.name.value.trim();
+    const f = e.target.elements;
+    const name = f.name.value.trim();
     const rate = f.rentalRate.value;
     if (!name) return toast('Give the unit a name.', true);
     if (rate === '' || Number(rate) < 0) return toast('Enter a monthly rate of 0 or more.', true);
     const fields = { name, rentalRate: rate, electricity: f.electricity.checked, water: f.water.checked };
     if (f.areaSqm.value) Object.assign(fields, { exactSize: true, areaSqm: f.areaSqm.value });
-    addZone(f, `/api/properties/${propertyId}/units`, fields);
+    addZone(e.target, `/api/properties/${propertyId}/units`, fields);
   });
 
-  $('addAreaForm').addEventListener('submit', (e) => {
+  el.addAreaForm.addEventListener('submit', (e) => {
     e.preventDefault();
-    const f = e.target;
-    const name = f.elements.name.value.trim();
+    const f = e.target.elements;
+    const name = f.name.value.trim();
     if (!name) return toast('Give the common area a name.', true);
-    addZone(f, `/api/properties/${propertyId}/common-areas`, { name, areaType: f.areaType.value });
+    if (!state.addColor) return toast('Pick a color for the common area.', true);
+    addZone(e.target, `/api/properties/${propertyId}/common-areas`, { name, areaType: f.areaType.value, color: state.addColor });
   });
 
   // ------------------------------------------------------------------ save (two requests)
@@ -806,17 +1233,15 @@ document.addEventListener('DOMContentLoaded', async () => {
   const SHORTCUTS = [
     { group: 'Tools', keys: ['S'], label: 'Spots mode', test: plain('s'), run: () => setMode('spots') },
     { group: 'Tools', keys: ['W'], label: 'Walls & doors mode', test: plain('w'), run: () => setMode('edges') },
-    { group: 'Tools', keys: ['H'], label: 'Hand (move around)', test: plain('h'),
-      run: () => (state.mode === 'edges' ? setEdgeTool('hand') : setTool('hand')) },
-    { group: 'Tools', keys: ['B'], label: 'Brush', test: plain('b'), run: () => setTool('brush') },
-    { group: 'Tools', keys: ['R'], label: 'Rectangle', test: plain('r'), run: () => setTool('rect') },
-    { group: 'Tools', keys: ['E'], label: 'Eraser', test: plain('e'),
-      run: () => (state.mode === 'edges' ? setEdgeTool(ERASER) : setTool(ERASER)) },
+    { group: 'Tools', keys: ['H'], label: 'Hand (move around, hover to inspect)', test: plain('h'), run: () => setTool('hand') },
+    { group: 'Tools', keys: ['B'], label: 'Brush · press again for Rectangle', test: plain('b'), run: cycleDraw },
+    { group: 'Tools', keys: ['R'], label: 'Rectangle', test: plain('r'), run: () => { setTool('rect'); flash('Rectangle'); } },
+    { group: 'Tools', keys: ['E'], label: 'Eraser', test: plain('e'), run: () => setTool(ERASER) },
     { group: 'Tools', keys: ['1', '–', '9'], label: 'Spots: pick zone 1–9 · Walls: 1 Wall, 2 Door, 3 Window',
       test: (e) => noMods(e) && !e.shiftKey && /^[1-9]$/.test(e.key),
       run: (e) => {
         const n = Number(e.key);
-        if (state.mode === 'edges') { if (EDGE_BY_DIGIT[n]) setEdgeTool(EDGE_BY_DIGIT[n]); }
+        if (state.mode === 'edges') { if (EDGE_TYPES[n - 1]) pickEdgeType(EDGE_TYPES[n - 1].type); }
         else pickZoneByNumber(n);
       } },
     { group: 'Tools', keys: ['Shift', 'drag'], label: 'Rectangle with the Brush or the Eraser' },
@@ -831,7 +1256,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     { group: 'View', keys: ['Shift', '0'], label: 'Zoom to 100%', test: shiftDigit(0), run: () => setZoom(CELL_BASE) },
     { group: 'View', keys: ['0'], label: 'Zoom to fit', hidden: true, test: (e) => noMods(e) && !e.shiftKey && e.key === '0', run: () => setZoom('fit') },
     { group: 'View', keys: ['\\'], label: 'Show / hide the panel', test: plain('\\'), run: () => panel.toggle() },
-    { group: 'View', keys: ['G'], label: 'Grid size', test: plain('g'), run: openSizePop },
+    { group: 'View', keys: ['G'], label: 'Resize grid (or drag the grid\'s edges)', test: plain('g'), run: openSizePop },
 
     { group: 'Edit', keys: ['Ctrl', 'Z'], label: 'Undo', test: ctrl('z', false), run: undo },
     { group: 'Edit', keys: ['Ctrl', 'Shift', 'Z'], label: 'Redo (also: Ctrl + Y)', test: ctrl('z', true), run: redo },
@@ -871,25 +1296,24 @@ document.addEventListener('DOMContentLoaded', async () => {
     }));
     const note = document.createElement('p');
     note.className = 'pl-dialog-note';
-    note.textContent = 'On a Mac, use Cmd instead of Ctrl. Adding a unit or common area is saved at once and cannot be undone.';
+    note.textContent = 'On a Mac, use Cmd instead of Ctrl. Adding a unit or common area, and changing a color, '
+      + 'are saved at once and cannot be undone.';
     body.appendChild(note);
-    el.dialog.showModal();
+    el.shortcutsDialog.showModal();
   }
-  $('btnShortcutsClose').addEventListener('click', () => el.dialog.close());
-  el.dialog.addEventListener('click', (e) => { if (e.target === el.dialog) el.dialog.close(); });   // click on the dark backdrop
 
   const typingInField = (e) => /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName) || e.target.isContentEditable;
 
   function onEscape(e) {
     if (state.openPop) { closePopover(); return; }
     if (typingInField(e)) { e.target.blur(); return; }
+    if (state.resizing) { state.resizing = null; removeSizePreview(); return; }
     if (state.rect) { cancelRect(); return; }
-    if (state.mode === 'edges' && state.edgeTool !== 'hand') setEdgeTool('hand');
-    else if (state.mode === 'spots' && state.tool !== 'hand') setTool('hand');
+    if (state.tool !== 'hand') setTool('hand');
   }
 
   document.addEventListener('keydown', (e) => {
-    if (el.dialog.open) return;                     // the dialog closes itself on Esc
+    if (document.querySelector('dialog[open]')) return;     // a dialog handles its own keys (Esc closes it)
     if (e.key === 'Escape') { onEscape(e); return; }
     if (!state.layout || e.repeat && !/^[+=\-_]$/.test(e.key)) return;
     const typing = typingInField(e);
@@ -912,12 +1336,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     el.host.classList.remove('is-pan-ready');
   });
   window.addEventListener('blur', () => { state.space = false; el.host.classList.remove('is-pan-ready'); });
-  window.addEventListener('resize', () => { closePopover(); scheduleRender(); });
+  window.addEventListener('resize', () => {
+    closePopover();
+    if (state.zoom === 'fit' && state.layout) { render(); centerView(); } else scheduleRender();
+  });
   window.addEventListener('beforeunload', (e) => { if (state.dirty) { e.preventDefault(); e.returnValue = ''; } });
 
   // ------------------------------------------------------------------ start
   /** keepHistory = true after a save: undo still works, and "unsaved" is now measured from the saved layout. */
   function load(property, keepHistory) {
+    const first = !state.layout;
     state.layout = gridRenderer.fromProperty(property);
     history.saved = gridRenderer.snapshot(state.layout);
     if (!keepHistory) {
@@ -928,6 +1356,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     el.name.textContent = property.name;
     document.title = `${property.name} · Grid · SpaceGrid`;
     render();
+    if (first) centerView();
   }
 
   if (!Number.isInteger(propertyId) || propertyId < 1) {

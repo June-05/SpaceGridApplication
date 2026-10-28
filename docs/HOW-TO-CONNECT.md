@@ -94,7 +94,7 @@ The JSON keys are the getter names without `get`/`is` (`getFullName()` → `full
 |---|---|
 | `User` | `id, createdAt, username, fullName, role` |
 | `Property` | `id, landlordId, name, address, propertyType, description, dimensions{exact, description, areaSqm}, status, gridRows, gridColumns, zones[], edgesByType{}` |
-| zone in `zones[]` | `id, propertyId, name, positions[{row, col}], rentable, enclosed, cssClasses, color`, plus unit fields (`rentalRate, status, …`) or `areaType` |
+| zone in `zones[]` | `id, propertyId, name, positions[{row, col}], rentable, enclosed, cssClasses, color`, plus unit fields (`rentalRate, status, …`) or `areaType, customColor` (common area: `color` = picked color, else the type's default; `customColor` = null when not picked) |
 | `RentableUnit` | `id, propertyId, name, positions, rentalRate, dimensions, includesElectricity, includesWater, status, …` |
 | `LeaseContract` | `id, unitId, renterId, startDate, endDate, monthlyRent, previousLeaseId, status, closedOn, unitName, propertyName, renterName, currentState, daysRemaining` |
 | `RentDue` | `billingMonth, dueDate, amountDue, status` |

@@ -51,9 +51,15 @@ public class JdbcCommonAreaDao implements CommonAreaDao {
         }, keys);
         int zoneId = keys.getKey().intValue();
 
-        jdbcTemplate.update("INSERT INTO common_areas (zone_id, area_type) VALUES (?, ?)", zoneId, entity.getAreaType().name());
+        jdbcTemplate.update("INSERT INTO common_areas (zone_id, area_type, color) VALUES (?, ?, ?)",
+                zoneId, entity.getAreaType().name(), entity.getCustomColor());
         entity.assignId(zoneId);
         return entity;
+    }
+
+    @Override
+    public void updateColor(int zoneId, String color) {
+        jdbcTemplate.update("UPDATE common_areas SET color = ? WHERE zone_id = ?", color, zoneId);
     }
 
     @Override
