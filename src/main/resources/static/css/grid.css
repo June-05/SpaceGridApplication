@@ -17,13 +17,18 @@
 /* ---------------------------------------------------------------- grid */
 .grid-host {
   overflow: auto;
+  max-height: 78vh;                  /* big grids pan inside this box (also used by "Fit" in property-grid.js) */
   padding: 12px;
   border-radius: 8px;
   background: repeating-linear-gradient(45deg, #f1f4f8 0 8px, #edf1f6 8px 16px);
 }
 
+/* pan with the space bar or the middle mouse button */
+.grid-host.is-pan-ready, .grid-host.is-pan-ready .cell, .grid-host.is-pan-ready .edge-handle { cursor: grab; }
+.grid-host.is-panning, .grid-host.is-panning .cell, .grid-host.is-panning .edge-handle { cursor: grabbing; }
+
 .grid-stage {
-  --edge: 5px;                       /* wall thickness */
+  --edge: 5px;                       /* wall thickness (grid-renderer.js sets it from the cell size) */
   position: relative;
   margin: 0 auto;
   user-select: none;
@@ -85,8 +90,15 @@
 .mode-edges .edge.is-auto { opacity: 0.55; }        /* automatic walls are lighter while editing */
 
 .edge-handle { z-index: 4; cursor: pointer; border-radius: 3px; }
-.edge-handle.edge-h { height: 12px; }
-.edge-handle.edge-v { width: 12px; }
+.edge-handle.edge-h { height: var(--handle, 12px); }
+.edge-handle.edge-v { width: var(--handle, 12px); }
+
+/* zoomed out: names are hidden (see the hover title); tiny cells also lose the thin line between spots */
+.grid-stage.is-small .cell-label { display: none; }
+.grid-stage.is-tiny .cell { border-width: 0; }
+
+/* rectangle fill: the area that will be painted when the mouse is released */
+.cell.is-preview { box-shadow: inset 0 0 0 100px rgba(37, 99, 235, 0.35); }
 .edge-handle:hover { background: rgba(37, 99, 235, 0.35); }
 
 /* ---------------------------------------------------------------- plotter page layout */
@@ -133,6 +145,14 @@
 .seg { border: 0; padding: 7px 12px; background: var(--surface); color: #64748b; cursor: pointer; font: inherit; }
 .seg + .seg { border-left: 1px solid var(--border); }
 .seg.is-active { background: var(--text); color: #fff; }
+.seg-group[hidden] { display: none; }
+
+.tool-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-top: 12px; }
+.zoom-controls { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #64748b; }
+.zoom-controls input[type=range] { width: 120px; padding: 0; }
+.zoom-label { min-width: 44px; text-align: center; font-variant-numeric: tabular-nums; }
+.btn-icon { min-width: 32px; padding: 4px 10px; font-weight: 700; }
+.btn.is-active { background: var(--text); border-color: var(--text); color: #fff; }
 .hint { min-height: 20px; margin: 12px 0 8px; color: #64748b; font-size: 13px; }
 .hint.is-error { color: var(--danger); }
 .summary { margin: 12px 0 0; color: #64748b; font-size: 13px; }

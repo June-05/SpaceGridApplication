@@ -44,7 +44,7 @@ value objects, with no SQL or web code.
 
 ## Business rules (summary)
 - **Accounts:** usernames are unique. Passwords are at least 8 characters, hashed with BCrypt. Login failures give one generic message.
-- **Properties:** only the owner can see or change one. A new property is DRAFT with a 1×1 grid. The grid is at most 30×30. Status is DRAFT / ACTIVE / ARCHIVED. Types: APARTMENT, CONDOMINIUM, TOWNHOUSE, COMMERCIAL, NIGHT_MARKET, OPEN_SPACE.
+- **Properties:** only the owner can see or change one. A new property is DRAFT with a 1×1 grid. The grid is at most 60×60 (`Property.MAX_GRID_SIZE`, the CHECKs in `spacegrid_db.sql` and `MAX` in `property-grid.js` must match). Status is DRAFT / ACTIVE / ARCHIVED. Types: APARTMENT, CONDOMINIUM, TOWNHOUSE, COMMERCIAL, NIGHT_MARKET, OPEN_SPACE.
 - **Grid:**
   - abstract `GridZone` → `RentableUnit`, `CommonArea`.
   - Common area types: WALKWAY, GRASS, BATHROOM, KITCHEN, LAUNDRY, LOBBY, PARKING, STAIRS. Indoor ones are bathroom, kitchen, laundry, lobby, stairs.

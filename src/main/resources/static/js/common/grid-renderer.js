@@ -14,6 +14,8 @@
  * Manual overrides (WALL, DOOR, WINDOW, OPEN) replace the automatic result; OPEN means "no wall".
  */
 const gridRenderer = {
+  LABEL_MIN_CELL: 16,     // below this size (px) zone names are not drawn on the grid
+  BORDER_MIN_CELL: 10,    // below this size (px) the thin line between spots is dropped
   cellKey: (r, c) => `${r},${c}`,
   edgeKey: (orientation, r, c) => `${orientation}:${r}:${c}`,
 
@@ -56,7 +58,11 @@ const gridRenderer = {
   },
 
   zoneById(layout, id) {
-    return layout.zones.find(z => z.id === id) || null;
+    // index by id: big grids (60 × 60) call this thousands of times per draw
+    if (!layout.zoneIndex || layout.zoneIndex.size !== layout.zones.length) {
+      layout.zoneIndex = new Map(layout.zones.map(z => [z.id, z]));
+    }
+    return layout.zoneIndex.get(id) || null;
   },
 
   zoneAt(layout, r, c) {
@@ -87,15 +93,22 @@ const gridRenderer = {
 
   /**
    * Draws the grid into container.
-   * options: { mode: 'view' | 'spots' | 'edges', brushZoneId, highlightZoneId, minCell, maxCell }
+   * options: { mode: 'view' | 'spots' | 'edges', brushZoneId, highlightZoneId, minCell, maxCell,
+   *             cell }   cell = exact cell size in px (zoom); without it the grid is fitted to the container width
    */
   render(container, layout, options = {}) {
     const mode = options.mode || 'view';
     const width = container.clientWidth || 600;
-    const cell = Math.max(options.minCell || 30, Math.min(options.maxCell || 72, Math.floor((width - 8) / layout.cols)));
+    const cell = options.cell
+      ? Math.round(options.cell)
+      : Math.max(options.minCell || 30, Math.min(options.maxCell || 72, Math.floor((width - 8) / layout.cols)));
+    const showLabels = cell >= this.LABEL_MIN_CELL;
     const stage = document.createElement('div');
-    stage.className = `grid-stage mode-${mode}`;
+    stage.className = `grid-stage mode-${mode}${showLabels ? '' : ' is-small'}${cell < this.BORDER_MIN_CELL ? ' is-tiny' : ''}`;
     stage.style.setProperty('--cell', `${cell}px`);
+    // walls and clickable lines shrink with the cells, so small cells are not covered by thick lines
+    stage.style.setProperty('--edge', `${Math.max(1, Math.min(5, Math.round(cell / 10)))}px`);
+    stage.style.setProperty('--handle', `${Math.max(4, Math.min(12, Math.round(cell / 3)))}px`);
     stage.style.width = `${layout.cols * cell}px`;
     stage.style.height = `${layout.rows * cell}px`;
 
@@ -119,7 +132,7 @@ const gridRenderer = {
           if (options.highlightZoneId != null) {
             el.classList.add(zone.id === options.highlightZoneId ? 'is-highlight' : 'is-dim');
           }
-          if (!labelled.has(zone.id)) {                  // name on the zone's first spot
+          if (showLabels && !labelled.has(zone.id)) {    // name on the zone's first spot (hover title when cells are small)
             labelled.add(zone.id);
             const tag = document.createElement('span');
             tag.className = 'cell-label';

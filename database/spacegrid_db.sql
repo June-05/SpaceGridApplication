@@ -53,8 +53,8 @@ CREATE TABLE properties (
         ON DELETE RESTRICT ON UPDATE RESTRICT,
     CONSTRAINT ck_properties_type   CHECK (property_type IN ('APARTMENT', 'CONDOMINIUM', 'TOWNHOUSE', 'COMMERCIAL', 'NIGHT_MARKET', 'OPEN_SPACE')),
     CONSTRAINT ck_properties_status CHECK (status IN ('DRAFT', 'ACTIVE', 'ARCHIVED')),
-    CONSTRAINT ck_properties_rows   CHECK (grid_rows BETWEEN 1 AND 30),
-    CONSTRAINT ck_properties_cols   CHECK (grid_columns BETWEEN 1 AND 30),
+    CONSTRAINT ck_properties_rows   CHECK (grid_rows BETWEEN 1 AND 60),
+    CONSTRAINT ck_properties_cols   CHECK (grid_columns BETWEEN 1 AND 60),
     CONSTRAINT ck_properties_size   CHECK (
         is_exact_size IS NULL
         OR (is_exact_size = TRUE  AND area_sqm IS NOT NULL AND area_sqm > 0)
@@ -136,8 +136,8 @@ CREATE TABLE zone_cells (
 -- ---------------------------------------------------------------------
 -- 7. edge_overrides  (Java: Property.edgeOverrides  Map<GridEdge, EdgeType>)
 --    Only manual changes are stored; automatic walls are calculated in Java.
---    HORIZONTAL (r, c) = line ABOVE spot (r, c)   rows 0..30 (30 = bottom border)
---    VERTICAL   (r, c) = line LEFT OF spot (r, c) cols 0..30 (30 = right border)
+--    HORIZONTAL (r, c) = line ABOVE spot (r, c)   rows 0..60 (60 = bottom border)
+--    VERTICAL   (r, c) = line LEFT OF spot (r, c) cols 0..60 (60 = right border)
 -- ---------------------------------------------------------------------
 CREATE TABLE edge_overrides (
     property_id  INT         NOT NULL,
@@ -148,8 +148,8 @@ CREATE TABLE edge_overrides (
     CONSTRAINT pk_edge_overrides PRIMARY KEY (property_id, row_idx, col_idx, orientation),
     CONSTRAINT fk_edge_overrides_property FOREIGN KEY (property_id) REFERENCES properties (id)
         ON DELETE CASCADE ON UPDATE RESTRICT,
-    CONSTRAINT ck_edge_overrides_row         CHECK (row_idx BETWEEN 0 AND 30),
-    CONSTRAINT ck_edge_overrides_col         CHECK (col_idx BETWEEN 0 AND 30),
+    CONSTRAINT ck_edge_overrides_row         CHECK (row_idx BETWEEN 0 AND 60),
+    CONSTRAINT ck_edge_overrides_col         CHECK (col_idx BETWEEN 0 AND 60),
     CONSTRAINT ck_edge_overrides_orientation CHECK (orientation IN ('HORIZONTAL', 'VERTICAL')),
     CONSTRAINT ck_edge_overrides_type        CHECK (edge_type IN ('WALL', 'DOOR', 'WINDOW', 'OPEN'))
 ) ENGINE = InnoDB;

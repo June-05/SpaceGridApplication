@@ -91,7 +91,7 @@ Values: LANDLORD, RENTER
 Owns its zones and the grid rules that involve more than one zone (no overlaps, bounds, automatic walls).
 
 ```
-+ MAX_GRID_SIZE: int = 30   «static»
++ MAX_GRID_SIZE: int = 60   «static»
 - landlordId: int
 - name: String
 - address: String
@@ -1068,7 +1068,7 @@ Breaks a rule, e.g. username taken → 409
 **Properties**
 
 - Only the owner can view or change a property (`isOwnedBy`); anyone else gets `AccessDeniedException`.
-- A new property starts as DRAFT with a 1 × 1 grid. Rows and columns go from 1 to 30 (`MAX_GRID_SIZE`).
+- A new property starts as DRAFT with a 1 × 1 grid. Rows and columns go from 1 to 60 (`MAX_GRID_SIZE`; it was 30 before the zoom feature).
 - Property types: Apartment, Condominium, Townhouse, Commercial, Night Market, Open Space.
 
 **Grid**

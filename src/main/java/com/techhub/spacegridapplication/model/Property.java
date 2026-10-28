@@ -18,7 +18,7 @@ import java.util.Optional;
  */
 public class Property extends BaseEntity {
 
-    public static final int MAX_GRID_SIZE = 30;
+    public static final int MAX_GRID_SIZE = 60;
 
     private int landlordId;
     private String name;

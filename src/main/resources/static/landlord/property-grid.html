@@ -35,14 +35,27 @@
     <section class="board" aria-label="Property grid">
       <div class="toolbar">
         <div class="size-controls">
-          <label>Rows <input id="inpRows" type="number" min="1" max="30"></label>
+          <label>Rows <input id="inpRows" type="number" min="1" max="60"></label>
           <span class="times">×</span>
-          <label>Columns <input id="inpCols" type="number" min="1" max="30"></label>
+          <label>Columns <input id="inpCols" type="number" min="1" max="60"></label>
           <button id="btnResize" class="btn" type="button">Apply size</button>
         </div>
         <div class="seg-group" role="group" aria-label="Tool">
           <button class="seg is-active" type="button" data-mode="spots" aria-pressed="true">Spots</button>
           <button class="seg" type="button" data-mode="edges" aria-pressed="false">Walls &amp; doors</button>
+        </div>
+      </div>
+      <div class="tool-row">
+        <div class="zoom-controls" role="group" aria-label="Zoom">
+          <button id="btnZoomOut" class="btn btn-icon" type="button" title="Zoom out (-)" aria-label="Zoom out">−</button>
+          <input id="zoomSlider" type="range" min="6" max="96" step="1" aria-label="Zoom">
+          <button id="btnZoomIn" class="btn btn-icon" type="button" title="Zoom in (+, or Ctrl + mouse wheel)" aria-label="Zoom in">+</button>
+          <span id="zoomLabel" class="zoom-label" aria-live="polite">100%</span>
+          <button id="btnZoomFit" class="btn" type="button" title="Fit the whole grid on screen (0)">Fit</button>
+        </div>
+        <div id="fillGroup" class="seg-group" role="group" aria-label="Paint style">
+          <button class="seg is-active" type="button" data-fill="brush" aria-pressed="true">Brush</button>
+          <button class="seg" type="button" data-fill="rect" aria-pressed="false" title="Drag a rectangle to fill it">Rectangle</button>
         </div>
       </div>
       <p id="hint" class="hint"></p>

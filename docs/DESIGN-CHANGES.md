@@ -89,6 +89,9 @@ Status: **decided, not implemented.** Nothing below exists in the code yet. When
 6. A permit that expires before the lease ends only **warns** the landlord; it does not block approval.
 
 ### A. Zoom and bigger grid (smallest, independent; build first)
+> **BUILT 2026-10-28 (branch Plotter-Polish, not committed yet).** Changed: `Property.MAX_GRID_SIZE` = 60; `spacegrid_db.sql` CHECKs (rows/cols 1–60, edge indexes 0–60: **re-run the SQL by hand**); `grid-renderer.js` (new `cell` option, zone index, labels hidden under 16 px, spot borders dropped under 10 px, wall and click-line thickness scale with the cell); `property-grid.js` (zoom −/+/slider/Fit, Ctrl+wheel, keys `+` `-` `0`, zoom remembered in localStorage, pan with space+drag or middle mouse, **Brush / Rectangle** paint style, drawing limited to once per frame); `property-grid.html`; `grid.css` (grid area max 78vh so big grids pan inside it). Zoom range 6–96 px (100% = 48 px). Not done: zoom on `lease.html` (left for the lease pages), real tests (`PropertyTest` is still a disabled stub; `resizeGrid_over60_isRejected` is the placeholder).
+> Not checked in a real browser: only a stub-DOM run of the renderer at 60×60 (5.5k elements, 12.8k in the Walls mode) and a Maven build. Please try it by hand.
+
 - `Property.MAX_GRID_SIZE` 30 → 60; `properties` CHECKs for `grid_rows` / `grid_columns` 1–30 → 1–60 (TINYINT is enough). The renderer redraws every cell on each change, so do not go above 60 without partial redraws.
 - `grid-renderer.js`: lower the 30 px minimum cell so "fit to width" can shrink big grids. Add zoom −/+, slider with %, **Fit to screen**, Ctrl+wheel; remember the zoom in `localStorage`.
 - Below ~16 px: hide cell labels (show as tooltip) and scale wall thickness (`--edge`) with the cell size.

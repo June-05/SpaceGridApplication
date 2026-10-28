@@ -23,8 +23,8 @@ class PropertyTest {
     }
 
     @Test
-    void resizeGrid_over30_isRejected() {
-        // TODO: resizeGrid(31, 5) → ValidationException
+    void resizeGrid_over60_isRejected() {
+        // TODO: resizeGrid(60, 60) works; resizeGrid(61, 5) → ValidationException
     }
 
     @Test

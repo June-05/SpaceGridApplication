@@ -11,8 +11,11 @@
  */
 document.addEventListener('DOMContentLoaded', async () => {
   const user = await auth.requireLogin('LANDLORD');
-  const MAX = 30;
+  const MAX = 60;                       // same as Property.MAX_GRID_SIZE
   const ERASER = 'erase';
+  // zoom = size of one spot in px. 48 px is shown as 100%. 'fit' = the whole grid fits the grid area.
+  const CELL_MIN = 6, CELL_MAX = 96, CELL_BASE = 48, CELL_FIT_MAX = 72;
+  const ZOOM_KEY = 'spacegrid.gridZoom';
   const EDGE_TOOLS = [
     { type: 'WALL', name: 'Wall', meta: 'Add a wall' },
     { type: 'DOOR', name: 'Door', meta: 'Doorway between spaces' },
@@ -26,11 +29,33 @@ document.addEventListener('DOMContentLoaded', async () => {
     name: $('propertyName'), host: $('gridHost'), hint: $('hint'), summary: $('summary'),
     rows: $('inpRows'), cols: $('inpCols'), btnResize: $('btnResize'), btnSave: $('btnSave'),
     saveState: $('saveState'), zoneList: $('zoneList'), edgeList: $('edgeList'),
-    spotTools: $('spotTools'), edgeTools: $('edgeTools'), toast: $('toast')
+    spotTools: $('spotTools'), edgeTools: $('edgeTools'), toast: $('toast'),
+    zoomSlider: $('zoomSlider'), zoomLabel: $('zoomLabel'), btnZoomFit: $('btnZoomFit'), fillGroup: $('fillGroup')
   };
 
   const propertyId = Number(new URLSearchParams(location.search).get('id'));
-  const state = { layout: null, mode: 'spots', brush: null, edgeTool: 'DOOR', dirty: false, painting: false };
+  const state = {
+    layout: null, mode: 'spots', brush: null, edgeTool: 'DOOR', dirty: false, painting: false,
+    zoom: loadZoom(),          // a cell size in px, or 'fit'
+    fill: 'brush',             // 'brush' = paint spot by spot · 'rect' = drag a rectangle
+    rect: null,                // { r0, c0, r1, c1 } while a rectangle is being dragged
+    space: false,              // space bar held down: drag to pan
+    pan: null                  // { x, y, left, top } while panning
+  };
+
+  // The zoom is remembered in this browser only. localStorage can be blocked, so every use is wrapped in try/catch.
+  function loadZoom() {
+    try {
+      const saved = localStorage.getItem(ZOOM_KEY);
+      const n = Number(saved);
+      return saved && n >= CELL_MIN && n <= CELL_MAX ? Math.round(n) : 'fit';
+    } catch (err) {
+      return 'fit';
+    }
+  }
+  function saveZoom() {
+    try { localStorage.setItem(ZOOM_KEY, String(state.zoom)); } catch (err) { /* not remembered, still works */ }
+  }
 
   // ------------------------------------------------------------------ helpers
   let toastTimer;
@@ -56,15 +81,66 @@ document.addEventListener('DOMContentLoaded', async () => {
     return counts;
   };
 
+  // ------------------------------------------------------------------ zoom
+  const clampCell = (n) => Math.max(CELL_MIN, Math.min(CELL_MAX, Math.round(n)));
+
+  /** Spot size that makes the whole grid fit the grid area (it is at most 78% of the window high, see grid.css). */
+  function fitCell() {
+    const L = state.layout;
+    const width = el.host.clientWidth - 26;                       // minus the padding of the grid area
+    const height = Math.floor(window.innerHeight * 0.78) - 26;
+    return Math.max(CELL_MIN, Math.min(CELL_FIT_MAX, Math.floor(Math.min(width / L.cols, height / L.rows))));
+  }
+
+  const currentCell = () => (typeof state.zoom === 'number' ? state.zoom : fitCell());
+
+  /** value = a cell size in px or 'fit'. (ax, ay) = a screen point that stays in place (default: the middle). */
+  function setZoom(value, ax, ay) {
+    const host = el.host;
+    const box = host.getBoundingClientRect();
+    const mx = ax == null ? host.clientWidth / 2 : ax - box.left;
+    const my = ay == null ? host.clientHeight / 2 : ay - box.top;
+    const fx = (host.scrollLeft + mx) / Math.max(host.scrollWidth, 1);
+    const fy = (host.scrollTop + my) / Math.max(host.scrollHeight, 1);
+    state.zoom = value === 'fit' ? 'fit' : clampCell(value);
+    saveZoom();
+    render();
+    host.scrollLeft = fx * host.scrollWidth - mx;
+    host.scrollTop = fy * host.scrollHeight - my;
+  }
+
+  function zoomBy(factor, ax, ay) {
+    const base = currentCell();
+    let next = clampCell(base * factor);
+    if (next === base) next = clampCell(base + (factor > 1 ? 1 : -1));   // always move at least 1 px
+    setZoom(next, ax, ay);
+  }
+
+  function renderZoomControls() {
+    const cell = currentCell();
+    el.zoomSlider.value = cell;
+    el.zoomLabel.textContent = `${Math.round((cell / CELL_BASE) * 100)}%`;
+    el.btnZoomFit.classList.toggle('is-active', state.zoom === 'fit');
+  }
+
   // ------------------------------------------------------------------ rendering
+  // Painting by dragging calls scheduleRender() for every spot; the grid is drawn at most once per frame.
+  let renderFrame = 0;
+  function scheduleRender() {
+    if (!renderFrame) renderFrame = requestAnimationFrame(() => { renderFrame = 0; render(); });
+  }
+
   function render() {
     const L = state.layout;
     el.rows.value = L.rows;
     el.cols.value = L.cols;
+    el.fillGroup.hidden = state.mode !== 'spots';
     gridRenderer.render(el.host, L, {
       mode: state.mode,
-      brushZoneId: typeof state.brush === 'number' ? state.brush : null
+      brushZoneId: typeof state.brush === 'number' ? state.brush : null,
+      cell: currentCell()
     });
+    renderZoomControls();
     renderSidebar();
     const units = visibleZones().filter(z => z.rentable);
     const counts = spotCounts();
@@ -79,12 +155,14 @@ document.addEventListener('DOMContentLoaded', async () => {
       const tool = EDGE_TOOLS.find(t => t.type === state.edgeTool);
       return `${tool.name}: click a line between spots (or on the outer border).`;
     }
-    if (state.brush === ERASER) return 'Eraser: click or drag across spots to clear them. Esc to stop.';
+    const how = state.fill === 'rect' ? 'drag a rectangle' : 'click or drag across spots';
+    const nav = ' Zoom: Ctrl + wheel. Pan: hold space and drag.';
+    if (state.brush === ERASER) return `Eraser: ${how} to clear spots. Esc to stop.${nav}`;
     if (state.brush != null) {
       const z = gridRenderer.zoneById(state.layout, state.brush);
-      return `Placing ${z ? z.name : 'zone'}: click or drag across spots. Esc to stop.`;
+      return `Placing ${z ? z.name : 'zone'}: ${how}. Esc to stop.${nav}`;
     }
-    return 'Pick a zone on the right, or click a placed spot to pick its zone.';
+    return `Pick a zone on the right, or click a placed spot to pick its zone.${nav}`;
   }
 
   function item({ key, name, meta, badge, warn, zone, selected }) {
@@ -185,7 +263,47 @@ document.addEventListener('DOMContentLoaded', async () => {
     return cell && el.host.contains(cell) ? cell : null;
   };
 
+  // ---- rectangle fill: drag from one spot to another, everything in between gets the brush (or the eraser)
+  function rectBounds() {
+    const { r0, c0, r1, c1 } = state.rect;
+    return { top: Math.min(r0, r1), bottom: Math.max(r0, r1), left: Math.min(c0, c1), right: Math.max(c0, c1) };
+  }
+
+  let previewFrame = 0;
+  function schedulePreview() {
+    if (previewFrame) return;
+    previewFrame = requestAnimationFrame(() => {
+      previewFrame = 0;
+      const b = state.rect ? rectBounds() : null;
+      el.host.querySelectorAll('.cell').forEach(cell => {
+        const r = Number(cell.dataset.row), c = Number(cell.dataset.col);
+        cell.classList.toggle('is-preview', Boolean(b) && r >= b.top && r <= b.bottom && c >= b.left && c <= b.right);
+      });
+    });
+  }
+
+  function finishRect() {
+    if (!state.rect) return;
+    const b = rectBounds();
+    state.rect = null;
+    let changed = 0;
+    for (let r = b.top; r <= b.bottom; r++) for (let c = b.left; c <= b.right; c++) if (paint(r, c)) changed++;
+    if (changed) render(); else schedulePreview();
+  }
+
+  // ---- pan: space bar + drag, or the middle mouse button
+  function startPan(e) {
+    e.preventDefault();
+    state.pan = { x: e.clientX, y: e.clientY, left: el.host.scrollLeft, top: el.host.scrollTop };
+    el.host.classList.add('is-panning');
+  }
+  function stopPan() {
+    state.pan = null;
+    el.host.classList.remove('is-panning');
+  }
+
   el.host.addEventListener('pointerdown', (e) => {
+    if (e.button === 1 || (e.button === 0 && state.space)) { startPan(e); return; }
     if (e.button > 0) return;
     if (state.mode === 'edges') {
       const h = e.target.closest('.edge-handle');
@@ -202,16 +320,67 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     e.preventDefault();
     if (e.target.hasPointerCapture && e.target.hasPointerCapture(e.pointerId)) e.target.releasePointerCapture(e.pointerId);
+    if (state.fill === 'rect') {
+      state.rect = { r0: r, c0: c, r1: r, c1: c };
+      schedulePreview();
+      return;
+    }
     state.painting = true;
-    if (paint(r, c)) render();
+    if (paint(r, c)) scheduleRender();
   });
   el.host.addEventListener('pointermove', (e) => {
-    if (!state.painting) return;
+    if (state.pan) {
+      el.host.scrollLeft = state.pan.left - (e.clientX - state.pan.x);
+      el.host.scrollTop = state.pan.top - (e.clientY - state.pan.y);
+      return;
+    }
+    if (!state.painting && !state.rect) return;
     const cell = cellFrom(document.elementFromPoint(e.clientX, e.clientY));
-    if (cell && paint(Number(cell.dataset.row), Number(cell.dataset.col))) render();
+    if (!cell) return;
+    const r = Number(cell.dataset.row), c = Number(cell.dataset.col);
+    if (state.rect) {
+      if (state.rect.r1 !== r || state.rect.c1 !== c) { state.rect.r1 = r; state.rect.c1 = c; schedulePreview(); }
+    } else if (paint(r, c)) {
+      scheduleRender();
+    }
   });
-  window.addEventListener('pointerup', () => { state.painting = false; });
-  window.addEventListener('pointercancel', () => { state.painting = false; });
+  const endPointer = () => { state.painting = false; stopPan(); finishRect(); };
+  window.addEventListener('pointerup', endPointer);
+  window.addEventListener('pointercancel', () => { state.rect = null; state.painting = false; stopPan(); schedulePreview(); });
+
+  // ---- zoom controls: buttons, slider, Ctrl + wheel (or pinch), keys + - 0
+  $('btnZoomOut').addEventListener('click', () => zoomBy(1 / 1.25));
+  $('btnZoomIn').addEventListener('click', () => zoomBy(1.25));
+  el.btnZoomFit.addEventListener('click', () => setZoom('fit'));
+  el.zoomSlider.addEventListener('input', () => setZoom(Number(el.zoomSlider.value)));
+
+  // the wheel can fire many times per frame: collect the steps and zoom once per frame
+  let wheelFrame = 0, wheelFactor = 1, wheelX = 0, wheelY = 0;
+  el.host.addEventListener('wheel', (e) => {
+    if (!(e.ctrlKey || e.metaKey)) return;          // a plain wheel still scrolls
+    e.preventDefault();
+    wheelFactor *= e.deltaY < 0 ? 1.1 : 1 / 1.1;
+    wheelX = e.clientX;
+    wheelY = e.clientY;
+    if (!wheelFrame) {
+      wheelFrame = requestAnimationFrame(() => {
+        wheelFrame = 0;
+        const factor = wheelFactor;
+        wheelFactor = 1;
+        zoomBy(factor, wheelX, wheelY);
+      });
+    }
+  }, { passive: false });
+
+  document.querySelectorAll('.seg[data-fill]').forEach(btn => btn.addEventListener('click', () => {
+    state.fill = btn.dataset.fill;
+    state.rect = null;
+    document.querySelectorAll('.seg[data-fill]').forEach(b => {
+      b.classList.toggle('is-active', b === btn);
+      b.setAttribute('aria-pressed', String(b === btn));
+    });
+    render();
+  }));
 
   el.zoneList.addEventListener('click', (e) => {
     const btn = e.target.closest('.zone-item');
@@ -229,9 +398,32 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
     render();
   }));
+  const typingInField = (e) => /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName) || e.target.isContentEditable;
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && state.brush != null) selectBrush(state.brush);
+    if (e.key === 'Escape') {
+      if (state.rect) { state.rect = null; schedulePreview(); return; }      // first Esc: drop the rectangle
+      if (state.brush != null) selectBrush(state.brush);
+      return;
+    }
+    if (typingInField(e) || e.ctrlKey || e.metaKey || e.altKey || !state.layout) return;
+    if (e.key === ' ') {                                                      // hold space to pan
+      e.preventDefault();
+      if (!state.space) { state.space = true; el.host.classList.add('is-pan-ready'); }
+    } else if (e.key === '+' || e.key === '=') {
+      zoomBy(1.25);
+    } else if (e.key === '-') {
+      zoomBy(1 / 1.25);
+    } else if (e.key === '0') {
+      setZoom('fit');
+    }
   });
+  document.addEventListener('keyup', (e) => {
+    if (e.key !== ' ') return;
+    if (!typingInField(e)) e.preventDefault();       // a focused button would otherwise be "clicked" by the space bar
+    state.space = false;
+    el.host.classList.remove('is-pan-ready');
+  });
+  window.addEventListener('blur', () => { state.space = false; el.host.classList.remove('is-pan-ready'); });
   $('btnResetEdges').addEventListener('click', () => {
     if (!state.layout.overrides.size) return;
     state.layout.overrides.clear();
