@@ -1326,13 +1326,16 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.addEventListener('keydown', (e) => {
     if (document.querySelector('dialog[open]')) return;     // a dialog handles its own keys (Esc closes it)
     if (e.key === 'Escape') { onEscape(e); return; }
-    if (!state.layout || e.repeat && !/^[+=\-_]$/.test(e.key)) return;
+    if (!state.layout) return;
     const typing = typingInField(e);
-    if (e.key === ' ' && !typing && noMods(e)) {     // hold space to pan
+    // Hold space to pan. Holding a key repeats keydown, and every repeat must be stopped too: the browser's default
+    // for Space is "scroll down", which otherwise keeps scrolling the canvas while you drag.
+    if (e.key === ' ' && !typing && noMods(e)) {
       e.preventDefault();
       if (!state.space) { state.space = true; el.host.classList.add('is-pan-ready'); }
       return;
     }
+    if (e.repeat && !/^[+=\-_]$/.test(e.key)) return;     // other keys act once per press (only zoom repeats)
     for (const s of SHORTCUTS) {
       if (!s.test || (typing && !s.inFields) || !s.test(e)) continue;
       e.preventDefault();
