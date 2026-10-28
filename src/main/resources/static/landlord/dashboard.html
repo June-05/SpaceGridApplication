@@ -6,16 +6,56 @@
   <title>My properties · SpaceGrid</title>
   <link rel="stylesheet" href="/css/base.css">
 </head>
-<body>
-  <!--
-    LANDLORD DASHBOARD  →  PropertyController.list   GET /api/properties?search=&type=
-    Build: search <input id="search">, type <select id="type"> (APARTMENT, CONDOMINIUM, TOWNHOUSE, COMMERCIAL),
-           <a href="/landlord/property-form.html">+ Add property</a>, and <div id="cards"></div>.
-    Each card links to: property-form.html?id=, property-grid.html?id=, units.html?propertyId=
-    Script: js/pages/landlord-dashboard.js
-  -->
-  <main>
-    <!-- TODO: nav, filters, property cards -->
+<body class="dashboard-page">
+  <header class="topbar">
+    <div class="titles">
+      <h1>SpaceGrid</h1>
+      <p class="subtitle">Landlord Workspace</p>
+    </div>
+    <div class="topbar-actions">
+      <a href="/landlord/property-form.html" class="btn btn-primary">+ Add property</a>
+      <button id="btnLogout" class="btn" type="button">Log out</button>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="toolbar">
+      <div class="filters">
+        <input id="search" type="search" placeholder="Search properties..." aria-label="Search properties">
+        <select id="type" aria-label="Filter by property type">
+          <option value="">All Types</option>
+          <option value="APARTMENT">Apartment</option>
+          <option value="CONDOMINIUM">Condominium</option>
+          <option value="TOWNHOUSE">Townhouse</option>
+          <option value="COMMERCIAL">Commercial</option>
+        </select>
+      </div>
+    </section>
+
+    <div id="cards" class="card-grid">
+      <!-- Sample Property Cards for User Manual Screenshots -->
+      <article class="card property-card">
+        <h2>Sunset Apartments</h2>
+        <span class="badge">APARTMENT</span>
+        <p class="address">123 Main Street, Zone 4</p>
+        <div class="card-actions">
+          <a href="/landlord/property-grid.html?id=1" class="btn btn-primary">Edit Layout</a>
+          <a href="/landlord/units.html?propertyId=1" class="btn">Manage Units</a>
+          <a href="/landlord/property-form.html?id=1" class="btn">Edit Details</a>
+        </div>
+      </article>
+
+      <article class="card property-card">
+        <h2>Grand Heights Plaza</h2>
+        <span class="badge">COMMERCIAL</span>
+        <p class="address">456 Commercial Ave, Downtown</p>
+        <div class="card-actions">
+          <a href="/landlord/property-grid.html?id=2" class="btn btn-primary">Edit Layout</a>
+          <a href="/landlord/units.html?propertyId=2" class="btn">Manage Units</a>
+          <a href="/landlord/property-form.html?id=2" class="btn">Edit Details</a>
+        </div>
+      </article>
+    </div>
   </main>
 
   <script src="/js/common/api.js"></script>
