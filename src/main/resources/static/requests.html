@@ -6,16 +6,10 @@
   <title>Lease requests · SpaceGrid</title>
   <link rel="stylesheet" href="/css/base.css">
   <link rel="stylesheet" href="/css/zones.css">
+  <!-- Dedicated Requests Page Stylesheet -->
+  <link rel="stylesheet" href="/css/renter-css/request.css">
 </head>
 <body class="dashboard-page">
-  <!--
-    LEASE REQUESTS  (both roles; route: /requests)
-    Renter:   their own requests, with Cancel on pending ones.
-    Landlord: requests for their properties, with Approve / Decline on pending ones.
-    Endpoints: GET /api/lease-requests
-               POST /api/lease-requests/{id}/approve | decline | cancel
-    Script: /js/pages/requests.js
-  -->
   <header class="topbar">
     <div class="titles">
       <h1>SpaceGrid</h1>
@@ -23,7 +17,7 @@
     </div>
     <div class="topbar-actions">
       <a href="/" class="btn">Browse spaces</a>
-      <a id="dashboardLink" href="/" class="btn">Dashboard</a>
+      <a id="dashboardLink" href="/renter/dashboard.html" class="btn">Dashboard</a>
       <button id="btnLogout" class="btn" type="button">Log out</button>
     </div>
   </header>
