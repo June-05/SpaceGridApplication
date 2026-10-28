@@ -59,6 +59,56 @@ const gridRenderer = {
     return true;
   },
 
+  /**
+   * Where a spot or line ends up after a resize to rows × cols with the content shifted by dr rows and dc columns
+   * (dr / dc are not 0 when rows or columns are added to / removed from the top or the left). Null = it falls outside.
+   */
+  shiftedCell(rows, cols, dr, dc, r, c) {
+    const nr = r + dr, nc = c + dc;
+    return nr >= 0 && nr < rows && nc >= 0 && nc < cols ? [nr, nc] : null;
+  },
+
+  shiftedEdge(rows, cols, dr, dc, orientation, r, c) {
+    const nr = r + dr, nc = c + dc;
+    const inside = orientation === 'HORIZONTAL'
+      ? nr >= 0 && nr <= rows && nc >= 0 && nc < cols
+      : nr >= 0 && nr < rows && nc >= 0 && nc <= cols;
+    return inside ? [nr, nc] : null;
+  },
+
+  /** What a resize would drop: { cellsOut: [cell keys], edgesOut: [edge keys] }. */
+  resizeLoss(layout, rows, cols, dr = 0, dc = 0) {
+    const cellsOut = [...layout.cells.keys()].filter(k => {
+      const [r, c] = k.split(',').map(Number);
+      return !this.shiftedCell(rows, cols, dr, dc, r, c);
+    });
+    const edgesOut = [...layout.overrides.keys()].filter(k => {
+      const [o, r, c] = k.split(':');
+      return !this.shiftedEdge(rows, cols, dr, dc, o, Number(r), Number(c));
+    });
+    return { cellsOut, edgesOut };
+  },
+
+  /** Resizes the layout to rows × cols, moving the spots and edge overrides by (dr, dc) and dropping what falls outside. */
+  resizeLayout(layout, rows, cols, dr = 0, dc = 0) {
+    const cells = new Map();
+    for (const [k, zoneId] of layout.cells) {
+      const [r, c] = k.split(',').map(Number);
+      const to = this.shiftedCell(rows, cols, dr, dc, r, c);
+      if (to) cells.set(this.cellKey(to[0], to[1]), zoneId);
+    }
+    const overrides = new Map();
+    for (const [k, type] of layout.overrides) {
+      const [o, r, c] = k.split(':');
+      const to = this.shiftedEdge(rows, cols, dr, dc, o, Number(r), Number(c));
+      if (to) overrides.set(this.edgeKey(o, to[0], to[1]), type);
+    }
+    layout.rows = rows;
+    layout.cols = cols;
+    layout.cells = cells;
+    layout.overrides = overrides;
+  },
+
   /** Body for PUT /api/properties/{id}/grid: { "zoneId": [{row, col}, ...] } */
   toSpotsByZone(layout) {
     const result = {};

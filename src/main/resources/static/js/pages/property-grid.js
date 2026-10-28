@@ -650,29 +650,46 @@ document.addEventListener('DOMContentLoaded', async () => {
   function addResizeHandles() {
     const s = stage();
     if (!s) return;
-    for (const dir of ['right', 'bottom', 'corner']) {
+    const titles = {
+      right: 'Drag to add or remove columns on the right', left: 'Drag to add or remove columns on the left',
+      bottom: 'Drag to add or remove rows at the bottom', top: 'Drag to add or remove rows at the top',
+      corner: 'Drag to resize'
+    };
+    for (const dir of ['right', 'bottom', 'left', 'top', 'corner']) {
       const h = document.createElement('div');
       h.className = `resize-handle rh-${dir}`;
       h.dataset.resize = dir;
-      h.title = dir === 'right' ? 'Drag to add or remove columns' : dir === 'bottom' ? 'Drag to add or remove rows' : 'Drag to resize';
+      h.title = titles[dir];
       s.appendChild(h);
     }
   }
 
+  /**
+   * The handle sits outside the grid, so the new size is the starting size plus how far the mouse moved.
+   * Right / bottom / corner grow or shrink at the right / bottom. Left / top grow or shrink at the left / top:
+   * the content moves with it (shiftR / shiftC), so what you drew stays where it is on screen.
+   */
   function moveResize(x, y) {
     const R = state.resizing;
-    const box = stage().getBoundingClientRect();
     const cell = currentCell();
-    if (R.dir !== 'bottom') R.cols = Math.max(1, Math.min(MAX, Math.round((x - box.left) / cell)));
-    if (R.dir !== 'right') R.rows = Math.max(1, Math.min(MAX, Math.round((y - box.top) / cell)));
-    drawSizeOutline(R.rows, R.cols, `${R.rows} × ${R.cols}`);
+    const clamp = (n) => Math.max(1, Math.min(MAX, n));
+    const dx = Math.round((x - R.startX) / cell), dy = Math.round((y - R.startY) / cell);
+    R.cols = R.startCols;
+    R.rows = R.startRows;
+    if (R.dir === 'right' || R.dir === 'corner') R.cols = clamp(R.startCols + dx);
+    if (R.dir === 'left') R.cols = clamp(R.startCols - dx);
+    if (R.dir === 'bottom' || R.dir === 'corner') R.rows = clamp(R.startRows + dy);
+    if (R.dir === 'top') R.rows = clamp(R.startRows - dy);
+    R.shiftC = R.dir === 'left' ? R.cols - R.startCols : 0;
+    R.shiftR = R.dir === 'top' ? R.rows - R.startRows : 0;
+    drawSizeOutline(R.rows, R.cols, `${R.rows} × ${R.cols}`, R.shiftR, R.shiftC);
   }
 
   function endResize() {
-    const { rows, cols } = state.resizing;
+    const { rows, cols, shiftR, shiftC } = state.resizing;
     state.resizing = null;
     removeSizePreview();
-    if (rows !== state.layout.rows || cols !== state.layout.cols) applyResize(rows, cols);
+    if (rows !== state.layout.rows || cols !== state.layout.cols) applyResize(rows, cols, shiftR, shiftC);
   }
 
   el.host.addEventListener('pointerdown', (e) => {
@@ -681,7 +698,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     const handle = e.target.closest('.resize-handle');
     if (handle && e.button === 0) {
       e.preventDefault();
-      state.resizing = { dir: handle.dataset.resize, rows: state.layout.rows, cols: state.layout.cols };
+      const { rows, cols } = state.layout;
+      state.resizing = {
+        dir: handle.dataset.resize, rows, cols, startRows: rows, startCols: cols, shiftR: 0, shiftC: 0,
+        startX: e.clientX, startY: e.clientY
+      };
       moveResize(e.clientX, e.clientY);
       return;
     }
@@ -865,30 +886,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  /** What a resize to rows × cols would remove. */
-  function resizeLoss(rows, cols) {
-    const L = state.layout;
-    const cellsOut = [...L.cells.keys()].filter(k => { const [r, c] = k.split(',').map(Number); return r >= rows || c >= cols; });
-    const edgesOut = [...L.overrides.keys()].filter(k => {
-      const [o, r, c] = k.split(':'); const R = Number(r), C = Number(c);
-      return o === 'HORIZONTAL' ? (R > rows || C >= cols) : (R >= rows || C > cols);
-    });
-    return { cellsOut, edgesOut };
-  }
-
   const validSize = (n) => Number.isInteger(n) && n >= 1 && n <= MAX;
 
   function removeSizePreview() {
     el.world.querySelectorAll('.size-preview').forEach(p => p.remove());
   }
 
-  function drawSizeOutline(rows, cols, label) {
+  /** shiftR / shiftC: rows / columns added on the top / left (the new grid then starts above / left of the old one). */
+  function drawSizeOutline(rows, cols, label, shiftR = 0, shiftC = 0) {
     removeSizePreview();
     const s = stage();
     if (!s) return;
     const cell = currentCell();
     const outline = document.createElement('div');
     outline.className = 'size-preview';
+    outline.style.left = `${-shiftC * cell}px`;
+    outline.style.top = `${-shiftR * cell}px`;
     outline.style.width = `${cols * cell}px`;
     outline.style.height = `${rows * cell}px`;
     if (label) outline.dataset.label = label;
@@ -910,7 +923,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (rows === L.rows && cols === L.cols) {
       note.textContent = 'Same size as now.';
     } else {
-      const { cellsOut, edgesOut } = resizeLoss(rows, cols);
+      const { cellsOut, edgesOut } = gridRenderer.resizeLoss(L, rows, cols);
       if (cellsOut.length || edgesOut.length) {
         note.textContent = `Shrinking removes ${plural(cellsOut.length, 'spot')} and ${plural(edgesOut.length, 'wall edit')}.`;
         note.classList.add('is-warn');
@@ -921,14 +934,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     drawSizeOutline(rows, cols);
   }
 
-  function applyResize(rows, cols) {
+  /** shiftR / shiftC: how far the content moves (rows / columns added or removed on the top / left). */
+  function applyResize(rows, cols, shiftR = 0, shiftC = 0) {
     const L = state.layout;
     if (!validSize(rows) || !validSize(cols)) {
       toast(`Rows and columns must be whole numbers from 1 to ${MAX}.`, true);
       return;
     }
     if (rows === L.rows && cols === L.cols) { closePopover(); return; }
-    const { cellsOut, edgesOut } = resizeLoss(rows, cols);
+    const { cellsOut, edgesOut } = gridRenderer.resizeLoss(L, rows, cols, shiftR, shiftC);
     if ((cellsOut.length || edgesOut.length) &&
         !confirm(`Resizing to ${rows} × ${cols} removes ${cellsOut.length} spot(s) and ${edgesOut.length} wall/door edit(s).`
           + '\n\nYou can undo this with Ctrl+Z. Continue?')) {
@@ -936,10 +950,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
     const before = gridRenderer.snapshot(L);
-    cellsOut.forEach(k => L.cells.delete(k));
-    edgesOut.forEach(k => L.overrides.delete(k));
-    L.rows = rows;
-    L.cols = cols;
+    gridRenderer.resizeLayout(L, rows, cols, shiftR, shiftC);
     commitAction(before);
     closePopover();
     render();

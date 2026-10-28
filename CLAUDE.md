@@ -50,7 +50,7 @@ value objects, with no SQL or web code.
   - abstract `GridZone` → `RentableUnit`, `CommonArea`.
   - Common area types: WALKWAY, GRASS, BATHROOM, KITCHEN, LAUNDRY, LOBBY, PARKING, STAIRS. Indoor ones are bathroom, kitchen, laundry, lobby, stairs.
   - **Common-area colors:** `common_areas.color` (`#rrggbb`, NULL = type default). Set on create (`color` field) or `PUT /api/properties/{id}/common-areas/{areaId}/color`. Must differ from every other common area's color in the same property and from the 4 unit status colors (409). Units are always colored by status.
-  - One zone per spot. Shrinking the grid drops spots and edges outside it.
+  - One zone per spot. Shrinking the grid drops spots and edges outside it. In the plotter the grid can be resized from all four sides; the top/left bars move the drawing with them (`gridRenderer.resizeLayout`), and the saved layout is still just rows, cols and absolute spots.
   - **Walls are automatic** on a line between different zones when at least one side is enclosed (a unit or indoor area), and on the border next to an enclosed spot.
   - Manual overrides are WALL / DOOR / WINDOW / OPEN. Each line is stored once, as the line above (HORIZONTAL) or left of (VERTICAL) a spot.
   - The plotter's toolbar is always Spots | Walls · Hand · Brush/Rectangle · Eraser · Preview. In Walls mode the Brush draws the Wall/Door/Window picked in the panel and the Rectangle draws it around an area (`gridRenderer.rectOutlineEdges`). Eraser over an automatic wall stores OPEN; Wall over an automatic wall removes the override (`gridRenderer.applyEdgeTool`).
