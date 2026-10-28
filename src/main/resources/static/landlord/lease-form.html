@@ -1,92 +1,525 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Lease Form · SpaceGrid</title>
-  <link rel="stylesheet" href="/css/base.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>New Lease Contract - SpaceGrid</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+        .bg-space-purple { background-color: #4f46e5; }
+        .hover-bg-space-purple:hover { background-color: #4338ca; }
+        .text-space-purple { color: #4f46e5; }
+        .border-space-purple { border-color: #4f46e5; }
+        .ring-space-purple { --tw-ring-color: #4f46e5; }
+        .shadow-xs { box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05); }
+    </style>
 </head>
-<body class="card-page">
-  <!--
-    ADD / EDIT LEASE  (no ?id = add, ?id=5 = edit)
-      GET  /api/leases/{id}            fill the form when editing
-      POST /api/leases                 add   (form fields below)
-      PUT  /api/leases/{id}            edit  (same fields)
-      POST /api/leases/{id}/activate   POST /api/leases/{id}/archive
-    Form field names: propertyName, unitName, renterName, startDate, endDate, monthlyRent, leaseTerms, confirmTerms
-    Script: js/pages/lease-form.js
-  -->
-  <header class="topbar">
-    <a href="/landlord/dashboard.html" class="back-link">← Dashboard</a>
-    <div class="titles">
-      <h1 id="pageTitle">Lease Form</h1>
-      <p class="subtitle">Configure and manage tenant lease details</p>
+<body class="bg-[#f8fafc] text-slate-900 min-h-screen flex flex-col antialiased">
+    <!-- TOP NAVIGATION BAR -->
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-xs">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between gap-6">
+            <div class="flex items-center gap-2 cursor-pointer flex-shrink-0" onclick="window.location.href='dashboard.html'">
+                <span class="text-2xl font-black tracking-tight text-slate-900">Space<span class="text-indigo-600">Grid</span></span>
+            </div>
+            <div class="flex items-center gap-3.5 flex-shrink-0">
+                <a href="leases.html" class="flex items-center gap-2 px-3.5 py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 rounded-xl text-xs font-semibold transition border border-slate-200">
+                    <i class="fa-solid fa-file-contract text-slate-500 text-xs"></i>
+                    <span>View All Leases</span>
+                </a>
+                <a href="dashboard.html" class="flex items-center gap-2 px-3.5 py-2 bg-indigo-50/80 hover:bg-indigo-100 text-indigo-600 rounded-xl text-xs font-semibold transition border border-indigo-100">
+                    <i class="fa-solid fa-gauge-high text-indigo-500 text-xs"></i>
+                    <span>Dashboard</span>
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <!-- MAIN CONTAINER -->
+    <main class="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Breadcrumb -->
+        <nav class="flex items-center gap-2 text-sm mb-6">
+            <a href="dashboard.html" class="text-slate-500 hover:text-indigo-600 transition font-medium">Dashboard</a>
+            <i class="fa-solid fa-chevron-right text-xs text-slate-400"></i>
+            <a href="leases.html" class="text-slate-500 hover:text-indigo-600 transition font-medium">Leases</a>
+            <i class="fa-solid fa-chevron-right text-xs text-slate-400"></i>
+            <span class="text-slate-900 font-semibold">New Lease Contract</span>
+        </nav>
+
+        <!-- Page Header -->
+        <div class="mb-8">
+            <h1 class="text-2xl font-extrabold text-slate-900 tracking-tight">Create New Lease Agreement</h1>
+            <p class="text-sm text-slate-500 mt-0.5">Fill in the details below to generate a new lease contract for a tenant.</p>
+        </div>
+
+        <form id="leaseForm" onsubmit="handleFormSubmit(event)" novalidate>
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <!-- LEFT COLUMN - FORM FIELDS -->
+                <div class="lg:col-span-2 space-y-6">
+                    <!-- Tenant Details -->
+                    <section class="bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden">
+                        <div class="px-6 py-4 border-b border-slate-100 bg-slate-50/50">
+                            <div class="flex items-center gap-2">
+                                <div class="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center">
+                                    <i class="fa-solid fa-user text-indigo-600 text-sm"></i>
+                                </div>
+                                <h2 class="text-base font-bold text-slate-900">Tenant Details</h2>
+                            </div>
+                        </div>
+                        <div class="p-6 space-y-4">
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 mb-1.5">Full Name <span class="text-rose-500">*</span></label>
+                                <input id="tenantName" required type="text" placeholder="e.g. Juan Dela Cruz" class="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/10 transition">
+                                <p id="tenantNameError" class="text-xs text-rose-500 mt-1 hidden">Please enter the tenant's full name.</p>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-700 mb-1.5">Email Address <span class="text-rose-500">*</span></label>
+                                    <input id="tenantEmail" required type="email" placeholder="juan@example.com" class="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/10 transition">
+                                    <p id="tenantEmailError" class="text-xs text-rose-500 mt-1 hidden">Please enter a valid email address.</p>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-700 mb-1.5">Phone Number <span class="text-rose-500">*</span></label>
+                                    <input id="tenantPhone" required type="tel" placeholder="+63 912 345 6789" class="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/10 transition">
+                                    <p id="tenantPhoneError" class="text-xs text-rose-500 mt-1 hidden">Please enter a valid phone number.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Lease Duration -->
+                    <section class="bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden">
+                        <div class="px-6 py-4 border-b border-slate-100 bg-slate-50/50">
+                            <div class="flex items-center gap-2">
+                                <div class="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center">
+                                    <i class="fa-solid fa-calendar-days text-indigo-600 text-sm"></i>
+                                </div>
+                                <h2 class="text-base font-bold text-slate-900">Lease Duration & Property</h2>
+                            </div>
+                        </div>
+                        <div class="p-6 space-y-4">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-700 mb-1.5">Property <span class="text-rose-500">*</span></label>
+                                    <select id="propertySelect" required class="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/10 transition cursor-pointer">
+                                        <option value="">Select a property</option>
+                                        <option value="Clark Global City Commercial Hub">Clark Global City Commercial Hub</option>
+                                        <option value="BGC Night Market Stalls">BGC Night Market Stalls</option>
+                                        <option value="Makati Corporate Tower Retail">Makati Corporate Tower Retail</option>
+                                        <option value="Ayala Triangle Open Plaza">Ayala Triangle Open Plaza</option>
+                                        <option value="Subic Bay Commercial Lots">Subic Bay Commercial Lots</option>
+                                    </select>
+                                    <p id="propertyError" class="text-xs text-rose-500 mt-1 hidden">Please select a property.</p>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-700 mb-1.5">Unit/Block <span class="text-rose-500">*</span></label>
+                                    <select id="unitSelect" required class="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/10 transition cursor-pointer">
+                                        <option value="">Select unit/block</option>
+                                        <option value="Block A-01">Block A-01</option>
+                                        <option value="Block A-02">Block A-02</option>
+                                        <option value="Block B-15">Block B-15</option>
+                                        <option value="Stall 12">Stall 12</option>
+                                        <option value="Unit 305">Unit 305</option>
+                                        <option value="Lot 5">Lot 5</option>
+                                    </select>
+                                    <p id="unitError" class="text-xs text-rose-500 mt-1 hidden">Please select a unit or block.</p>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-700 mb-1.5">Start Date <span class="text-rose-500">*</span></label>
+                                    <input id="startDate" required type="date" class="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/10 transition">
+                                    <p id="startDateError" class="text-xs text-rose-500 mt-1 hidden">Please select a start date.</p>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-700 mb-1.5">End Date <span class="text-rose-500">*</span></label>
+                                    <input id="endDate" required type="date" class="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/10 transition">
+                                    <p id="endDateError" class="text-xs text-rose-500 mt-1 hidden">Please select an end date.</p>
+                                    <p id="dateError" class="text-xs text-rose-500 mt-1 hidden">End date must be after start date.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Financials -->
+                    <section class="bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden">
+                        <div class="px-6 py-4 border-b border-slate-100 bg-slate-50/50">
+                            <div class="flex items-center gap-2">
+                                <div class="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center">
+                                    <i class="fa-solid fa-peso-sign text-indigo-600 text-sm"></i>
+                                </div>
+                                <h2 class="text-base font-bold text-slate-900">Financial Details</h2>
+                            </div>
+                        </div>
+                        <div class="p-6 space-y-4">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-700 mb-1.5">Monthly Rent (₱) <span class="text-rose-500">*</span></label>
+                                    <div class="relative">
+                                        <span class="absolute left-3.5 top-2.5 text-slate-400 text-sm">₱</span>
+                                        <input id="monthlyRent" required type="number" min="0" step="0.01" placeholder="25000" class="w-full pl-8 pr-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/10 transition">
+                                    </div>
+                                    <p id="rentError" class="text-xs text-rose-500 mt-1 hidden">Please enter a valid rent amount.</p>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-700 mb-1.5">Security Deposit (₱) <span class="text-rose-500">*</span></label>
+                                    <div class="relative">
+                                        <span class="absolute left-3.5 top-2.5 text-slate-400 text-sm">₱</span>
+                                        <input id="securityDeposit" required type="number" min="0" step="0.01" placeholder="50000" class="w-full pl-8 pr-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/10 transition">
+                                    </div>
+                                    <p id="depositError" class="text-xs text-rose-500 mt-1 hidden">Please enter a valid deposit amount.</p>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 mb-1.5">Payment Terms <span class="text-rose-500">*</span></label>
+                                <select id="paymentTerms" required class="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/10 transition cursor-pointer">
+                                    <option value="">Select payment terms</option>
+                                    <option value="Monthly in Advance">Monthly in Advance</option>
+                                    <option value="Monthly in Arrears">Monthly in Arrears</option>
+                                    <option value="Quarterly in Advance">Quarterly in Advance</option>
+                                    <option value="Semi-Annual in Advance">Semi-Annual in Advance</option>
+                                    <option value="Annual in Advance">Annual in Advance</option>
+                                </select>
+                                <p id="paymentTermsError" class="text-xs text-rose-500 mt-1 hidden">Please select payment terms.</p>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Contract Upload -->
+                    <section class="bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden">
+                        <div class="px-6 py-4 border-b border-slate-100 bg-slate-50/50">
+                            <div class="flex items-center gap-2">
+                                <div class="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center">
+                                    <i class="fa-solid fa-file-pdf text-indigo-600 text-sm"></i>
+                                </div>
+                                <h2 class="text-base font-bold text-slate-900">Contract Document</h2>
+                            </div>
+                        </div>
+                        <div class="p-6">
+                            <div id="dropZone" class="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center hover:border-indigo-400 hover:bg-indigo-50/30 transition cursor-pointer">
+                                <input type="file" id="contractFile" accept=".pdf" class="hidden">
+                                <div id="dropZoneContent">
+                                    <i class="fa-solid fa-cloud-arrow-up text-3xl text-slate-400 mb-3"></i>
+                                    <p class="text-sm font-semibold text-slate-700 mb-1">Drop your contract PDF here</p>
+                                    <p class="text-xs text-slate-500 mb-3">or click to browse</p>
+                                    <button type="button" onclick="document.getElementById('contractFile').click()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg transition">Browse Files</button>
+                                    <p class="text-xs text-slate-400 mt-2">Maximum file size: 10MB</p>
+                                </div>
+                                <div id="dropZoneFile" class="hidden">
+                                    <i class="fa-solid fa-file-pdf text-3xl text-rose-500 mb-3"></i>
+                                    <p id="fileName" class="text-sm font-semibold text-slate-700 mb-1"></p>
+                                    <p id="fileSize" class="text-xs text-slate-500 mb-3"></p>
+                                    <button type="button" onclick="removeFile()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition">Remove File</button>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Submit Button -->
+                    <div class="flex items-center gap-3">
+                        <button type="button" onclick="window.location.href='/landlord/leases.html'" class="px-6 py-3 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-sm font-semibold rounded-xl transition">
+                            Cancel
+                        </button>
+                        <button type="submit" class="flex-1 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-xl transition shadow-sm shadow-indigo-200">
+                            <i class="fa-solid fa-check mr-2"></i>
+                            Create Lease Contract
+                        </button>
+                    </div>
+                </div>
+
+                <!-- RIGHT COLUMN - LEASE SUMMARY -->
+                <div class="lg:col-span-1">
+                    <div class="bg-white border border-slate-200 rounded-2xl shadow-xs sticky top-28 overflow-hidden">
+                        <div class="px-6 py-4 border-b border-slate-100 bg-gradient-to-r from-indigo-50 to-purple-50">
+                            <div class="flex items-center gap-2">
+                                <div class="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center">
+                                    <i class="fa-solid fa-calculator text-white text-sm"></i>
+                                </div>
+                                <h2 class="text-base font-bold text-slate-900">Lease Summary</h2>
+                            </div>
+                        </div>
+                        <div class="p-6 space-y-4">
+                            <div class="space-y-3">
+                                <div class="flex items-center justify-between text-sm">
+                                    <span class="text-slate-600">Monthly Rent</span>
+                                    <span id="summaryRent" class="font-semibold text-slate-900">₱0.00</span>
+                                </div>
+                                <div class="flex items-center justify-between text-sm">
+                                    <span class="text-slate-600">Security Deposit</span>
+                                    <span id="summaryDeposit" class="font-semibold text-slate-900">₱0.00</span>
+                                </div>
+                                <div class="flex items-center justify-between text-sm">
+                                    <span class="text-slate-600">Lease Duration</span>
+                                    <span id="summaryDuration" class="font-semibold text-slate-900">-</span>
+                                </div>
+                                <div class="flex items-center justify-between text-sm">
+                                    <span class="text-slate-600">Number of Months</span>
+                                    <span id="summaryMonths" class="font-semibold text-slate-900">0</span>
+                                </div>
+                            </div>
+                            <div class="pt-4 border-t border-slate-100 space-y-3">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-sm font-bold text-slate-900">Total Contract Value</span>
+                                    <span id="totalContractValue" class="text-lg font-extrabold text-indigo-600">₱0.00</span>
+                                </div>
+                                <p class="text-xs text-slate-500">*Based on monthly rent × number of months</p>
+                            </div>
+                            <div class="pt-4 border-t border-slate-100">
+                                <h3 class="text-xs font-bold text-slate-700 mb-2 uppercase tracking-wider">Payment Schedule Preview</h3>
+                                <div class="bg-slate-50 rounded-xl p-3 space-y-2">
+                                    <div class="flex items-center justify-between text-xs">
+                                        <span class="text-slate-600">First Payment</span>
+                                        <span id="firstPayment" class="font-semibold text-slate-900">₱0.00</span>
+                                    </div>
+                                    <p id="paymentNote" class="text-[11px] text-slate-500">Select payment terms</p>
+                                </div>
+                            </div>
+                            <div class="pt-4 border-t border-slate-100">
+                                <div class="flex items-center gap-2 mb-2">
+                                    <div class="w-2 h-2 rounded-full bg-amber-500"></div>
+                                    <span class="text-xs font-bold text-slate-700">Status Indicator</span>
+                                </div>
+                                <div class="bg-amber-50 border border-amber-200 rounded-xl p-3">
+                                    <p class="text-xs font-semibold text-amber-800">Pending Review</p>
+                                    <p class="text-[11px] text-amber-700 mt-0.5">Contract will be pending until approved</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </main>
+
+    <!-- Success Toast Notification -->
+    <div id="toast" class="hidden fixed bottom-6 right-6 bg-emerald-600 text-white px-6 py-4 rounded-xl shadow-2xl z-50 flex items-center gap-3">
+        <div class="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
+            <i class="fa-solid fa-check text-white"></i>
+        </div>
+        <div>
+            <p class="text-sm font-bold">Lease Contract Created Successfully!</p>
+            <p class="text-xs text-emerald-100">Redirecting to leases page...</p>
+        </div>
     </div>
-    <div class="topbar-actions">
-      <button id="btnLogout" class="btn" type="button">Log out</button>
-    </div>
-  </header>
 
-  <main class="card">
-    <form id="leaseForm" novalidate>
-      <label class="field">
-        <span>Property Name</span>
-        <select name="propertyName" id="propertyName" required>
-          <option value="" disabled selected>Select Property</option>
-          <option value="sunset-apartments">Sunset Apartments</option>
-          <option value="ocean-view">Ocean View Residences</option>
-          <option value="pine-heights">Pine Heights Tower</option>
-        </select>
-      </label>
+    <script>
+        let selectedFile = null;
 
-      <label class="field">
-        <span>Unit Name / Number</span>
-        <input name="unitName" id="unitName" placeholder="e.g. Unit 105" required>
-      </label>
+        // File drop zone
+        const dropZone = document.getElementById('dropZone');
+        const contractFile = document.getElementById('contractFile');
+        const dropZoneContent = document.getElementById('dropZoneContent');
+        const dropZoneFile = document.getElementById('dropZoneFile');
+        const fileName = document.getElementById('fileName');
+        const fileSize = document.getElementById('fileSize');
 
-      <label class="field">
-        <span>Renter Name</span>
-        <input name="renterName" id="renterName" placeholder="e.g. John Doe" required>
-      </label>
+        dropZone.addEventListener('click', () => {
+            contractFile.click();
+        });
 
-      <label class="field">
-        <span>Start Date</span>
-        <input name="startDate" id="startDate" type="date" required>
-      </label>
+        contractFile.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFile(e.target.files[0]);
+            }
+        });
 
-      <label class="field">
-        <span>End Date</span>
-        <input name="endDate" id="endDate" type="date" required>
-      </label>
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('border-indigo-400', 'bg-indigo-50/30');
+        });
 
-      <label class="field">
-        <span>Monthly Rent (PHP)</span>
-        <input name="monthlyRent" id="monthlyRent" type="number" min="0" step="0.01" placeholder="e.g. 8500.00" required>
-      </label>
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('border-indigo-400', 'bg-indigo-50/30');
+        });
 
-      <label class="field">
-        <span>Special Terms / Notes (optional)</span>
-        <textarea name="leaseTerms" id="leaseTerms" rows="3" placeholder="Enter special agreement notes or conditions..."></textarea>
-      </label>
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('border-indigo-400', 'bg-indigo-50/30');
+            if (e.dataTransfer.files.length > 0) {
+                const file = e.dataTransfer.files[0];
+                if (file.type === 'application/pdf') {
+                    contractFile.files = e.dataTransfer.files;
+                    handleFile(file);
+                } else {
+                    alert('Please upload a PDF file.');
+                }
+            }
+        });
 
-      <label class="check">
-        <input name="confirmTerms" id="confirmTerms" type="checkbox" required> I confirm all lease details are accurate
-      </label>
+        function handleFile(file) {
+            if (file.size > 10 * 1024 * 1024) {
+                alert('File size exceeds 10MB limit.');
+                return;
+            }
+            selectedFile = file;
+            fileName.textContent = file.name;
+            fileSize.textContent = (file.size / 1024 / 1024).toFixed(2) + ' MB';
+            dropZoneContent.classList.add('hidden');
+            dropZoneFile.classList.remove('hidden');
+        }
 
-      <button id="btnSave" class="btn btn-primary btn-block" type="submit">Save Lease</button>
-    </form>
+        function removeFile() {
+            selectedFile = null;
+            contractFile.value = '';
+            dropZoneContent.classList.remove('hidden');
+            dropZoneFile.classList.add('hidden');
+        }
 
-    <div id="statusActions" class="status-actions">
-      <h3>Lease Actions</h3>
-      <div class="button-group">
-        <button id="btnActivate" class="btn btn-success" type="button">Activate Lease</button>
-        <button id="btnArchive" class="btn btn-danger" type="button">Archive Lease</button>
-      </div>
-    </div>
-  </main>
+        // Calculate lease summary
+        function calculateSummary() {
+            const rent = parseFloat(document.getElementById('monthlyRent').value) || 0;
+            const deposit = parseFloat(document.getElementById('securityDeposit').value) || 0;
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
+            const paymentTerms = document.getElementById('paymentTerms').value;
 
-  <script src="/js/common/api.js"></script>
-  <script src="/js/common/auth.js"></script>
-  <script src="/js/pages/lease-form.js"></script>
+            document.getElementById('summaryRent').textContent = '₱' + rent.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            document.getElementById('summaryDeposit').textContent = '₱' + deposit.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+            if (startDate && endDate) {
+                const start = new Date(startDate);
+                const end = new Date(endDate);
+                if (end >= start) {
+                    const diffTime = Math.abs(end - start);
+                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                    const diffMonths = Math.round(diffDays / 30.44);
+                    document.getElementById('summaryDuration').textContent = start.toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' }) + ' - ' + end.toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' });
+                    document.getElementById('summaryMonths').textContent = diffMonths > 0 ? diffMonths : 1;
+                    const totalValue = rent * (diffMonths > 0 ? diffMonths : 1);
+                    document.getElementById('totalContractValue').textContent = '₱' + totalValue.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                } else {
+                    document.getElementById('summaryDuration').textContent = '-';
+                    document.getElementById('summaryMonths').textContent = '0';
+                    document.getElementById('totalContractValue').textContent = '₱0.00';
+                }
+            }
+
+            if (paymentTerms) {
+                document.getElementById('paymentNote').textContent = paymentTerms;
+                if (paymentTerms.includes('Advance')) {
+                    document.getElementById('firstPayment').textContent = '₱' + (rent + deposit).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                } else if (paymentTerms.includes('Arrears')) {
+                    document.getElementById('firstPayment').textContent = '₱' + deposit.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                } else {
+                    document.getElementById('firstPayment').textContent = '₱' + rent.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                }
+            }
+        }
+
+        // Event listeners for calculations
+        document.getElementById('monthlyRent').addEventListener('input', calculateSummary);
+        document.getElementById('securityDeposit').addEventListener('input', calculateSummary);
+        document.getElementById('startDate').addEventListener('change', calculateSummary);
+        document.getElementById('endDate').addEventListener('change', calculateSummary);
+        document.getElementById('paymentTerms').addEventListener('change', calculateSummary);
+
+        // Form validation and submission
+        function handleFormSubmit(e) {
+            e.preventDefault();
+            
+            // Clear all errors
+            document.querySelectorAll('[id$="Error"]').forEach(el => el.classList.add('hidden'));
+            document.getElementById('dateError').classList.add('hidden');
+            
+            let isValid = true;
+            
+            // Tenant validation
+            const tenantName = document.getElementById('tenantName').value.trim();
+            if (!tenantName) {
+                document.getElementById('tenantNameError').classList.remove('hidden');
+                isValid = false;
+            }
+            
+            const tenantEmail = document.getElementById('tenantEmail').value.trim();
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!tenantEmail || !emailRegex.test(tenantEmail)) {
+                document.getElementById('tenantEmailError').classList.remove('hidden');
+                isValid = false;
+            }
+            
+            const tenantPhone = document.getElementById('tenantPhone').value.trim();
+            const phoneRegex = /^[\+]?[\d\s\-\(\)]{10,}$/;
+            if (!tenantPhone || !phoneRegex.test(tenantPhone)) {
+                document.getElementById('tenantPhoneError').classList.remove('hidden');
+                isValid = false;
+            }
+            
+            // Property validation
+            if (!document.getElementById('propertySelect').value) {
+                document.getElementById('propertyError').classList.remove('hidden');
+                isValid = false;
+            }
+            if (!document.getElementById('unitSelect').value) {
+                document.getElementById('unitError').classList.remove('hidden');
+                isValid = false;
+            }
+            
+            // Date validation
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
+            if (!startDate) {
+                document.getElementById('startDateError').classList.remove('hidden');
+                isValid = false;
+            }
+            if (!endDate) {
+                document.getElementById('endDateError').classList.remove('hidden');
+                isValid = false;
+            }
+            if (startDate && endDate && new Date(endDate) <= new Date(startDate)) {
+                document.getElementById('dateError').classList.remove('hidden');
+                isValid = false;
+            }
+            
+            // Financial validation
+            const monthlyRent = document.getElementById('monthlyRent').value;
+            if (!monthlyRent || parseFloat(monthlyRent) <= 0) {
+                document.getElementById('rentError').classList.remove('hidden');
+                isValid = false;
+            }
+            const securityDeposit = document.getElementById('securityDeposit').value;
+            if (!securityDeposit || parseFloat(securityDeposit) < 0) {
+                document.getElementById('depositError').classList.remove('hidden');
+                isValid = false;
+            }
+            if (!document.getElementById('paymentTerms').value) {
+                document.getElementById('paymentTermsError').classList.remove('hidden');
+                isValid = false;
+            }
+            
+            if (isValid) {
+                // Show success toast
+                const toast = document.getElementById('toast');
+                toast.classList.remove('hidden');
+                setTimeout(() => {
+                    toast.classList.add('hidden');
+                    window.location.href = '/landlord/leases.html';
+                }, 2000);
+            } else {
+                // Scroll to first error
+                const firstError = document.querySelector('[id$="Error"]:not(.hidden)');
+                if (firstError) {
+                    firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            }
+        }
+
+        // Set minimum date to today
+        document.addEventListener('DOMContentLoaded', function() {
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('startDate').min = today;
+            document.getElementById('endDate').min = today;
+            
+            document.getElementById('startDate').addEventListener('change', function() {
+                document.getElementById('endDate').min = this.value;
+                calculateSummary();
+            });
+            
+            calculateSummary();
+        });
+    </script>
 </body>
 </html>

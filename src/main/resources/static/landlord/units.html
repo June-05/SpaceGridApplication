@@ -1,140 +1,353 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Units · SpaceGrid</title>
-  <link rel="stylesheet" href="/css/base.css">
-  <link rel="stylesheet" href="/css/zones.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manage Units - SpaceGrid</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+        .bg-space-purple { background-color: #4f46e5; }
+        .hover-bg-space-purple:hover { background-color: #4338ca; }
+        .text-space-purple { color: #4f46e5; }
+        .border-space-purple { border-color: #4f46e5; }
+        .ring-space-purple { --tw-ring-color: #4f46e5; }
+        .shadow-xs { box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05); }
+    </style>
 </head>
-<body class="dashboard-page">
-  <!--
-    UNITS  (/landlord/units.html?propertyId=5)
-      GET    /api/properties/{propertyId}/units      list
-      POST   /api/properties/{propertyId}/units      add   (name, rentalRate, exactSize, areaSqm, sizeDescription, electricity, water)
-      PUT    /api/units/{id}                         edit  (same fields)
-      POST   /api/units/{id}/maintenance             form field: underMaintenance=true|false
-      POST   /api/units/{id}/archive                 archive (unit has lease history)
-      DELETE /api/units/{id}                         delete (never leased; otherwise the server answers 409)
-    Build: units table, add/edit form, "Archived" filter (status ARCHIVED).
-    Script: js/pages/units.js
-  -->
-  <header class="topbar">
-    <a href="/landlord/dashboard.html" class="back-link">← Dashboard</a>
-    <div class="titles">
-      <h1 id="propertyName">Units Management</h1>
-      <p class="subtitle">View and configure property rental units</p>
-    </div>
-    <div class="topbar-actions">
-      <button id="btnLogout" class="btn" type="button">Log out</button>
-    </div>
-  </header>
-
-  <main class="container">
-    <section class="toolbar">
-      <div class="filters">
-        <label class="check">
-          <input type="checkbox" id="chkShowArchived"> Show Archived Units
-        </label>
-      </div>
-      <button id="btnNewUnit" class="btn btn-primary" type="button">+ New Unit</button>
-    </section>
-
-    <!-- UNITS TABLE -->
-    <section class="card">
-      <h2>Property Units</h2>
-      <div class="table-responsive">
-        <table id="unitsTable" class="table">
-          <thead>
-            <tr>
-              <th>Unit Name</th>
-              <th>Monthly Rate</th>
-              <th>Area</th>
-              <th>Inclusions</th>
-              <th>Status</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            <!-- Sample Rows for Live Preview & User Manual Screenshots -->
-            <tr>
-              <td><strong>Unit 101</strong></td>
-              <td>₱8,500.00</td>
-              <td>25.00 sqm</td>
-              <td>Water, Electricity</td>
-              <td><span class="badge badge-active">VACANT</span></td>
-              <td class="table-actions">
-                <button class="btn btn-sm" type="button">Edit</button>
-                <button class="btn btn-sm" type="button">Maintenance</button>
-                <button class="btn btn-sm btn-danger" type="button">Archive</button>
-              </td>
-            </tr>
-            <tr>
-              <td><strong>Unit 102</strong></td>
-              <td>₱10,000.00</td>
-              <td>32.00 sqm</td>
-              <td>Water</td>
-              <td><span class="badge">OCCUPIED</span></td>
-              <td class="table-actions">
-                <button class="btn btn-sm" type="button">Edit</button>
-                <button class="btn btn-sm" type="button">Maintenance</button>
-                <button class="btn btn-sm btn-danger" type="button">Archive</button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
-
-    <!-- ADD / EDIT UNIT FORM -->
-    <section id="unitFormContainer" class="card" style="margin-top: 2rem;">
-      <h2 id="formTitle">Add / Edit Unit</h2>
-      <form id="unitForm" novalidate>
-        <input type="hidden" name="id" id="unitId">
-
-        <label class="field">
-          <span>Unit Name</span>
-          <input name="name" id="name" placeholder="e.g. Unit 105" required>
-        </label>
-
-        <label class="field">
-          <span>Monthly Rental Rate (₱)</span>
-          <input name="rentalRate" id="rentalRate" type="number" min="0" step="0.01" placeholder="8500.00" required>
-        </label>
-
-        <label class="field">
-          <span>Area in sqm</span>
-          <input name="areaSqm" id="areaSqm" type="number" min="0" step="0.01" placeholder="25.00">
-        </label>
-
-        <label class="field">
-          <span>Size Description</span>
-          <input name="sizeDescription" id="sizeDescription" placeholder="e.g. Studio with balcony">
-        </label>
-
-        <label class="check">
-          <input name="exactSize" id="exactSize" type="checkbox"> Exact measurement confirmed
-        </label>
-
-        <label class="check">
-          <input name="electricity" id="electricity" type="checkbox"> Includes Electricity
-        </label>
-
-        <label class="check">
-          <input name="water" id="water" type="checkbox"> Includes Water
-        </label>
-
-        <div class="button-group" style="margin-top: 1rem;">
-          <button id="btnSaveUnit" class="btn btn-primary" type="submit">Save Unit</button>
-          <button id="btnCancelUnit" class="btn" type="button">Cancel</button>
+<body class="bg-[#f8fafc] text-slate-900 min-h-screen flex flex-col antialiased">
+    <!-- TOP HEADER -->
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-xs">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between gap-4">
+            <div class="flex items-center gap-4 flex-1">
+                <a href="dashboard.html" class="text-slate-600 hover:text-indigo-600 transition flex items-center gap-2">
+                    <i class="fa-solid fa-arrow-left"></i>
+                    <span class="text-sm font-medium">Back to Portfolio</span>
+                </a>
+                <div class="flex items-center gap-2">
+                    <span class="text-slate-400 text-sm">Viewing:</span>
+                    <select id="propertySelector" class="text-sm font-semibold text-slate-900 bg-transparent border-none focus:outline-none cursor-pointer">
+                        <option value="clark">Clark Global City Commercial Hub</option>
+                        <option value="bgc">BGC Night Market Stalls</option>
+                        <option value="makati">Makati Corporate Tower Retail</option>
+                        <option value="ayala">Ayala Triangle Open Plaza</option>
+                        <option value="subic">Subic Bay Commercial Lots</option>
+                    </select>
+                    <i class="fa-solid fa-chevron-down text-xs text-slate-400"></i>
+                </div>
+                <div class="flex-1 max-w-md hidden md:block">
+                    <div class="relative">
+                        <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-2.5 text-slate-400 text-sm"></i>
+                        <input id="unitSearch" type="text" placeholder="Search by block/unit code..." class="w-full pl-10 pr-4 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-600">
+                    </div>
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                <a href="property-form.html" class="flex items-center gap-2 px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-semibold transition border border-slate-200">
+                    <i class="fa-solid fa-pen-to-square text-slate-500 text-xs"></i>
+                    <span>Edit Property Details</span>
+                </a>
+                <a href="property-grid.html" class="flex items-center gap-2 px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl text-xs font-semibold transition border border-indigo-100">
+                    <i class="fa-solid fa-grip text-indigo-500 text-xs"></i>
+                    <span>Edit Grid Layout</span>
+                </a>
+            </div>
         </div>
-      </form>
-    </section>
-  </main>
+    </header>
 
-  <script src="/js/common/api.js"></script>
-  <script src="/js/common/auth.js"></script>
-  <script src="/js/common/format.js"></script>
-  <script src="/js/pages/units.js"></script>
+    <!-- MAIN CONTAINER -->
+    <main class="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Page Header -->
+        <div class="mb-6">
+            <h1 class="text-2xl font-extrabold text-slate-900 tracking-tight">Unit & Block Management</h1>
+            <p class="text-sm text-slate-500 mt-0.5">Manage individual blocks, assign tenants, and update rental status</p>
+        </div>
+
+        <!-- Stats Bar -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <div class="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-xs text-slate-500 font-medium">Total Blocks</p>
+                        <p id="statTotal" class="text-xl font-extrabold text-slate-900 mt-0.5">0</p>
+                    </div>
+                    <div class="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center">
+                        <i class="fa-solid fa-cubes text-slate-600"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-xs text-slate-500 font-medium">Occupancy %</p>
+                        <p id="statOccupancy" class="text-xl font-extrabold text-emerald-600 mt-0.5">0%</p>
+                    </div>
+                    <div class="w-10 h-10 rounded-lg bg-emerald-100 flex items-center justify-center">
+                        <i class="fa-solid fa-chart-pie text-emerald-600"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-xs text-slate-500 font-medium">Vacant Count</p>
+                        <p id="statVacant" class="text-xl font-extrabold text-blue-600 mt-0.5">0</p>
+                    </div>
+                    <div class="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
+                        <i class="fa-solid fa-door-open text-blue-600"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-xs text-slate-500 font-medium">Monthly Potential Income</p>
+                        <p id="statIncome" class="text-xl font-extrabold text-indigo-600 mt-0.5">₱0</p>
+                    </div>
+                    <div class="w-10 h-10 rounded-lg bg-indigo-100 flex items-center justify-center">
+                        <i class="fa-solid fa-peso-sign text-indigo-600"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Filter Pills -->
+        <div class="flex items-center gap-2 mb-6 flex-wrap">
+            <button onclick="setFilter('all')" class="filter-pill active px-4 py-2 bg-indigo-600 text-white text-xs font-semibold rounded-xl transition">
+                All Units (<span id="countAll">0</span>)
+            </button>
+            <button onclick="setFilter('Occupied')" class="filter-pill px-4 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-semibold rounded-xl transition">
+                Occupied (<span id="countOccupied">0</span>)
+            </button>
+            <button onclick="setFilter('Vacant')" class="filter-pill px-4 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-semibold rounded-xl transition">
+                Vacant (<span id="countVacant">0</span>)
+            </button>
+            <button onclick="setFilter('Maintenance')" class="filter-pill px-4 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-semibold rounded-xl transition">
+                Maintenance (<span id="countMaintenance">0</span>)
+            </button>
+        </div>
+
+        <!-- Block Grid -->
+        <div id="blockGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"></div>
+        <div id="emptyState" class="hidden py-16 text-center bg-white border border-slate-200 rounded-2xl">
+            <i class="fa-solid fa-cube text-4xl text-slate-300 mb-3"></i>
+            <h3 class="text-base font-bold text-slate-800">No units found</h3>
+            <p class="text-xs text-slate-500 mt-1">Try adjusting your search or filter</p>
+        </div>
+    </main>
+
+    <!-- Unit Quick Edit Modal -->
+    <div id="editModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-md w-full border border-slate-200 shadow-2xl overflow-hidden">
+            <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                <div class="flex items-center gap-2">
+                    <div class="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center">
+                        <i class="fa-solid fa-pen-to-square text-indigo-600 text-sm"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-base font-bold text-slate-900">Quick Edit Unit</h2>
+                        <p id="modalBlockCode" class="text-xs text-slate-500"></p>
+                    </div>
+                </div>
+                <button onclick="closeEditModal()" class="w-8 h-8 rounded-full hover:bg-slate-200 text-slate-400 hover:text-slate-600 flex items-center justify-center transition">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="p-6 space-y-4">
+                <input type="hidden" id="modalUnitId">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1.5">Status</label>
+                    <select id="modalStatus" class="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-600 cursor-pointer">
+                        <option value="Occupied">Occupied</option>
+                        <option value="Vacant">Vacant</option>
+                        <option value="Maintenance">Maintenance</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1.5">Monthly Rental Price (₱)</label>
+                    <div class="relative">
+                        <span class="absolute left-3.5 top-2.5 text-slate-400 text-sm">₱</span>
+                        <input id="modalRent" type="number" min="0" step="0.01" class="w-full pl-8 pr-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-600">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1.5">Assign Tenant (if occupied)</label>
+                    <input id="modalTenant" type="text" placeholder="e.g. Juan Dela Cruz" class="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-600">
+                    <p class="text-xs text-slate-500 mt-1">Leave empty if vacant or in maintenance</p>
+                </div>
+                <div class="pt-4 flex items-center gap-3">
+                    <button onclick="closeEditModal()" class="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition">Cancel</button>
+                    <button onclick="saveUnitEdit()" class="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl transition">Save Changes</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let units = [
+            { id: 1, code: "Block A-01", sqft: 25, status: "Occupied", tenant: "Maria Rodriguez", rent: 25000 },
+            { id: 2, code: "Block A-02", sqft: 25, status: "Occupied", tenant: "Miguel Torres", rent: 28000 },
+            { id: 3, code: "Block A-03", sqft: 30, status: "Vacant", tenant: null, rent: 30000 },
+            { id: 4, code: "Block A-04", sqft: 25, status: "Occupied", tenant: "Ana Santos", rent: 25000 },
+            { id: 5, code: "Block B-01", sqft: 20, status: "Vacant", tenant: null, rent: 20000 },
+            { id: 6, code: "Block B-02", sqft: 20, status: "Maintenance", tenant: null, rent: 20000 },
+            { id: 7, code: "Block B-03", sqft: 25, status: "Occupied", tenant: "Carlos Mendoza", rent: 25000 },
+            { id: 8, code: "Block B-04", sqft: 30, status: "Vacant", tenant: null, rent: 32000 },
+            { id: 9, code: "Block C-01", sqft: 35, status: "Occupied", tenant: "Roberto Cruz", rent: 35000 },
+            { id: 10, code: "Block C-02", sqft: 35, status: "Vacant", tenant: null, rent: 35000 },
+            { id: 11, code: "Block C-03", sqft: 25, status: "Maintenance", tenant: null, rent: 28000 },
+            { id: 12, code: "Block C-04", sqft: 25, status: "Vacant", tenant: null, rent: 28000 }
+        ];
+
+        let currentFilter = 'all';
+        let currentSearch = '';
+
+        function updateStats() {
+            const total = units.length;
+            const occupied = units.filter(u => u.status === 'Occupied').length;
+            const vacant = units.filter(u => u.status === 'Vacant').length;
+            const maintenance = units.filter(u => u.status === 'Maintenance').length;
+            const occupancy = total > 0 ? Math.round((occupied / total) * 100) : 0;
+            const potentialIncome = units.reduce((sum, u) => sum + (u.status !== 'Maintenance' ? u.rent : 0), 0);
+
+            document.getElementById('statTotal').textContent = total;
+            document.getElementById('statOccupancy').textContent = occupancy + '%';
+            document.getElementById('statVacant').textContent = vacant;
+            document.getElementById('statIncome').textContent = '₱' + potentialIncome.toLocaleString('en-PH');
+
+            document.getElementById('countAll').textContent = total;
+            document.getElementById('countOccupied').textContent = occupied;
+            document.getElementById('countVacant').textContent = vacant;
+            document.getElementById('countMaintenance').textContent = maintenance;
+        }
+
+        function setFilter(filter) {
+            currentFilter = filter;
+            document.querySelectorAll('.filter-pill').forEach(pill => {
+                pill.classList.remove('bg-indigo-600', 'text-white');
+                pill.classList.add('bg-white', 'border', 'border-slate-200', 'text-slate-700', 'hover:bg-slate-50');
+            });
+            event.target.classList.remove('bg-white', 'border', 'border-slate-200', 'text-slate-700', 'hover:bg-slate-50');
+            event.target.classList.add('bg-indigo-600', 'text-white');
+            renderGrid();
+        }
+
+        document.getElementById('unitSearch').addEventListener('input', function() {
+            currentSearch = this.value.toLowerCase();
+            renderGrid();
+        });
+
+        function renderGrid() {
+            const grid = document.getElementById('blockGrid');
+            const emptyState = document.getElementById('emptyState');
+            grid.innerHTML = '';
+
+            let filtered = units.filter(unit => {
+                const matchesFilter = currentFilter === 'all' || unit.status === currentFilter;
+                const matchesSearch = !currentSearch || unit.code.toLowerCase().includes(currentSearch);
+                return matchesFilter && matchesSearch;
+            });
+
+            if (filtered.length === 0) {
+                emptyState.classList.remove('hidden');
+                return;
+            }
+
+            emptyState.classList.add('hidden');
+
+            filtered.forEach(unit => {
+                let statusBadge = '';
+                let statusColor = '';
+                if (unit.status === 'Occupied') {
+                    statusBadge = 'Occupied';
+                    statusColor = 'bg-emerald-100 text-emerald-700';
+                } else if (unit.status === 'Vacant') {
+                    statusBadge = 'Vacant';
+                    statusColor = 'bg-blue-100 text-blue-700';
+                } else if (unit.status === 'Maintenance') {
+                    statusBadge = 'Maintenance';
+                    statusColor = 'bg-amber-100 text-amber-700';
+                }
+
+                const card = document.createElement('div');
+                card.className = 'bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs hover:shadow-md transition';
+                card.innerHTML = `
+                    <div class="p-4">
+                        <div class="flex items-start justify-between mb-3">
+                            <div>
+                                <h3 class="text-base font-bold text-slate-900">${unit.code}</h3>
+                                <p class="text-xs text-slate-500">${unit.sqft} sq.m.</p>
+                            </div>
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${statusColor}">${statusBadge}</span>
+                        </div>
+                        <div class="mb-3">
+                            ${unit.status === 'Occupied' && unit.tenant ? 
+                                `<p class="text-xs text-slate-500 mb-1">Current Tenant</p>
+                                 <p class="text-sm font-semibold text-slate-900">${unit.tenant}</p>` :
+                                `<p class="text-xs text-slate-500 mb-1">Monthly Rent</p>
+                                 <p class="text-sm font-bold text-indigo-600">₱${unit.rent.toLocaleString('en-PH')}</p>`
+                            }
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <button onclick="openEditModal(${unit.id})" class="flex-1 py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-semibold rounded-xl transition border border-slate-200 flex items-center justify-center gap-2">
+                                <i class="fa-solid fa-pen text-xs"></i>
+                                Quick Edit
+                            </button>
+                            <a href="lease-form.html" class="flex-1 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 text-xs font-semibold rounded-xl transition border border-indigo-100 flex items-center justify-center gap-2">
+                                <i class="fa-solid fa-file-contract text-xs"></i>
+                                Create Lease
+                            </a>
+                        </div>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        function openEditModal(id) {
+            const unit = units.find(u => u.id === id);
+            if (!unit) return;
+
+            document.getElementById('modalUnitId').value = unit.id;
+            document.getElementById('modalBlockCode').textContent = unit.code + ' • ' + unit.sqft + ' sq.m.';
+            document.getElementById('modalStatus').value = unit.status;
+            document.getElementById('modalRent').value = unit.rent;
+            document.getElementById('modalTenant').value = unit.tenant || '';
+
+            document.getElementById('editModal').classList.remove('hidden');
+        }
+
+        function closeEditModal() {
+            document.getElementById('editModal').classList.add('hidden');
+        }
+
+        function saveUnitEdit() {
+            const id = parseInt(document.getElementById('modalUnitId').value);
+            const unit = units.find(u => u.id === id);
+            if (!unit) return;
+
+            unit.status = document.getElementById('modalStatus').value;
+            unit.rent = parseFloat(document.getElementById('modalRent').value) || 0;
+            unit.tenant = document.getElementById('modalTenant').value.trim() || null;
+
+            if (unit.status === 'Vacant' || unit.status === 'Maintenance') {
+                unit.tenant = null;
+            }
+
+            updateStats();
+            renderGrid();
+            closeEditModal();
+            alert('Unit updated successfully!');
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            updateStats();
+            renderGrid();
+        });
+    </script>
 </body>
 </html>

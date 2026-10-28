@@ -1,490 +1,594 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Leases · SpaceGrid</title>
-  
-  <!-- Simulated project stylesheets / CSS design system -->
-  <style>
-    /* /css/base.css & /css/zones.css fallback styles matching SpaceGrid UI */
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    }
-
-    body {
-      background-color: #f4f5f8;
-      color: #1a1f36;
-      min-height: 100vh;
-      padding: 24px 16px;
-    }
-
-    /* Page Layout Container */
-    .dashboard-container {
-      max-width: 1100px;
-      margin: 0 auto;
-    }
-
-    /* Topbar Header */
-    .topbar {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: space-between;
-      align-items: center;
-      gap: 16px;
-      margin-bottom: 24px;
-    }
-
-    .back-link {
-      color: #4e5ba6;
-      text-decoration: none;
-      font-size: 14px;
-      font-weight: 500;
-      display: inline-block;
-      margin-bottom: 6px;
-    }
-
-    .back-link:hover {
-      text-decoration: underline;
-    }
-
-    .titles h1 {
-      font-size: 26px;
-      font-weight: 800;
-      color: #1a1f36;
-      line-height: 1.2;
-    }
-
-    .titles .subtitle {
-      font-size: 14px;
-      color: #697386;
-      margin-top: 4px;
-    }
-
-    .topbar-actions {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-
-    /* Buttons */
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
-      padding: 8px 16px;
-      border-radius: 8px;
-      font-size: 13px;
-      font-weight: 600;
-      cursor: pointer;
-      border: 1px solid #dcdfe6;
-      background-color: #ffffff;
-      color: #3c4257;
-      transition: all 0.15s ease-in-out;
-      text-decoration: none;
-    }
-
-    .btn:hover {
-      background-color: #f8f9fa;
-      border-color: #c0c4cc;
-    }
-
-    .btn-primary {
-      background-color: #4e5ba6;
-      color: #ffffff;
-      border-color: #4e5ba6;
-    }
-
-    .btn-primary:hover {
-      background-color: #3e498c;
-      border-color: #3e498c;
-    }
-
-    .btn-sm {
-      padding: 5px 10px;
-      font-size: 12px;
-      border-radius: 6px;
-    }
-
-    /* Summary Metrics Row */
-    .metrics-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: 16px;
-      margin-bottom: 24px;
-    }
-
-    .metric-card {
-      background-color: #ffffff;
-      border: 1px solid #e3e8ee;
-      border-radius: 12px;
-      padding: 20px 24px;
-      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.02);
-    }
-
-    .metric-card .metric-label {
-      font-size: 12px;
-      font-weight: 600;
-      color: #697386;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      margin-bottom: 8px;
-    }
-
-    .metric-card .metric-value {
-      font-size: 26px;
-      font-weight: 800;
-      color: #1a1f36;
-    }
-
-    /* Filter & Controls Card */
-    .main-card {
-      background-color: #ffffff;
-      border: 1px solid #e3e8ee;
-      border-radius: 16px;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.02);
-      overflow: hidden;
-    }
-
-    .table-toolbar {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: space-between;
-      align-items: center;
-      gap: 12px;
-      padding: 20px 24px;
-      border-bottom: 1px solid #f0f2f5;
-    }
-
-    .search-box {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      background: #f8f9fa;
-      border: 1px solid #e3e8ee;
-      border-radius: 8px;
-      padding: 8px 12px;
-      width: 100%;
-      max-width: 320px;
-    }
-
-    .search-box input {
-      border: none;
-      outline: none;
-      background: transparent;
-      font-size: 13px;
-      width: 100%;
-      color: #1a1f36;
-    }
-
-    .filter-group {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-
-    .filter-select {
-      padding: 8px 12px;
-      border: 1px solid #e3e8ee;
-      border-radius: 8px;
-      font-size: 13px;
-      color: #3c4257;
-      outline: none;
-      background-color: #ffffff;
-      cursor: pointer;
-    }
-
-    /* Data Table */
-    .table-responsive {
-      width: 100%;
-      overflow-x: auto;
-    }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      text-align: left;
-      font-size: 13px;
-    }
-
-    th {
-      background-color: #fafbfc;
-      color: #697386;
-      font-weight: 600;
-      padding: 12px 20px;
-      border-bottom: 1px solid #e3e8ee;
-      white-space: nowrap;
-    }
-
-    td {
-      padding: 16px 20px;
-      border-bottom: 1px solid #f0f2f5;
-      color: #1a1f36;
-      vertical-align: middle;
-    }
-
-    tr:last-child td {
-      border-bottom: none;
-    }
-
-    tr:hover td {
-      background-color: #fcfdfe;
-    }
-
-    .unit-name {
-      font-weight: 700;
-      color: #1a1f36;
-    }
-
-    .property-sub {
-      font-size: 12px;
-      color: #697386;
-      margin-top: 2px;
-    }
-
-    /* Status Badges */
-    .badge {
-      display: inline-block;
-      padding: 4px 10px;
-      border-radius: 20px;
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: 0.3px;
-      text-transform: uppercase;
-    }
-
-    .badge-active {
-      background-color: #ecfdf5;
-      color: #059669;
-      border: 1px solid #a7f3d0;
-    }
-
-    .badge-expiring {
-      background-color: #fffbebfb;
-      color: #d97706;
-      border: 1px solid #fde68a;
-    }
-
-    .badge-expired {
-      background-color: #fef2f2;
-      color: #dc2626;
-      border: 1px solid #fecaca;
-    }
-
-    .badge-terminated {
-      background-color: #f3f4f6;
-      color: #4b5563;
-      border: 1px solid #e5e7eb;
-    }
-
-    /* Empty state */
-    .empty-state {
-      text-align: center;
-      padding: 40px 20px;
-      color: #697386;
-    }
-
-    /* Footer Pagination/Info */
-    .table-footer {
-      padding: 16px 24px;
-      border-top: 1px solid #f0f2f5;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-size: 12px;
-      color: #697386;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lease Management - SpaceGrid</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+        .bg-space-purple { background-color: #4f46e5; }
+        .hover-bg-space-purple:hover { background-color: #4338ca; }
+        .text-space-purple { color: #4f46e5; }
+        .border-space-purple { border-color: #4f46e5; }
+        .ring-space-purple { --tw-ring-color: #4f46e5; }
+        .shadow-xs { box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05); }
+    </style>
 </head>
-<body>
-  <!--
-    LANDLORD LEASES → LeaseController.list GET /api/leases
-    Show: unitName, propertyName, renterName, dates, monthlyRent, currentState badge
-          (highlight EXPIRING_SOON and EXPIRED). Each row links to /lease-form.html?id=
-    Script dependencies: js/common/api.js, js/common/auth.js, js/common/format.js, js/pages/leases.js
-  -->
-
-  <div class="dashboard-container">
-    <!-- Topbar Navigation -->
-    <header class="topbar">
-      <div>
-        <a href="/landlord/dashboard.html" class="back-link">← Dashboard</a>
-        <div class="titles">
-          <h1 id="pageTitle">Leases</h1>
-          <p class="subtitle">Overview of active, expiring, and past tenant agreements</p>
+<body class="bg-[#f8fafc] text-slate-900 min-h-screen flex flex-col antialiased">
+    <!-- TOP NAVIGATION BAR -->
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-xs">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between gap-6">
+            <div class="flex items-center gap-2 cursor-pointer flex-shrink-0" onclick="window.location.href='dashboard.html'">
+                <span class="text-2xl font-black tracking-tight text-slate-900">Space<span class="text-indigo-600">Grid</span></span>
+            </div>
+            <div class="flex-1 max-w-xl mx-auto">
+                <div class="relative flex items-center">
+                    <i class="fa-solid fa-magnifying-glass absolute left-4 text-slate-400 text-sm"></i>
+                    <input id="globalSearch" type="text" placeholder="Search by tenant name, property, or unit..." class="w-full pl-11 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition">
+                </div>
+            </div>
+            <div class="flex items-center gap-3.5 flex-shrink-0">
+                <a href="lease-form.html" class="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow-sm shadow-indigo-200">
+                    <i class="fa-solid fa-plus text-xs"></i>
+                    <span>Create New Lease</span>
+                </a>
+                <a href="dashboard.html" class="flex items-center gap-2 px-3.5 py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 rounded-xl text-xs font-semibold transition border border-slate-200">
+                    <i class="fa-solid fa-gauge-high text-slate-500 text-xs"></i>
+                    <span>Dashboard</span>
+                </a>
+            </div>
         </div>
-      </div>
-      <div class="topbar-actions">
-        <a href="lease-form.html" class="btn btn-primary">+ Add Lease</a>
-        <button id="btnLogout" class="btn" type="button" onclick="alert('Logged out successfully')">Log out</button>
-      </div>
     </header>
 
-    <!-- Metrics Highlights -->
-    <section class="metrics-grid">
-      <div class="metric-card">
-        <div class="metric-label">Active Leases</div>
-        <div class="metric-value" id="activeCount">0</div>
-      </div>
-      <div class="metric-card">
-        <div class="metric-label">Expiring Soon</div>
-        <div class="metric-value" id="expiringCount" style="color: #d97706;">0</div>
-      </div>
-      <div class="metric-card">
-        <div class="metric-label">Total Monthly Revenue</div>
-        <div class="metric-value" id="totalRevenue">₱0.00</div>
-      </div>
-    </section>
-
-    <!-- Main Content Table Card -->
-    <main class="main-card">
-      <!-- Toolbar Filters -->
-      <div class="table-toolbar">
-        <div class="search-box">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#697386" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-          <input type="text" id="searchInput" placeholder="Search unit, tenant, or property..." oninput="filterLeases()">
+    <!-- MAIN CONTAINER -->
+    <main class="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Page Header -->
+        <div class="mb-6">
+            <h1 class="text-2xl font-extrabold text-slate-900 tracking-tight">Lease Contracts</h1>
+            <p class="text-sm text-slate-500 mt-0.5">Review, manage, and track all tenant lease agreements</p>
         </div>
 
-        <div class="filter-group">
-          <select id="statusFilter" class="filter-select" onchange="filterLeases()">
-            <option value="ALL">All Statuses</option>
-            <option value="ACTIVE">Active</option>
-            <option value="EXPIRING_SOON">Expiring Soon</option>
-            <option value="EXPIRED">Expired</option>
-            <option value="TERMINATED">Terminated</option>
-          </select>
+        <!-- Metric Cards -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Total Active Leases</p>
+                        <p id="metricActive" class="text-2xl font-extrabold text-slate-900 mt-1">0</p>
+                    </div>
+                    <div class="w-12 h-12 rounded-xl bg-emerald-100 flex items-center justify-center">
+                        <i class="fa-solid fa-file-contract text-emerald-600 text-lg"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Total Monthly Collections</p>
+                        <p id="metricCollections" class="text-2xl font-extrabold text-slate-900 mt-1">₱0</p>
+                    </div>
+                    <div class="w-12 h-12 rounded-xl bg-indigo-100 flex items-center justify-center">
+                        <i class="fa-solid fa-peso-sign text-indigo-600 text-lg"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Expiring (30 Days)</p>
+                        <p id="metricExpiring" class="text-2xl font-extrabold text-amber-600 mt-1">0</p>
+                    </div>
+                    <div class="w-12 h-12 rounded-xl bg-amber-100 flex items-center justify-center">
+                        <i class="fa-solid fa-clock text-amber-600 text-lg"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Pending Contracts</p>
+                        <p id="metricPending" class="text-2xl font-extrabold text-slate-600 mt-1">0</p>
+                    </div>
+                    <div class="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center">
+                        <i class="fa-solid fa-hourglass-half text-slate-600 text-lg"></i>
+                    </div>
+                </div>
+            </div>
         </div>
-      </div>
 
-      <!-- Data Table -->
-      <div class="table-responsive">
-        <table>
-          <thead>
-            <tr>
-              <th>Unit & Property</th>
-              <th>Tenant Name</th>
-              <th>Lease Term</th>
-              <th>Monthly Rent</th>
-              <th>Status</th>
-              <th style="text-align: right;">Action</th>
-            </tr>
-          </thead>
-          <tbody id="leasesTableBody">
-            <!-- Dynamic rows populated via js/pages/leases.js simulator -->
-          </tbody>
-        </table>
-      </div>
+        <!-- Filter & Search Bar -->
+        <div class="bg-white border border-slate-200 rounded-2xl p-4 mb-6 shadow-xs">
+            <div class="flex flex-col lg:flex-row lg:items-center gap-4">
+                <div class="flex-1">
+                    <div class="relative">
+                        <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-2.5 text-slate-400 text-sm"></i>
+                        <input id="searchInput" type="text" placeholder="Search by tenant name or property..." class="w-full pl-10 pr-4 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-600">
+                    </div>
+                </div>
+                <div class="flex items-center gap-3 flex-wrap">
+                    <select id="statusFilter" class="px-3.5 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-600 cursor-pointer">
+                        <option value="all">All Status</option>
+                        <option value="Active">Active</option>
+                        <option value="Pending">Pending</option>
+                        <option value="Expired">Expired</option>
+                        <option value="Terminated">Terminated</option>
+                    </select>
+                    <select id="sortBy" class="px-3.5 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-600 cursor-pointer">
+                        <option value="recent">Most Recent</option>
+                        <option value="expiring">Expiring Soon</option>
+                        <option value="rent-high">Highest Rent</option>
+                        <option value="rent-low">Lowest Rent</option>
+                    </select>
+                </div>
+            </div>
+        </div>
 
-      <!-- Table Footer -->
-      <div class="table-footer">
-        <span id="recordCount">Showing 0 leases</span>
-        <span>SpaceGrid Lease Management System</span>
-      </div>
+        <!-- Data Table -->
+        <div class="bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden mb-6">
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead class="bg-slate-50 border-b border-slate-200">
+                        <tr>
+                            <th class="text-left px-6 py-3.5 text-xs font-bold text-slate-600 uppercase tracking-wider">Tenant Name</th>
+                            <th class="text-left px-6 py-3.5 text-xs font-bold text-slate-600 uppercase tracking-wider">Property & Unit #</th>
+                            <th class="text-left px-6 py-3.5 text-xs font-bold text-slate-600 uppercase tracking-wider">Lease Term</th>
+                            <th class="text-left px-6 py-3.5 text-xs font-bold text-slate-600 uppercase tracking-wider">Monthly Rate</th>
+                            <th class="text-left px-6 py-3.5 text-xs font-bold text-slate-600 uppercase tracking-wider">Payment Status</th>
+                            <th class="text-left px-6 py-3.5 text-xs font-bold text-slate-600 uppercase tracking-wider">Contract Status</th>
+                            <th class="text-right px-6 py-3.5 text-xs font-bold text-slate-600 uppercase tracking-wider">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="leaseTableBody" class="divide-y divide-slate-100">
+                        <!-- Populated by JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+            <div id="emptyState" class="hidden py-16 text-center">
+                <i class="fa-solid fa-file-contract text-4xl text-slate-300 mb-3"></i>
+                <h3 class="text-base font-bold text-slate-800">No leases found</h3>
+                <p class="text-xs text-slate-500 mt-1">Try adjusting your search or filters</p>
+            </div>
+        </div>
+
+        <!-- Pagination -->
+        <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
+            <p class="text-xs text-slate-500 font-medium">
+                Showing <span id="showingStart" class="font-bold text-slate-800">1</span> to <span id="showingEnd" class="font-bold text-slate-800">10</span> of <span id="showingTotal" class="font-bold text-slate-800">0</span> leases
+            </p>
+            <div class="flex items-center gap-1">
+                <button id="prevPage" class="px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition disabled:opacity-40 disabled:cursor-not-allowed">
+                    <i class="fa-solid fa-chevron-left mr-1"></i> Previous
+                </button>
+                <div id="pageNumbers" class="flex items-center gap-1"></div>
+                <button id="nextPage" class="px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition disabled:opacity-40 disabled:cursor-not-allowed">
+                    Next <i class="fa-solid fa-chevron-right ml-1"></i>
+                </button>
+            </div>
+        </div>
     </main>
-  </div>
 
-  <!-- Scripts -->
-  <script src="/js/common/api.js"></script>
-  <script src="/js/common/auth.js"></script>
-  <script src="/js/common/format.js"></script>
-  <script>
-    /* Simulated js/pages/leases.js Controller Logic for Interactive Demo */
-    // Empty on purpose: no sample leases. Leases you add will be listed here.
-    const mockLeases = [];
+    <!-- Lease Preview Modal -->
+    <div id="leaseModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-2xl w-full border border-slate-200 shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto">
+            <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                <div class="flex items-center gap-2">
+                    <div class="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center">
+                        <i class="fa-solid fa-file-contract text-indigo-600 text-sm"></i>
+                    </div>
+                    <h2 class="text-base font-bold text-slate-900">Lease Details</h2>
+                </div>
+                <button onclick="closeLeaseModal()" class="w-8 h-8 rounded-full hover:bg-slate-200 text-slate-400 hover:text-slate-600 flex items-center justify-center transition">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="p-6 space-y-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <p class="text-xs font-bold text-slate-400 uppercase mb-1">Tenant Name</p>
+                        <p id="modalTenant" class="text-sm font-semibold text-slate-900"></p>
+                    </div>
+                    <div>
+                        <p class="text-xs font-bold text-slate-400 uppercase mb-1">Email</p>
+                        <p id="modalEmail" class="text-sm text-slate-700"></p>
+                    </div>
+                    <div>
+                        <p class="text-xs font-bold text-slate-400 uppercase mb-1">Phone</p>
+                        <p id="modalPhone" class="text-sm text-slate-700"></p>
+                    </div>
+                    <div>
+                        <p class="text-xs font-bold text-slate-400 uppercase mb-1">Property</p>
+                        <p id="modalProperty" class="text-sm font-semibold text-slate-900"></p>
+                    </div>
+                    <div>
+                        <p class="text-xs font-bold text-slate-400 uppercase mb-1">Unit/Block</p>
+                        <p id="modalUnit" class="text-sm text-slate-700"></p>
+                    </div>
+                    <div>
+                        <p class="text-xs font-bold text-slate-400 uppercase mb-1">Lease Term</p>
+                        <p id="modalTerm" class="text-sm text-slate-700"></p>
+                    </div>
+                    <div>
+                        <p class="text-xs font-bold text-slate-400 uppercase mb-1">Monthly Rent</p>
+                        <p id="modalRent" class="text-sm font-bold text-indigo-600"></p>
+                    </div>
+                    <div>
+                        <p class="text-xs font-bold text-slate-400 uppercase mb-1">Security Deposit</p>
+                        <p id="modalDeposit" class="text-sm text-slate-700"></p>
+                    </div>
+                    <div>
+                        <p class="text-xs font-bold text-slate-400 uppercase mb-1">Payment Terms</p>
+                        <p id="modalPaymentTerms" class="text-sm text-slate-700"></p>
+                    </div>
+                    <div>
+                        <p class="text-xs font-bold text-slate-400 uppercase mb-1">Contract Status</p>
+                        <p id="modalStatus" class="text-sm"></p>
+                    </div>
+                    <div>
+                        <p class="text-xs font-bold text-slate-400 uppercase mb-1">Payment Status</p>
+                        <p id="modalPayment" class="text-sm"></p>
+                    </div>
+                </div>
+                <div class="pt-4 border-t border-slate-100 flex items-center gap-3">
+                    <button onclick="closeLeaseModal()" class="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition">Close</button>
+                    <button class="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl transition">Download Contract</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
-    function formatCurrency(amount) {
-      return "₱" + amount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    }
+    <script>
+        // Lease Data
+        let leases = [
+            {
+                id: 1,
+                tenant: "Maria Rodriguez",
+                email: "maria.rodriguez@email.com",
+                phone: "+63 912 345 6789",
+                property: "Clark Global City Commercial Hub",
+                unit: "Block A-01",
+                startDate: "2024-01-15",
+                endDate: "2025-01-15",
+                rent: 25000,
+                deposit: 50000,
+                paymentTerms: "Monthly in Advance",
+                contractStatus: "Active",
+                paymentStatus: "Paid"
+            },
+            {
+                id: 2,
+                tenant: "Carlos Mendoza",
+                email: "carlos.mendoza@email.com",
+                phone: "+63 917 234 5678",
+                property: "BGC Night Market Stalls",
+                unit: "Stall 12",
+                startDate: "2024-03-01",
+                endDate: "2024-12-31",
+                rent: 8500,
+                deposit: 17000,
+                paymentTerms: "Monthly in Advance",
+                contractStatus: "Active",
+                paymentStatus: "Overdue"
+            },
+            {
+                id: 3,
+                tenant: "Ana Santos",
+                email: "ana.santos@email.com",
+                phone: "+63 918 345 6789",
+                property: "Makati Corporate Tower Retail",
+                unit: "Unit 305",
+                startDate: "2024-06-01",
+                endDate: "2025-05-31",
+                rent: 45000,
+                deposit: 90000,
+                paymentTerms: "Quarterly in Advance",
+                contractStatus: "Active",
+                paymentStatus: "Paid"
+            },
+            {
+                id: 4,
+                tenant: "Roberto Cruz",
+                email: "roberto.cruz@email.com",
+                phone: "+63 919 456 7890",
+                property: "Subic Bay Commercial Lots",
+                unit: "Lot 5",
+                startDate: "2024-09-01",
+                endDate: "2025-08-31",
+                rent: 18000,
+                deposit: 36000,
+                paymentTerms: "Monthly in Advance",
+                contractStatus: "Pending",
+                paymentStatus: "Pending"
+            },
+            {
+                id: 5,
+                tenant: "Lisa Tan",
+                email: "lisa.tan@email.com",
+                phone: "+63 920 567 8901",
+                property: "Ayala Triangle Open Plaza",
+                unit: "Block B-15",
+                startDate: "2023-10-01",
+                endDate: "2024-09-30",
+                rent: 12000,
+                deposit: 24000,
+                paymentTerms: "Monthly in Advance",
+                contractStatus: "Expired",
+                paymentStatus: "Paid"
+            },
+            {
+                id: 6,
+                tenant: "Miguel Torres",
+                email: "miguel.torres@email.com",
+                phone: "+63 921 678 9012",
+                property: "Clark Global City Commercial Hub",
+                unit: "Block A-02",
+                startDate: "2024-02-01",
+                endDate: "2025-01-31",
+                rent: 28000,
+                deposit: 56000,
+                paymentTerms: "Monthly in Advance",
+                contractStatus: "Active",
+                paymentStatus: "Paid"
+            }
+        ];
 
-    function renderBadge(status) {
-      switch(status) {
-        case 'ACTIVE':
-          return `<span class="badge badge-active">Active</span>`;
-        case 'EXPIRING_SOON':
-          return `<span class="badge badge-expiring">Expiring Soon</span>`;
-        case 'EXPIRED':
-          return `<span class="badge badge-expired">Expired</span>`;
-        case 'TERMINATED':
-          return `<span class="badge badge-terminated">Terminated</span>`;
-        default:
-          return `<span class="badge badge-terminated">${status}</span>`;
-      }
-    }
+        let filteredLeases = [...leases];
+        let currentPage = 1;
+        const itemsPerPage = 5;
 
-    function updateMetrics(leases) {
-      const activeCount = leases.filter(l => l.currentState === 'ACTIVE' || l.currentState === 'EXPIRING_SOON').length;
-      const expiringCount = leases.filter(l => l.currentState === 'EXPIRING_SOON').length;
-      const totalRevenue = leases
-        .filter(l => l.currentState === 'ACTIVE' || l.currentState === 'EXPIRING_SOON')
-        .reduce((sum, l) => sum + l.monthlyRent, 0);
+        function updateMetrics() {
+            const active = leases.filter(l => l.contractStatus === 'Active').length;
+            const pending = leases.filter(l => l.contractStatus === 'Pending').length;
+            const now = new Date();
+            const expiring = leases.filter(l => {
+                if (l.contractStatus !== 'Active') return false;
+                const endDate = new Date(l.endDate);
+                const diffDays = Math.ceil((endDate - now) / (1000 * 60 * 60 * 24));
+                return diffDays <= 30 && diffDays > 0;
+            }).length;
+            const collections = leases.filter(l => l.contractStatus === 'Active' && l.paymentStatus === 'Paid')
+                .reduce((sum, l) => sum + l.rent, 0);
 
-      document.getElementById('activeCount').textContent = activeCount;
-      document.getElementById('expiringCount').textContent = expiringCount;
-      document.getElementById('totalRevenue').textContent = formatCurrency(totalRevenue);
-    }
+            document.getElementById('metricActive').textContent = active;
+            document.getElementById('metricPending').textContent = pending;
+            document.getElementById('metricExpiring').textContent = expiring;
+            document.getElementById('metricCollections').textContent = '₱' + collections.toLocaleString('en-PH');
+        }
 
-    function filterLeases() {
-      const search = document.getElementById('searchInput').value.toLowerCase();
-      const statusFilter = document.getElementById('statusFilter').value;
+        function renderTable() {
+            const tbody = document.getElementById('leaseTableBody');
+            const emptyState = document.getElementById('emptyState');
+            tbody.innerHTML = '';
 
-      const filtered = mockLeases.filter(lease => {
-        const matchesSearch = 
-          lease.unitName.toLowerCase().includes(search) ||
-          lease.propertyName.toLowerCase().includes(search) ||
-          lease.renterName.toLowerCase().includes(search);
-        
-        const matchesStatus = statusFilter === 'ALL' || lease.currentState === statusFilter;
+            if (filteredLeases.length === 0) {
+                emptyState.classList.remove('hidden');
+                document.getElementById('showingStart').textContent = 0;
+                document.getElementById('showingEnd').textContent = 0;
+                document.getElementById('showingTotal').textContent = 0;
+                renderPagination();
+                return;
+            }
 
-        return matchesSearch && matchesStatus;
-      });
+            emptyState.classList.add('hidden');
 
-      renderTable(filtered);
-    }
+            const start = (currentPage - 1) * itemsPerPage;
+            const end = start + itemsPerPage;
+            const pageItems = filteredLeases.slice(start, end);
 
-    function renderTable(leases) {
-      const tbody = document.getElementById('leasesTableBody');
-      tbody.innerHTML = '';
+            pageItems.forEach(lease => {
+                const startDate = new Date(lease.startDate).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' });
+                const endDate = new Date(lease.endDate).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' });
 
-      if (leases.length === 0) {
-        const message = mockLeases.length === 0
-          ? 'No leases yet. Click "+ Add Lease" to create one.'
-          : 'No lease records found matching your query.';
-        tbody.innerHTML = `<tr><td colspan="6" class="empty-state">${message}</td></tr>`;
-        document.getElementById('recordCount').textContent = `Showing 0 leases`;
-        return;
-      }
+                let contractBadge = '';
+                if (lease.contractStatus === 'Active') {
+                    contractBadge = '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">Active</span>';
+                } else if (lease.contractStatus === 'Pending') {
+                    contractBadge = '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">Pending</span>';
+                } else if (lease.contractStatus === 'Expired') {
+                    contractBadge = '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700">Expired</span>';
+                } else if (lease.contractStatus === 'Terminated') {
+                    contractBadge = '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-100 text-rose-700">Terminated</span>';
+                }
 
-      leases.forEach(lease => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-          <td>
-            <div class="unit-name">${lease.unitName}</div>
-            <div class="property-sub">${lease.propertyName}</div>
-          </td>
-          <td>${lease.renterName}</td>
-          <td>${lease.startDate} &rarr; ${lease.endDate}</td>
-          <td style="font-weight: 600;">${formatCurrency(lease.monthlyRent)}</td>
-          <td>${renderBadge(lease.currentState)}</td>
-          <td style="text-align: right;">
-            <a href="lease-form.html?id=${lease.id}" class="btn btn-sm">View / Edit</a>
-          </td>
-        `;
-        tbody.appendChild(tr);
-      });
+                let paymentBadge = '';
+                if (lease.paymentStatus === 'Paid') {
+                    paymentBadge = '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">Paid</span>';
+                } else if (lease.paymentStatus === 'Overdue') {
+                    paymentBadge = '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-100 text-rose-700">Overdue</span>';
+                } else if (lease.paymentStatus === 'Pending') {
+                    paymentBadge = '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">Pending</span>';
+                }
 
-      document.getElementById('recordCount').textContent = `Showing ${leases.length} lease(s)`;
-    }
+                const row = document.createElement('tr');
+                row.className = 'hover:bg-slate-50/50 transition';
+                row.innerHTML = `
+                    <td class="px-6 py-4">
+                        <a href="units.html" class="flex items-center gap-3 hover:opacity-80 transition">
+                            <div class="w-9 h-9 rounded-full bg-indigo-100 flex items-center justify-center flex-shrink-0">
+                                <span class="text-xs font-bold text-indigo-600">${lease.tenant.split(' ').map(n => n[0]).join('')}</span>
+                            </div>
+                            <div>
+                                <p class="text-sm font-semibold text-slate-900">${lease.tenant}</p>
+                                <p class="text-xs text-slate-500">${lease.email}</p>
+                            </div>
+                        </a>
+                    </td>
+                    <td class="px-6 py-4">
+                        <a href="units.html" class="block hover:opacity-80 transition">
+                            <p class="text-sm font-medium text-slate-900">${lease.property}</p>
+                            <p class="text-xs text-slate-500">${lease.unit}</p>
+                        </a>
+                    </td>
+                    <td class="px-6 py-4">
+                        <p class="text-sm text-slate-700">${startDate} - ${endDate}</p>
+                    </td>
+                    <td class="px-6 py-4">
+                        <p class="text-sm font-semibold text-slate-900">₱${lease.rent.toLocaleString('en-PH')}</p>
+                    </td>
+                    <td class="px-6 py-4">
+                        ${paymentBadge}
+                    </td>
+                    <td class="px-6 py-4">
+                        ${contractBadge}
+                    </td>
+                    <td class="px-6 py-4 text-right">
+                        <div class="flex items-center justify-end gap-1">
+                            <button onclick="viewLease(${lease.id})" class="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition" title="View">
+                                <i class="fa-solid fa-eye text-sm"></i>
+                            </button>
+                            <a href="units.html" class="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition" title="View Units">
+                                <i class="fa-solid fa-building text-sm"></i>
+                            </a>
+                            <a href="lease-form.html" class="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition" title="Renew">
+                                <i class="fa-solid fa-rotate text-sm"></i>
+                            </a>
+                            <button onclick="terminateLease(${lease.id})" class="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition" title="Terminate">
+                                <i class="fa-solid fa-ban text-sm"></i>
+                            </button>
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
 
-    // Initialize Page Load
-    document.addEventListener('DOMContentLoaded', () => {
-      updateMetrics(mockLeases);
-      renderTable(mockLeases);
-    });
-  </script>
-  <script src="/js/pages/leases.js"></script>
+            document.getElementById('showingStart').textContent = start + 1;
+            document.getElementById('showingEnd').textContent = Math.min(end, filteredLeases.length);
+            document.getElementById('showingTotal').textContent = filteredLeases.length;
+
+            renderPagination();
+        }
+
+        function renderPagination() {
+            const totalPages = Math.ceil(filteredLeases.length / itemsPerPage) || 1;
+            const pageNumbers = document.getElementById('pageNumbers');
+            pageNumbers.innerHTML = '';
+
+            document.getElementById('prevPage').disabled = currentPage === 1;
+            document.getElementById('nextPage').disabled = currentPage === totalPages;
+
+            for (let i = 1; i <= totalPages; i++) {
+                const btn = document.createElement('button');
+                btn.className = `px-3 py-1.5 text-xs font-semibold rounded-lg transition ${currentPage === i ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:bg-slate-100'}`;
+                btn.textContent = i;
+                btn.onclick = () => {
+                    currentPage = i;
+                    renderTable();
+                };
+                pageNumbers.appendChild(btn);
+            }
+        }
+
+        document.getElementById('prevPage').addEventListener('click', () => {
+            if (currentPage > 1) {
+                currentPage--;
+                renderTable();
+            }
+        });
+
+        document.getElementById('nextPage').addEventListener('click', () => {
+            const totalPages = Math.ceil(filteredLeases.length / itemsPerPage) || 1;
+            if (currentPage < totalPages) {
+                currentPage++;
+                renderTable();
+            }
+        });
+
+        function applyFilters() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const statusFilter = document.getElementById('statusFilter').value;
+            const sortBy = document.getElementById('sortBy').value;
+
+            filteredLeases = leases.filter(lease => {
+                const matchesSearch = !searchTerm || 
+                    lease.tenant.toLowerCase().includes(searchTerm) ||
+                    lease.property.toLowerCase().includes(searchTerm) ||
+                    lease.unit.toLowerCase().includes(searchTerm);
+                const matchesStatus = statusFilter === 'all' || lease.contractStatus === statusFilter;
+                return matchesSearch && matchesStatus;
+            });
+
+            // Sort
+            if (sortBy === 'expiring') {
+                filteredLeases.sort((a, b) => new Date(a.endDate) - new Date(b.endDate));
+            } else if (sortBy === 'rent-high') {
+                filteredLeases.sort((a, b) => b.rent - a.rent);
+            } else if (sortBy === 'rent-low') {
+                filteredLeases.sort((a, b) => a.rent - b.rent);
+            } else {
+                filteredLeases.sort((a, b) => b.id - a.id);
+            }
+
+            currentPage = 1;
+            renderTable();
+        }
+
+        document.getElementById('searchInput').addEventListener('input', applyFilters);
+        document.getElementById('globalSearch').addEventListener('input', function() {
+            document.getElementById('searchInput').value = this.value;
+            applyFilters();
+        });
+        document.getElementById('statusFilter').addEventListener('change', applyFilters);
+        document.getElementById('sortBy').addEventListener('change', applyFilters);
+
+        function viewLease(id) {
+            const lease = leases.find(l => l.id === id);
+            if (!lease) return;
+
+            document.getElementById('modalTenant').textContent = lease.tenant;
+            document.getElementById('modalEmail').textContent = lease.email;
+            document.getElementById('modalPhone').textContent = lease.phone;
+            document.getElementById('modalProperty').textContent = lease.property;
+            document.getElementById('modalUnit').textContent = lease.unit;
+            document.getElementById('modalTerm').textContent = new Date(lease.startDate).toLocaleDateString('en-PH') + ' - ' + new Date(lease.endDate).toLocaleDateString('en-PH');
+            document.getElementById('modalRent').textContent = '₱' + lease.rent.toLocaleString('en-PH');
+            document.getElementById('modalDeposit').textContent = '₱' + lease.deposit.toLocaleString('en-PH');
+            document.getElementById('modalPaymentTerms').textContent = lease.paymentTerms;
+
+            let statusHtml = '';
+            if (lease.contractStatus === 'Active') {
+                statusHtml = '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">Active</span>';
+            } else if (lease.contractStatus === 'Pending') {
+                statusHtml = '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">Pending</span>';
+            } else if (lease.contractStatus === 'Expired') {
+                statusHtml = '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700">Expired</span>';
+            }
+            document.getElementById('modalStatus').innerHTML = statusHtml;
+
+            let paymentHtml = '';
+            if (lease.paymentStatus === 'Paid') {
+                paymentHtml = '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">Paid</span>';
+            } else if (lease.paymentStatus === 'Overdue') {
+                paymentHtml = '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-100 text-rose-700">Overdue</span>';
+            } else if (lease.paymentStatus === 'Pending') {
+                paymentHtml = '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">Pending</span>';
+            }
+            document.getElementById('modalPayment').innerHTML = paymentHtml;
+
+            document.getElementById('leaseModal').classList.remove('hidden');
+        }
+
+        function closeLeaseModal() {
+            document.getElementById('leaseModal').classList.add('hidden');
+        }
+
+        function renewLease(id) {
+            alert('Renewal process initiated for lease ID: ' + id);
+        }
+
+        function terminateLease(id) {
+            if (confirm('Are you sure you want to terminate this lease? This action cannot be undone.')) {
+                alert('Lease ID: ' + id + ' has been terminated.');
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            updateMetrics();
+            renderTable();
+        });
+    </script>
 </body>
 </html>
