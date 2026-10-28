@@ -5,6 +5,7 @@
 :root {
   --bg: #f5f6f8;
   --surface: #ffffff;
+  --btnbg: #e6e6e6;
   --text: #1f2933;
   --primary: #2563eb;
   --danger: #dc2626;
@@ -25,7 +26,7 @@ body {
   padding: 7px 14px;
   font: inherit;
   color: inherit;
-  background: var(--surface);
+  background: var(--btnbg);
   border: 1px solid var(--border);
   border-radius: 8px;
   cursor: pointer;

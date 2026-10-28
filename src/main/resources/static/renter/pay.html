@@ -3,51 +3,58 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Pay rent · SpaceGrid</title>
+  <title>Pay Rent · SpaceGrid</title>
   <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/zones.css">
+  <!-- Dedicated Pay Page Stylesheet -->
+  <link rel="stylesheet" href="/css/renter-css/pay.css">
 </head>
-<body class="card-page">
-  <!--
-    PAY RENT (simulated)  →  PaymentController.pay   POST /api/leases/{leaseId}/payments
-    Open as /renter/pay.html?leaseId=5&month=2026-11
-    Form fields: billingMonth (yyyy-MM), method (GCASH | MAYA | CARD), accountNumber
-  -->
+<body class="pay-page">
+
+  <!-- Full-width Topbar matching Dashboard -->
   <header class="topbar">
-    <a href="/renter/dashboard.html" class="back-link">← Dashboard</a>
     <div class="titles">
       <h1>SpaceGrid</h1>
       <p class="subtitle">Pay Rent</p>
     </div>
+    <div class="topbar-actions">
+      <a href="/renter/dashboard.html" class="btn">← Back to Dashboard</a>
+    </div>
   </header>
 
-  <main class="card">
-    <h2>Rent Payment</h2>
-    <p class="subtitle">Simulated Payment Gateway</p>
+  <!-- Centered Payment Container -->
+  <main class="pay-container">
+    <div class="pay-card">
+      <div class="pay-card-header">
+        <h2>Rent Payment</h2>
+        <p class="subtitle">Simulated Payment Gateway</p>
+      </div>
 
-    <form id="payForm" novalidate>
-      <label class="field">
-        <span>Billing Month</span>
-        <input name="billingMonth" type="month" id="billingMonth" required>
-      </label>
+      <form id="payForm" novalidate>
+        <label class="field">
+          <span>Billing Month</span>
+          <input name="billingMonth" type="month" id="billingMonth" required>
+        </label>
 
-      <label class="field">
-        <span>Payment Method</span>
-        <select name="method" id="method" required>
-          <option value="GCASH">GCash</option>
-          <option value="MAYA">Maya</option>
-          <option value="CARD">Credit / Debit Card</option>
-        </select>
-      </label>
+        <label class="field">
+          <span>Payment Method</span>
+          <select name="method" id="method" required>
+            <option value="GCASH">GCash</option>
+            <option value="MAYA">Maya</option>
+            <option value="CARD">Credit / Debit Card</option>
+          </select>
+        </label>
 
-      <label class="field">
-        <span>Account / Card Number</span>
-        <input name="accountNumber" id="accountNumber" placeholder="e.g. 09171234567" required>
-        <small class="help-text">Note: Numbers ending in 0000 simulate a declined payment.</small>
-      </label>
+        <label class="field">
+          <span>Account / Card Number</span>
+          <input name="accountNumber" id="accountNumber" placeholder="e.g. 09171234567" required>
+          <small class="help-text">Note: Numbers ending in 0000 simulate a declined payment.</small>
+        </label>
 
-      <button class="btn btn-primary btn-block" type="submit">Complete Payment</button>
-      <p id="error" class="error" aria-live="polite"></p>
-    </form>
+        <button class="btn btn-primary btn-block pay-btn" type="submit">Complete Payment</button>
+        <p id="error" class="error" aria-live="polite"></p>
+      </form>
+    </div>
   </main>
 
   <script src="/js/common/api.js"></script>

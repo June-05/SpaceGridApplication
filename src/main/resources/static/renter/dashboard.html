@@ -3,9 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>My leases · SpaceGrid</title>
-  <link rel="stylesheet" href="/css/base.css">
-  <link rel="stylesheet" href="/css/zones.css">
+  <title>My Leases · SpaceGrid</title>
+    <link rel="stylesheet" href="/css/base.css">
+    <link rel="stylesheet" href="/css/zones.css">
+    <!-- Links directly to your updated folder path -->
+    <link rel="stylesheet" href="/css/renter-css/dashboard.css">
 </head>
 <body class="dashboard-page">
   <header class="topbar">
@@ -25,22 +27,19 @@
       <h2>My Active Leases</h2>
     </section>
 
-    <div id="leases" class="card-grid">
-      <!-- Sample Lease Card for User Manual Screenshots -->
-      <article class="card lease-card">
-        <div class="lease-header">
-          <h2>Sunset Apartments</h2>
-          <span class="badge badge-active">ACTIVE</span>
-        </div>
-        <p class="unit-info"><strong>Unit:</strong> Unit 105</p>
-        <p class="due-info"><strong>Next Amount Due:</strong> ₱8,500.00</p>
-        <p class="days-info"><strong>Days Remaining:</strong> 12 days</p>
+    <!-- Isolated search bar container -->
+    <div class="dashboard-search-container">
+      <input 
+        type="text" 
+        id="leaseSearchInput" 
+        class="search-input" 
+        placeholder="Search property or unit..."
+      />
+    </div>
 
-        <div class="card-actions">
-          <a href="/lease.html?id=1" class="btn btn-primary">View Lease</a>
-          <a href="/renter/pay.html?leaseId=1" class="btn">Pay Statement</a>
-        </div>
-      </article>
+    <!-- Active Leases Grid -->
+    <div id="leases" class="card-grid">
+      <!-- Dynamic content from renter-dashboard.js -->
     </div>
   </main>
 
