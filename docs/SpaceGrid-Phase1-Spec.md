@@ -18,15 +18,18 @@ Java 17 · Spring Boot · JdbcTemplate · MySQL · HTML/JS frontend. Base packag
 
 | Package | Responsibility | Classes |
 |---|---|---|
-| `model` | Data and rules of the system: entities, enums and value objects. No SQL, no web code. | 26 |
-| `dao` | Database access. Interfaces say what can be saved or loaded; Jdbc classes run the SQL with JdbcTemplate. | 13 |
-| `service` | Business rules: ownership checks, lease rules, payment rules. Called by controllers, uses DAOs. | 6 |
-| `controller` | Web API for the HTML pages. Reads the request, calls one service method, returns JSON. | 6 |
+| `model` | Data and rules of the system: entities, enums and value objects. No SQL, no web code. | 30 |
+| `dao` | Database access. Interfaces say what can be saved or loaded; Jdbc classes run the SQL with JdbcTemplate. | 15 |
+| `service` | Business rules: ownership checks, lease rules, payment rules. Called by controllers, uses DAOs. | 7 |
+| `controller` | Web API for the HTML pages. Reads the request, calls one service method, returns JSON. | 8 |
+| `config` | Spring configuration: page routes (`WebConfig`). | 1 |
 | `security` | Password hashing and tracking who is logged in. | 3 |
 | `payment` | The payment step, hidden behind an interface. FakePaymentGateway simulates GCash, Maya and Card. | 2 |
 | `exception` | Custom error types and the handler that turns them into JSON error messages. | 7 |
 | `(root)` | Entry point that starts Spring Boot. | 1 |
-| **Total** | | **64** |
+| **Total** | | **74** |
+
+> Updated 2026-10-28 (homepage + lease requests): model 26→30, dao 13→15, service 6→7, controller 6→8, new `config`. Details in `DESIGN-CHANGES.md`.
 
 ## 3. Conventions (apply to every class)
 
@@ -132,10 +135,74 @@ Owns its zones and the grid rules that involve more than one zone (no overlaps, 
 #### `PropertyType`, Class · enumeration
 
 ```
-Values: APARTMENT, CONDOMINIUM, TOWNHOUSE, COMMERCIAL
+Values: APARTMENT, CONDOMINIUM, TOWNHOUSE, COMMERCIAL, NIGHT_MARKET, OPEN_SPACE
 - label: String
 
 + getLabel(): String
+```
+
+#### `RequestStatus`, Class · enumeration
+
+```
+Values: PENDING, APPROVED, DECLINED, CANCELLED
+- label: String
+- cssClass: String          // "request-pending", ...
+
++ getLabel(): String
++ getCssClass(): String
+```
+
+#### `LeaseRequest`, Class · entity · extends `BaseEntity`
+
+A renter's request to lease an AVAILABLE unit found on the homepage. Only a PENDING request can change. Approving does not create the lease.
+
+```
++ MAX_MONTHS: int = 60   «static»
++ MAX_MESSAGE_LENGTH: int = 500   «static»
+- unitId: int {final}
+- renterId: int {final}
+- desiredStart: LocalDate {final}
+- months: int {final}
+- message: String {final}            // optional
+- status: RequestStatus
+- decidedAt: LocalDateTime
+// read-only display fields, filled from the lease_request_details view:
+- propertyId: int
+- landlordId: int
+- unitName: String
+- propertyName: String
+- renterName: String
+- monthlyRate: BigDecimal
+
++ LeaseRequest(unitId: int, renterId: int, desiredStart: LocalDate, months: int, message: String)
++ getSuggestedEndDate(): LocalDate     // desiredStart + months - 1 day
++ isFromRenter(userId: int): boolean
++ isForLandlord(userId: int): boolean
++ approve(): void        // PENDING only, else ConflictException
++ decline(): void
++ cancel(): void
+```
+
+#### `PropertyListing`, Class · value object (record)
+
+An ACTIVE property as shown on the public homepage, with only its AVAILABLE units. Nothing private.
+
+```
+id: int, name: String, address: String, propertyType: PropertyType, description: String,
+landlordName: String, createdAt: LocalDateTime, units: List<UnitListing>
+
++ getAvailableBlocks(): int          // number of units = "blocks"
++ getMinRate(): BigDecimal
++ getMaxRate(): BigDecimal
++ isPowerIncluded(): boolean
++ isWaterIncluded(): boolean
+```
+
+#### `UnitListing`, Class · value object (record)
+
+```
+id: int, name: String, rentalRate: BigDecimal, dimensions: Dimensions,
+includesElectricity: boolean, includesWater: boolean
 ```
 
 #### `PropertyStatus`, Class · enumeration
@@ -475,6 +542,28 @@ Generic interface shared by all DAOs.
 + findByLandlordId(landlordId: int): List<Property>
 + saveGridLayout(property: Property): void
 + saveEdgeOverrides(property: Property): void
++ findActiveListings(): List<PropertyListing>               // homepage: ACTIVE properties with at least one AVAILABLE unit
++ findActiveListingById(propertyId: int): Optional<PropertyListing>
+```
+
+#### `LeaseRequestDao`, Interface · interface · extends `CrudDao<LeaseRequest>`
+
+```
++ findByRenterId(renterId: int): List<LeaseRequest>
++ findByLandlordId(landlordId: int): List<LeaseRequest>
++ existsPendingByUnitAndRenter(unitId: int, renterId: int): boolean
+```
+
+#### `JdbcLeaseRequestDao`, Class · repository · implements `LeaseRequestDao`
+
+Reads the `lease_request_details` view; writes `lease_requests`. `update` changes only status and decided_at.
+
+```
+- jdbcTemplate: JdbcTemplate
+- rowMapper: RowMapper<LeaseRequest>
+
++ JdbcLeaseRequestDao(jdbcTemplate: JdbcTemplate)
++ «all LeaseRequestDao methods»
 ```
 
 #### `JdbcPropertyDao`, Class · repository · implements `PropertyDao`
@@ -577,6 +666,8 @@ Generic interface shared by all DAOs.
 ```
 - propertyDao: PropertyDao
 
++ getListings(): List<PropertyListing>                  // public homepage, no login
++ getListing(propertyId: int): PropertyListing           // NotFoundException if not ACTIVE or nothing available
 + getPropertiesForLandlord(landlord: User, search: String, type: PropertyType): List<Property>
 + getOwnedProperty(propertyId: int, landlord: User): Property
 + createProperty(landlord: User, name: String, address: String, type: PropertyType, description: String, dimensions: Dimensions): Property
@@ -585,6 +676,20 @@ Generic interface shared by all DAOs.
 + archiveProperty(propertyId: int, landlord: User): void
 + saveGridLayout(propertyId: int, landlord: User, rows: int, cols: int, spotsByZone: Map<Integer, List<GridPosition>>): Property
 + saveEdgeOverrides(propertyId: int, landlord: User, edgesByType: Map<EdgeType, List<GridEdge>>): Property
+```
+
+#### `LeaseRequestService`, Class · service
+
+```
+- leaseRequestDao: LeaseRequestDao
+- rentableUnitDao: RentableUnitDao
+- propertyDao: PropertyDao
+
++ createRequest(renter: User, unitId: int, desiredStart: LocalDate, months: int, message: String): LeaseRequest   // @Transactional
++ getRequestsFor(user: User): List<LeaseRequest>
++ approve(requestId: int, landlord: User): LeaseRequest      // @Transactional; unit must still be AVAILABLE
++ decline(requestId: int, landlord: User): LeaseRequest      // @Transactional
++ cancel(requestId: int, renter: User): LeaseRequest         // @Transactional
 ```
 
 #### `RentableUnitService`, Class · service
@@ -776,6 +881,49 @@ Generic interface shared by all DAOs.
 | `GET /api/leases/{leaseId}/payments` | `history` |
 | `POST /api/leases/{leaseId}/payments` | `pay` |
 
+#### `BrowseController`, Class · controller
+
+Public: no `HttpSession`, no login. Used by `homepage.html`.
+
+```
+- propertyService: PropertyService
+
++ list(): List<PropertyListing>
++ get(id): PropertyListing
+```
+
+| Endpoint | Method |
+|---|---|
+| `GET /api/browse` | `list` |
+| `GET /api/browse/{id}` | `get` |
+
+#### `LeaseRequestController`, Class · controller
+
+```
+- leaseRequestService: LeaseRequestService
+- sessionManager: SessionManager
+
++ list(session): List<LeaseRequest>          // renter: own · landlord: for own properties
++ create(unitId, startDate, months, message): LeaseRequest      // RENTER
++ approve(id): LeaseRequest                  // LANDLORD owner
++ decline(id): LeaseRequest                  // LANDLORD owner
++ cancel(id): LeaseRequest                   // RENTER owner
+```
+
+| Endpoint | Method |
+|---|---|
+| `GET /api/lease-requests` | `list` |
+| `POST /api/lease-requests` | `create` |
+| `POST /api/lease-requests/{id}/approve` | `approve` |
+| `POST /api/lease-requests/{id}/decline` | `decline` |
+| `POST /api/lease-requests/{id}/cancel` | `cancel` |
+
+### Package `config`
+
+#### `WebConfig`, Class · configuration · implements `WebMvcConfigurer`
+
+Page routes: `/`, `/home`, `/browse` → `homepage.html`; `/login`, `/register`, `/requests` → the page of the same name.
+
 ### Package `security`
 
 #### `PasswordHasher`, Interface · interface
@@ -896,7 +1044,7 @@ Breaks a rule, e.g. username taken → 409
 
 | From | Relationship | To | Multiplicity |
 |---|---|---|---|
-| User, Property, GridZone, LeaseContract, Payment | extends | BaseEntity |  |
+| User, Property, GridZone, LeaseContract, Payment, LeaseRequest | extends | BaseEntity |  |
 | RentableUnit, CommonArea | extends | GridZone |  |
 | User (landlord) | owns | Property | 1 → 0..* |
 | Property | ◆ composition (zones) | GridZone | 1 → 0..* |
@@ -907,7 +1055,8 @@ Breaks a rule, e.g. username taken → 409
 | RentableUnit | leased through | LeaseContract | 1 → 0..* |
 | LeaseContract | renews (previousLeaseId) | LeaseContract | 0..1 → 0..1 |
 | LeaseContract | paid by | Payment | 1 → 0..* |
-
+| User (renter) | sends | LeaseRequest | 1 → 0..* |
+| RentableUnit | requested through | LeaseRequest | 1 → 0..* |
 ## 6. Business rules
 
 **Accounts**
@@ -920,7 +1069,7 @@ Breaks a rule, e.g. username taken → 409
 
 - Only the owner can view or change a property (`isOwnedBy`); anyone else gets `AccessDeniedException`.
 - A new property starts as DRAFT with a 1 × 1 grid. Rows and columns go from 1 to 30 (`MAX_GRID_SIZE`).
-- Property types: Apartment, Condominium, Townhouse, Commercial.
+- Property types: Apartment, Condominium, Townhouse, Commercial, Night Market, Open Space.
 
 **Grid**
 
@@ -947,6 +1096,13 @@ Breaks a rule, e.g. username taken → 409
 - Archive (`Property.archiveUnit`): only when the unit has no ACTIVE lease. The unit's spots are cleared from the grid, it can't be leased or edited again, and its past leases and payments are kept. Archived units are hidden from the grid and the unit list (shown under an "Archived" filter).
 - Delete is only allowed for a unit that has never been leased (`existsByUnitId` is false). Otherwise `ConflictException` asks the landlord to archive it instead. The database also blocks it (ON DELETE RESTRICT).
 - Zone names don't have to be unique. Rental rates can't be negative.
+
+**Browsing and lease requests**
+
+- The homepage is public. It shows ACTIVE properties that have at least one AVAILABLE unit; one AVAILABLE unit is one "block". It never shows DRAFT or ARCHIVED properties or any non-AVAILABLE unit.
+- Only a RENTER can send a request, and only for an AVAILABLE unit of an ACTIVE property. A renter can have one PENDING request per unit. The start date can't be in the past and the length is 1 to 60 months.
+- Only the landlord who owns the property can approve or decline. The renter can cancel their own PENDING request. APPROVED, DECLINED and CANCELLED are final.
+- Approve needs the unit to be still AVAILABLE. It does not create the lease and does not change the unit: the landlord creates the lease with the normal lease form.
 
 **Leases**
 

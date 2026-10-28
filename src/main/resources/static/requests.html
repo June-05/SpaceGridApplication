@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lease requests · SpaceGrid</title>
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/zones.css">
+</head>
+<body class="dashboard-page">
+  <!--
+    LEASE REQUESTS  (both roles; route: /requests)
+    Renter:   their own requests, with Cancel on pending ones.
+    Landlord: requests for their properties, with Approve / Decline on pending ones.
+    Endpoints: GET /api/lease-requests
+               POST /api/lease-requests/{id}/approve | decline | cancel
+    Script: /js/pages/requests.js
+  -->
+  <header class="topbar">
+    <div class="titles">
+      <h1>SpaceGrid</h1>
+      <p id="subtitle" class="subtitle">Lease requests</p>
+    </div>
+    <div class="topbar-actions">
+      <a href="/" class="btn">Browse spaces</a>
+      <a id="dashboardLink" href="/" class="btn">Dashboard</a>
+      <button id="btnLogout" class="btn" type="button">Log out</button>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="section-header">
+      <h2 id="heading">Lease requests</h2>
+    </section>
+
+    <p id="error" class="error" aria-live="polite"></p>
+    <p id="empty" class="empty" hidden></p>
+
+    <div id="requests" class="card-grid"></div>
+  </main>
+
+  <div id="toast" class="toast" role="status"></div>
+
+  <script src="/js/common/api.js"></script>
+  <script src="/js/common/auth.js"></script>
+  <script src="/js/common/format.js"></script>
+  <script src="/js/pages/requests.js"></script>
+</body>
+</html>

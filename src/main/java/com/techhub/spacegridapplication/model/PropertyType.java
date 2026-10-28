@@ -5,7 +5,9 @@ public enum PropertyType {
     APARTMENT("Apartment"),
     CONDOMINIUM("Condominium"),
     TOWNHOUSE("Townhouse"),
-    COMMERCIAL("Commercial");
+    COMMERCIAL("Commercial"),
+    NIGHT_MARKET("Night Market"),
+    OPEN_SPACE("Open Space");
 
     private final String label;
 

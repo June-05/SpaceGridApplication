@@ -57,14 +57,12 @@ public class User extends BaseEntity {
 
     @JsonIgnore
     public boolean isLandlord() {
-        // TODO
-        throw new UnsupportedOperationException("TODO");
+        return role == Role.LANDLORD;
     }
 
     @JsonIgnore
     public boolean isRenter() {
-        // TODO
-        throw new UnsupportedOperationException("TODO");
+        return role == Role.RENTER;
     }
 
     public void changePassword(String newHash) {

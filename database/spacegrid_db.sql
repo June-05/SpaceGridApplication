@@ -51,7 +51,7 @@ CREATE TABLE properties (
     CONSTRAINT pk_properties PRIMARY KEY (id),
     CONSTRAINT fk_properties_landlord FOREIGN KEY (landlord_id) REFERENCES users (id)
         ON DELETE RESTRICT ON UPDATE RESTRICT,
-    CONSTRAINT ck_properties_type   CHECK (property_type IN ('APARTMENT', 'CONDOMINIUM', 'TOWNHOUSE', 'COMMERCIAL')),
+    CONSTRAINT ck_properties_type   CHECK (property_type IN ('APARTMENT', 'CONDOMINIUM', 'TOWNHOUSE', 'COMMERCIAL', 'NIGHT_MARKET', 'OPEN_SPACE')),
     CONSTRAINT ck_properties_status CHECK (status IN ('DRAFT', 'ACTIVE', 'ARCHIVED')),
     CONSTRAINT ck_properties_rows   CHECK (grid_rows BETWEEN 1 AND 30),
     CONSTRAINT ck_properties_cols   CHECK (grid_columns BETWEEN 1 AND 30),
@@ -240,6 +240,51 @@ JOIN    grid_zones  z ON z.id = l.rentable_unit_id
 JOIN    properties  p ON p.id = z.property_id
 JOIN    users       u ON u.id = l.renter_id;
 
+-- ---------------------------------------------------------------------
+-- 10. lease_requests  (Java: LeaseRequest) - a renter asks to lease an AVAILABLE unit
+--     found on the homepage; the landlord approves or declines it, then creates the lease.
+--     pending_key is calculated: it holds "unit-renter" only while the request is PENDING,
+--     so its UNIQUE rule blocks the same renter from having two open requests on one unit.
+-- ---------------------------------------------------------------------
+CREATE TABLE lease_requests (
+    id                INT           NOT NULL AUTO_INCREMENT,
+    rentable_unit_id  INT           NOT NULL,
+    renter_id         INT           NOT NULL,
+    desired_start     DATE          NOT NULL,
+    months            TINYINT       NOT NULL,
+    message           VARCHAR(500)  NULL,
+    status            VARCHAR(20)   NOT NULL DEFAULT 'PENDING',
+    decided_at        DATETIME      NULL,                  -- when approved / declined / cancelled
+    created_at        DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    pending_key       VARCHAR(30) AS (IF(status = 'PENDING', CONCAT(rentable_unit_id, '-', renter_id), NULL)) STORED,
+    CONSTRAINT pk_lease_requests PRIMARY KEY (id),
+    CONSTRAINT uq_lease_requests_pending UNIQUE (pending_key),
+    CONSTRAINT fk_lease_requests_unit FOREIGN KEY (rentable_unit_id) REFERENCES rentable_units (zone_id)
+        ON DELETE RESTRICT ON UPDATE RESTRICT,
+    CONSTRAINT fk_lease_requests_renter FOREIGN KEY (renter_id) REFERENCES users (id)
+        ON DELETE RESTRICT ON UPDATE RESTRICT,
+    CONSTRAINT ck_lease_requests_months  CHECK (months BETWEEN 1 AND 60),
+    CONSTRAINT ck_lease_requests_status  CHECK (status IN ('PENDING', 'APPROVED', 'DECLINED', 'CANCELLED')),
+    CONSTRAINT ck_lease_requests_decided CHECK (
+        (status = 'PENDING' AND decided_at IS NULL) OR (status <> 'PENDING' AND decided_at IS NOT NULL))
+) ENGINE = InnoDB;
+
+-- View used by JdbcLeaseRequestDao: request + display names, the unit's rate and the landlord id.
+CREATE VIEW lease_request_details AS
+SELECT  r.id, r.rentable_unit_id, r.renter_id, r.desired_start, r.months, r.message,
+        r.status, r.decided_at, r.created_at,
+        z.name        AS unit_name,
+        u.rental_rate AS rental_rate,
+        p.id          AS property_id,
+        p.name        AS property_name,
+        p.landlord_id AS landlord_id,
+        usr.full_name AS renter_name
+FROM    lease_requests r
+JOIN    grid_zones      z   ON z.id = r.rentable_unit_id
+JOIN    rentable_units  u   ON u.zone_id = z.id
+JOIN    properties      p   ON p.id = z.property_id
+JOIN    users           usr ON usr.id = r.renter_id;
+
 -- =====================================================================
 --  SAMPLE DATA  (today in the story: late October 2026)
 -- =====================================================================
@@ -255,7 +300,9 @@ INSERT INTO properties (id, landlord_id, name, address, property_type, descripti
                         is_exact_size, size_description, area_sqm, status, grid_rows, grid_columns) VALUES
     (1, 1, 'SpaceGrid Suites Bajada', 'J.P. Laurel Ave, Bajada, Davao City', 'APARTMENT', 'Two-floor apartment near Victoria Plaza with a shared garden.', 1, NULL, 180.00, 'ACTIVE', 4, 6),
     (2, 1, 'Matina Enclave Residences', 'MacArthur Highway, Matina, Davao City', 'CONDOMINIUM', 'Condo floor still being set up.', 0, 'Half-floor', NULL, 'DRAFT', 3, 3),
-    (3, 2, 'Agdao Market Stalls', 'Lapu-Lapu St, Agdao, Davao City', 'COMMERCIAL', 'Ground-floor stalls with customer parking.', 1, NULL, 96.00, 'ACTIVE', 2, 4);
+    (3, 2, 'Agdao Market Stalls', 'Lapu-Lapu St, Agdao, Davao City', 'COMMERCIAL', 'Ground-floor stalls with customer parking.', 1, NULL, 96.00, 'ACTIVE', 2, 4),
+    (4, 2, 'Roxas Night Market - Section C', 'Roxas Ave, Poblacion District, Davao City', 'NIGHT_MARKET', 'Evening market booths along a covered walkway.', 1, NULL, 150.00, 'ACTIVE', 3, 4),
+    (5, 1, 'Magsaysay Open Plaza', 'Magsaysay Park, Davao City', 'OPEN_SPACE', 'Open plaza plots for pop-up stalls and events.', 0, 'Open plaza', NULL, 'ACTIVE', 2, 3);
 
 -- Property 1 grid (4 x 6):
 --   row 0: [101][101][102][102][103][103]
@@ -275,7 +322,14 @@ INSERT INTO grid_zones (id, property_id, zone_kind, name) VALUES
     (10, 2, 'COMMON', 'Lobby'),
     (11, 3, 'UNIT', 'Stall 1'),
     (12, 3, 'UNIT', 'Stall 2'),
-    (13, 3, 'COMMON', 'Parking');
+    (13, 3, 'COMMON', 'Parking'),
+    (14, 4, 'UNIT', 'Booth 1'),
+    (15, 4, 'UNIT', 'Booth 2'),
+    (16, 4, 'UNIT', 'Booth 3'),
+    (17, 4, 'UNIT', 'Booth 4'),
+    (18, 4, 'COMMON', 'Walkway'),
+    (19, 5, 'UNIT', 'Plot A'),
+    (20, 5, 'UNIT', 'Plot B');
 
 INSERT INTO rentable_units (zone_id, rental_rate, is_exact_size, size_description, area_sqm,
                             includes_electricity, includes_water, status) VALUES
@@ -286,14 +340,21 @@ INSERT INTO rentable_units (zone_id, rental_rate, is_exact_size, size_descriptio
     (8, 7000.00, NULL, NULL, NULL, 0, 0, 'ARCHIVED'),
     (9, 15000.00, 1, NULL, 40.00, 1, 1, 'AVAILABLE'),
     (11, 6000.00, 1, NULL, 12.00, 1, 0, 'OCCUPIED'),
-    (12, 6000.00, 1, NULL, 12.00, 1, 0, 'AVAILABLE');
+    (12, 6000.00, 1, NULL, 12.00, 1, 0, 'AVAILABLE'),
+    (14, 4500.00, 1, NULL, 20.00, 1, 0, 'AVAILABLE'),
+    (15, 4500.00, 1, NULL, 20.00, 1, 0, 'AVAILABLE'),
+    (16, 5200.00, 1, NULL, 25.00, 1, 1, 'AVAILABLE'),
+    (17, 5200.00, 1, NULL, 25.00, 1, 1, 'UNDER_MAINTENANCE'),
+    (19, 3000.00, 0, 'Large plot', NULL, 0, 0, 'AVAILABLE'),
+    (20, 2200.00, 0, 'Small plot', NULL, 0, 0, 'AVAILABLE');
 
 INSERT INTO common_areas (zone_id, area_type) VALUES
     (4, 'WALKWAY'),
     (5, 'BATHROOM'),
     (7, 'GRASS'),
     (10, 'LOBBY'),
-    (13, 'PARKING');
+    (13, 'PARKING'),
+    (18, 'WALKWAY');
 
 INSERT INTO zone_cells (property_id, row_idx, col_idx, zone_id) VALUES
     (1, 0, 0, 1),
@@ -334,7 +395,25 @@ INSERT INTO zone_cells (property_id, row_idx, col_idx, zone_id) VALUES
     (3, 1, 0, 13),
     (3, 1, 1, 13),
     (3, 1, 2, 13),
-    (3, 1, 3, 13);
+    (3, 1, 3, 13),
+    (4, 0, 0, 14),
+    (4, 0, 1, 14),
+    (4, 0, 2, 15),
+    (4, 0, 3, 15),
+    (4, 1, 0, 18),
+    (4, 1, 1, 18),
+    (4, 1, 2, 18),
+    (4, 1, 3, 18),
+    (4, 2, 0, 16),
+    (4, 2, 1, 16),
+    (4, 2, 2, 17),
+    (4, 2, 3, 17),
+    (5, 0, 0, 19),
+    (5, 0, 1, 19),
+    (5, 1, 0, 19),
+    (5, 1, 1, 19),
+    (5, 0, 2, 20),
+    (5, 1, 2, 20);
 
 -- Manual edits on top of the automatic walls (doors to the hallway, street windows)
 INSERT INTO edge_overrides (property_id, row_idx, col_idx, orientation, edge_type) VALUES
@@ -400,3 +479,10 @@ INSERT INTO payments (lease_id, renter_id, billing_month, amount, method, status
     (5, 5, '2026-08-01', 6000.00, 'CARD', 'PAID', 'SG-20260730-0036', '2026-07-30 10:15:00'),
     (5, 5, '2026-09-01', 6000.00, 'CARD', 'PAID', 'SG-20260830-0037', '2026-08-30 10:15:00'),
     (5, 5, '2026-10-01', 6000.00, 'CARD', 'PAID', 'SG-20260929-0038', '2026-09-29 10:15:00');
+
+-- Lease requests made from the homepage. Request 4 was approved: the landlord still has to create the lease.
+INSERT INTO lease_requests (id, rentable_unit_id, renter_id, desired_start, months, message, status, decided_at) VALUES
+    (1, 3, 4, '2026-11-15', 12, 'Looking for a studio near the city center.', 'PENDING', NULL),
+    (2, 12, 3, '2026-12-01', 6, 'Planning to open a small food stall.', 'PENDING', NULL),
+    (3, 12, 5, '2026-09-01', 6, NULL, 'DECLINED', '2026-08-25 09:00:00'),
+    (4, 14, 5, '2026-11-10', 3, 'Selling handmade crafts on weekends.', 'APPROVED', '2026-10-26 14:30:00');

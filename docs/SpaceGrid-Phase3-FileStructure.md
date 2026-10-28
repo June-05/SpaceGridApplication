@@ -3,7 +3,10 @@
 Spring Boot **4.1.1** · Java **17** · Maven project in NetBeans · Base package `com.techhub.spacegridapplication`.
 Related documents: Phase 1 (`SpaceGrid-Phase1-Spec.md`, class diagram), Phase 2 (`spacegrid_db.sql`, ERD).
 
-Only `pom.xml` exists so far. Every other file below is planned and will be written when coding starts.
+> **Updated 2026-10-28:** the tree and page list below now include the public homepage and lease requests
+> (`homepage.html`, `requests.html`, `config/WebConfig`, `BrowseController`, `LeaseRequest*`, ...). See `DESIGN-CHANGES.md`.
+> The test folder is `src/test/java/com/techhub/spacegridapplication/` (same package as the main code).
+> The list below was the original plan: where it differs from the code, the code and `CLAUDE.md` win.
 
 ---
 
@@ -39,6 +42,10 @@ SpaceGrid/
 │   │   ├── Property.java
 │   │   ├── PropertyType.java
 │   │   ├── PropertyStatus.java
+│   │   ├── PropertyListing.java        (homepage, record)
+│   │   ├── UnitListing.java            (homepage, record)
+│   │   ├── LeaseRequest.java
+│   │   ├── RequestStatus.java
 │   │   ├── GridZone.java
 │   │   ├── RentableUnit.java
 │   │   ├── UnitStatus.java
@@ -67,19 +74,22 @@ SpaceGrid/
 │   │   ├── CommonAreaDao.java
 │   │   ├── LeaseContractDao.java
 │   │   ├── PaymentDao.java
+│   │   ├── LeaseRequestDao.java
 │   │   └── jdbc/
 │   │       ├── JdbcUserDao.java
 │   │       ├── JdbcPropertyDao.java
 │   │       ├── JdbcRentableUnitDao.java
 │   │       ├── JdbcCommonAreaDao.java
 │   │       ├── JdbcLeaseContractDao.java
-│   │       └── JdbcPaymentDao.java
+│   │       ├── JdbcPaymentDao.java
+│   │       └── JdbcLeaseRequestDao.java
 │   ├── service/
 │   │   ├── AuthService.java
 │   │   ├── PropertyService.java
 │   │   ├── RentableUnitService.java
 │   │   ├── CommonAreaService.java
 │   │   ├── LeaseService.java
+│   │   ├── LeaseRequestService.java
 │   │   └── PaymentService.java
 │   ├── controller/
 │   │   ├── AuthController.java
@@ -87,7 +97,11 @@ SpaceGrid/
 │   │   ├── RentableUnitController.java
 │   │   ├── CommonAreaController.java
 │   │   ├── LeaseController.java
+│   │   ├── LeaseRequestController.java
+│   │   ├── BrowseController.java       (public)
 │   │   └── PaymentController.java
+│   ├── config/
+│   │   └── WebConfig.java              (page routes)
 │   ├── security/
 │   │   ├── PasswordHasher.java
 │   │   ├── BCryptPasswordHasher.java
@@ -108,6 +122,8 @@ SpaceGrid/
 │   ├── application.properties
 │   └── static/
 │       ├── index.html
+│       ├── homepage.html               (public: browse spaces; routes /, /home, /browse; Tailwind CDN)
+│       ├── requests.html               (lease requests, both roles; route /requests)
 │       ├── login.html
 │       ├── register.html
 │       ├── lease.html
@@ -132,6 +148,8 @@ SpaceGrid/
 │       │   │   ├── format.js
 │       │   │   └── grid-renderer.js
 │       │   └── pages/
+│       │       ├── homepage.js
+│       │       ├── requests.js
 │       │       ├── login.js
 │       │       ├── register.js
 │       │       ├── lease.js
@@ -153,7 +171,7 @@ SpaceGrid/
         └── LeaseContractTest.java
 ```
 
-**File count:** 64 Java classes · 3 test classes · 12 HTML · 3 CSS · 15 JS · 1 properties file · 1 SQL script · `pom.xml`
+**File count:** 74 Java classes · 3 test classes · 14 HTML · 3 CSS · 17 JS · 1 properties file · 1 SQL script · `pom.xml`
 
 ---
 
@@ -221,7 +239,9 @@ Links start with `/` so they work from inside the `landlord/` and `renter/` fold
 
 | Page | Who | Purpose | Script | Grid? | Endpoints |
 |---|---|---|---|---|---|
-| `index.html` | everyone | Welcome, Login / Register buttons | none | | none |
+| `index.html` | everyone | Old welcome page, Login / Register / Browse buttons | none | | none |
+| `homepage.html` | everyone | **Front door (`/`).** Browse spaces with free blocks: search, type / min-blocks / power filters, sort, pagination, saved spaces, details window. Renters send a lease request there; guests are sent to log in. Uses Tailwind CDN, not `base.css` | `homepage.js` | | `GET /api/browse`, `GET /api/browse/{id}`, `GET /api/auth/me` (plain fetch), `POST /api/lease-requests`, `POST /api/auth/logout` |
+| `requests.html` | both | Renter: own requests + Cancel. Landlord: incoming requests + Approve / Decline, "Create lease" on approved ones | `requests.js` | | `GET /api/lease-requests`, `POST …/{id}/approve`, `…/decline`, `…/cancel` |
 | `login.html` | everyone | Login, then redirect by role | `login.js` | | `POST /api/auth/login` |
 | `register.html` | everyone | Create an account (choose role) | `register.js` | | `POST /api/auth/register` |
 | `landlord/dashboard.html` | landlord | Property cards, search, type filter, "+ Add property" | `landlord-dashboard.js` | | `GET /api/properties?search=&type=` |

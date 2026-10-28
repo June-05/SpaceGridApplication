@@ -23,10 +23,11 @@ value objects, with no SQL or web code.
 
 | Package | Annotation | Notes |
 |---|---|---|
-| model | none | 26 classes. Value objects are Java records (accessors are `row()`, not `getRow()`). |
+| model | none | 30 classes. Value objects are Java records (accessors are `row()`, not `getRow()`). |
+| config | `@Configuration` | `WebConfig`: page routes (`/`, `/home`, `/browse` → `homepage.html`; `/login`, `/register`, `/requests`). |
 | dao / dao.jdbc | `@Repository` on Jdbc classes | `CrudDao<T>` + one interface per entity. The constructor takes `JdbcTemplate`. `JdbcLeaseContractDao` reads the `lease_details` view. |
 | service | `@Service` | `@Transactional` on multi-table writes (grid save, create/renew/end lease, pay rent). |
-| controller | `@RestController` under `/api/...` | Every method takes `HttpSession` and uses `SessionManager`. |
+| controller | `@RestController` under `/api/...` | Every method takes `HttpSession` and uses `SessionManager`, **except `BrowseController`** (`/api/browse`, public: the homepage works without login). |
 | security | `@Component` | `PasswordHasher` / `BCryptPasswordHasher`, `SessionManager` (session key `userId`). |
 | payment | `@Component` | `PaymentGateway` / `FakePaymentGateway`. |
 | exception | `@RestControllerAdvice` | `SpaceGridException` subclasses: Validation 400, Unauthenticated 401, AccessDenied 403, NotFound 404, Conflict 409. Errors are returned as `{"error": "..."}`. A method still marked TODO answers 501. |
@@ -38,11 +39,12 @@ value objects, with no SQL or web code.
 - Grid methods on `GridZone` are package-private, so only `Property` changes spots.
 - Methods not written yet contain `// TODO` + `throw new UnsupportedOperationException("TODO")`.
 - Frontend: each page loads `/css/base.css` (+ `zones.css`, `grid.css` on grid pages), then `/js/common/api.js`, `auth.js`, `format.js` (+ `grid-renderer.js`), then `/js/pages/<page>.js`. Links start with `/`. `auth.js` `requireLogin(role)` redirects to the right page by role.
+- **Exception:** `homepage.html` uses the Tailwind CDN + Font Awesome (not `base.css`) and loads only `api.js` + `js/pages/homepage.js`. It checks login with a plain `fetch('/api/auth/me')` (a 401 means guest), not `auth.requireLogin`.
 - Colors come from enum `cssClass` + `defaultColor`. Spots get classes like `zone zone-unit status-occupied` and `--zone-color`. `css/zones.css` is the file to edit for custom looks.
 
 ## Business rules (summary)
 - **Accounts:** usernames are unique. Passwords are at least 8 characters, hashed with BCrypt. Login failures give one generic message.
-- **Properties:** only the owner can see or change one. A new property is DRAFT with a 1×1 grid. The grid is at most 30×30. Status is DRAFT / ACTIVE / ARCHIVED. Types: APARTMENT, CONDOMINIUM, TOWNHOUSE, COMMERCIAL.
+- **Properties:** only the owner can see or change one. A new property is DRAFT with a 1×1 grid. The grid is at most 30×30. Status is DRAFT / ACTIVE / ARCHIVED. Types: APARTMENT, CONDOMINIUM, TOWNHOUSE, COMMERCIAL, NIGHT_MARKET, OPEN_SPACE.
 - **Grid:**
   - abstract `GridZone` → `RentableUnit`, `CommonArea`.
   - Common area types: WALKWAY, GRASS, BATHROOM, KITCHEN, LAUNDRY, LOBBY, PARKING, STAIRS. Indoor ones are bathroom, kitchen, laundry, lobby, stairs.
@@ -67,7 +69,9 @@ value objects, with no SQL or web code.
   - Each month is paid once, oldest unpaid first. **Paying ahead is allowed.**
   - Due status per month: PAID / OVERDUE / DUE (within 7 days) / UPCOMING.
   - Methods are GCASH / MAYA / CARD. The fake gateway declines account numbers ending in `0000`, saving the payment as FAILED so it can be retried.
-- Renters have no property-browsing page. The landlord creates the lease by typing the renter's username.
+- **Browsing (public homepage):** `homepage.html` lists every ACTIVE property that has at least one AVAILABLE unit. A **block = one AVAILABLE unit**. `GET /api/browse` (and `/{id}`) needs no login. Search, filter, sort and pagination run in the browser. "Power included" = at least one free unit includes electricity. "Saved" spaces live only in the browser (localStorage).
+- **Lease requests:** a logged-in renter asks for an AVAILABLE unit (start date, 1–60 months, optional message). One PENDING request per renter per unit. The landlord of that property approves or declines; the renter can cancel while PENDING. Only PENDING changes; the rest are final. **Approving does not create the lease**: the landlord still creates it with the lease form (the unit stays AVAILABLE until then). Approve fails if the unit is no longer AVAILABLE.
+- The landlord can also create a lease directly by typing the renter's username.
 
 ## Status
 **Done:**
@@ -78,13 +82,16 @@ value objects, with no SQL or web code.
 - exception handler
 - `landlord/property-grid.html` + `grid-renderer.js`
 - `login.html`
+- public homepage (`homepage.html` + `js/pages/homepage.js`, routes in `WebConfig`) with `GET /api/browse`
+- lease requests: `LeaseRequest` model, DAO, service, controller, `requests.html` (both roles)
+- `RentableUnitDao` `findById` / `findByPropertyId`, `User.isLandlord()` / `isRenter()`, `format.date` / `format.badge`
 
-The plotter works end to end against the real database.
+The plotter works end to end against the real database. After pulling these changes, **re-run `database/spacegrid_db.sql`** (new types, `lease_requests` table and view, sample data).
 
 **TODO (about 79 method bodies + pages), in this order:**
 1. register + `index.html`, landlord dashboard, property form (list/search, create, update, publish, archive)
 2. units page (list, update, maintenance, archive, delete) and common area update/delete
-3. leases: `LeaseContract` logic, DAO, service, controller, `leases.html`, `lease-form.html`
+3. leases: `LeaseContract` logic, DAO, service, controller, `leases.html`, `lease-form.html` (make it read `?requestId=` to prefill renter and dates from an approved request)
 4. `lease.html` (details, read-only grid, statement, history), renter dashboard, `renter/pay.html` + payments
 5. tests: `PropertyTest`, `LeaseContractTest`, `SpaceGridApplicationTests` (written last)
 
@@ -93,7 +100,7 @@ The plotter works end to end against the real database.
 - `SpaceGrid-Phase2-ERD.drawio` (schema in `database/spacegrid_db.sql`).
 - `SpaceGrid-Phase3-FileStructure.md`: the page list with each page's endpoints.
 - `HOW-TO-CONNECT.md`: matching pages to controllers (`@RequestParam` vs `@RequestBody`, date/enum formats).
-- Create a .md file logging if the design changes.
+- `DESIGN-CHANGES.md`: log of design changes (add an entry whenever the design changes). Latest: homepage + lease requests.
 
 ## Working with me
 - I'm a student. Explain changes simply, and keep code readable rather than clever.

@@ -11,8 +11,10 @@ import com.techhub.spacegridapplication.model.GridZone;
 import com.techhub.spacegridapplication.model.Orientation;
 import com.techhub.spacegridapplication.model.Property;
 import com.techhub.spacegridapplication.model.PropertyStatus;
+import com.techhub.spacegridapplication.model.PropertyListing;
 import com.techhub.spacegridapplication.model.PropertyType;
 import com.techhub.spacegridapplication.model.RentableUnit;
+import com.techhub.spacegridapplication.model.UnitListing;
 import com.techhub.spacegridapplication.model.UnitStatus;
 
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -46,6 +48,26 @@ public class JdbcPropertyDao implements PropertyDao {
             LEFT JOIN common_areas c ON c.zone_id = z.id
             WHERE z.property_id = ?
             ORDER BY z.id
+            """;
+
+    /** Homepage: ACTIVE properties with the landlord's name. The optional "AND p.id = ?" is added by loadListings. */
+    private static final String LISTINGS_SQL = """
+            SELECT p.id, p.name, p.address, p.property_type, p.description, p.created_at,
+                   usr.full_name AS landlord_name
+            FROM properties p
+            JOIN users usr ON usr.id = p.landlord_id
+            WHERE p.status = 'ACTIVE'
+            """;
+
+    /** Homepage: the AVAILABLE units ("blocks") of ACTIVE properties. */
+    private static final String AVAILABLE_UNITS_SQL = """
+            SELECT z.property_id, z.id, z.name, u.rental_rate, u.is_exact_size, u.size_description, u.area_sqm,
+                   u.includes_electricity, u.includes_water
+            FROM grid_zones z
+            JOIN rentable_units u ON u.zone_id = z.id
+            JOIN properties p ON p.id = z.property_id
+            WHERE p.status = 'ACTIVE' AND u.status = 'AVAILABLE'
+            ORDER BY z.property_id, z.id
             """;
 
     public JdbcPropertyDao(JdbcTemplate jdbcTemplate) {
@@ -128,6 +150,45 @@ public class JdbcPropertyDao implements PropertyDao {
             jdbcTemplate.batchUpdate("INSERT INTO edge_overrides (property_id, row_idx, col_idx, orientation, edge_type) "
                     + "VALUES (?, ?, ?, ?, ?)", rows);
         }
+    }
+
+    @Override
+    public List<PropertyListing> findActiveListings() {
+        return loadListings(null);
+    }
+
+    @Override
+    public Optional<PropertyListing> findActiveListingById(int propertyId) {
+        return loadListings(propertyId).stream().findFirst();
+    }
+
+    /** Two queries (properties, then their available units), joined here. Properties without a free unit are left out. */
+    private List<PropertyListing> loadListings(Integer propertyId) {
+        Map<Integer, List<UnitListing>> unitsByProperty = new HashMap<>();
+        jdbcTemplate.query(AVAILABLE_UNITS_SQL, rs -> {
+            unitsByProperty.computeIfAbsent(rs.getInt("property_id"), k -> new ArrayList<>()).add(new UnitListing(
+                    rs.getInt("id"),
+                    rs.getString("name"),
+                    rs.getBigDecimal("rental_rate"),
+                    readDimensions(rs),
+                    rs.getBoolean("includes_electricity"),
+                    rs.getBoolean("includes_water")));
+        });
+
+        String sql = LISTINGS_SQL + (propertyId == null ? "" : " AND p.id = ?") + " ORDER BY p.created_at DESC, p.id DESC";
+        RowMapper<PropertyListing> mapper = (rs, rowNum) -> new PropertyListing(
+                rs.getInt("id"),
+                rs.getString("name"),
+                rs.getString("address"),
+                PropertyType.valueOf(rs.getString("property_type")),
+                rs.getString("description"),
+                rs.getString("landlord_name"),
+                rs.getTimestamp("created_at").toLocalDateTime(),
+                unitsByProperty.getOrDefault(rs.getInt("id"), List.of()));
+        List<PropertyListing> listings = (propertyId == null)
+                ? jdbcTemplate.query(sql, mapper)
+                : jdbcTemplate.query(sql, mapper, propertyId);
+        return listings.stream().filter(listing -> !listing.units().isEmpty()).toList();
     }
 
     /** Units + common areas of a property (with their spots), for the from-database constructor. */

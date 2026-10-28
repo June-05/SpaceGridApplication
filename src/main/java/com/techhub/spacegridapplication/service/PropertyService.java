@@ -11,6 +11,7 @@ import com.techhub.spacegridapplication.model.GridPosition;
 import com.techhub.spacegridapplication.model.GridZone;
 import com.techhub.spacegridapplication.model.Orientation;
 import com.techhub.spacegridapplication.model.Property;
+import com.techhub.spacegridapplication.model.PropertyListing;
 import com.techhub.spacegridapplication.model.PropertyType;
 import com.techhub.spacegridapplication.model.Side;
 import com.techhub.spacegridapplication.model.User;
@@ -32,6 +33,17 @@ public class PropertyService {
 
     public PropertyService(PropertyDao propertyDao) {
         this.propertyDao = propertyDao;
+    }
+
+    /** Public homepage: ACTIVE properties that have at least one AVAILABLE unit. No login needed. */
+    public List<PropertyListing> getListings() {
+        return propertyDao.findActiveListings();
+    }
+
+    /** Public homepage details. NotFoundException if the property isn't ACTIVE or has nothing available. */
+    public PropertyListing getListing(int propertyId) {
+        return propertyDao.findActiveListingById(propertyId)
+                .orElseThrow(() -> new NotFoundException("This space isn't available for rent right now."));
     }
 
     /** search and type are optional filters. */

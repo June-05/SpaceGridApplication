@@ -44,3 +44,10 @@
 .due-due { }
 .due-overdue { }
 .due-paid { }
+
+/* Lease request badges (RequestStatus) */
+.request-pending { background: #fef3c7; color: #92400e; }
+.request-approved { background: #dcfce7; color: #166534; }
+.request-declined { background: #fee2e2; color: #991b1b; }
+.request-cancelled { background: #e2e8f0; color: #475569; }
+.request-message { font-style: italic; color: #475569; }

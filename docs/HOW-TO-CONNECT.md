@@ -99,6 +99,9 @@ The JSON keys are the getter names without `get`/`is` (`getFullName()` → `full
 | `LeaseContract` | `id, unitId, renterId, startDate, endDate, monthlyRent, previousLeaseId, status, closedOn, unitName, propertyName, renterName, currentState, daysRemaining` |
 | `RentDue` | `billingMonth, dueDate, amountDue, status` |
 | `Payment` | `id, leaseId, billingMonth, amount, method, status, referenceNo, paidAt` |
+| `PropertyListing` (`/api/browse`) | `id, name, address, propertyType, description, landlordName, createdAt, units[], availableBlocks, minRate, maxRate, powerIncluded, waterIncluded` |
+| unit in `units[]` | `id, name, rentalRate, dimensions{exact, description, areaSqm} or null, includesElectricity, includesWater` |
+| `LeaseRequest` | `id, unitId, renterId, desiredStart, months, message, status, decidedAt, createdAt, propertyId, landlordId, unitName, propertyName, renterName, monthlyRate, suggestedEndDate` |
 
 To see the real JSON at any time, open a GET URL in the browser while logged in, e.g. `http://localhost:8080/api/auth/me`.
 
@@ -144,7 +147,17 @@ location.href = `/landlord/property-grid.html?id=${property.id}`;   // going to 
 const id = new URLSearchParams(location.search).get('id');          // reading it on that page
 ```
 URLs used by the pages: `property-form.html?id=`, `property-grid.html?id=`, `units.html?propertyId=`,
-`lease.html?id=`, `lease-form.html?renew=`, `pay.html?leaseId=&month=`.
+`lease.html?id=`, `lease-form.html?renew=`, `lease-form.html?requestId=` (from an approved request), `pay.html?leaseId=&month=`,
+`/?space=` (homepage, opens that space's details window; used to come back after logging in).
+
+Short page routes (set in `config/WebConfig`): `/`, `/home`, `/browse` → `homepage.html`; `/login`; `/register`; `/requests`.
+
+## 8b. The public homepage is different
+
+`homepage.html` is the only page that works **without login**, so it does not use `auth.requireLogin` (that would send guests to
+the login page). It calls `GET /api/browse` (no session needed), and asks `GET /api/auth/me` with a plain `fetch`: a 401 simply means
+"guest". It loads `api.js` only for the lease-request POST and the logout. The request form sends form fields
+`unitId, startDate (yyyy-MM-dd), months, message` to `POST /api/lease-requests`, which needs a RENTER login.
 
 ## 9. The grid page in short
 

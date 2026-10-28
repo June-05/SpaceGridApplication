@@ -5,6 +5,7 @@
  *   prefix + name in lowercase with "_" → "-"
  *   cssClass('state-', 'EXPIRING_SOON') → 'state-expiring-soon'   (same as LeaseState.getCssClass())
  * Prefixes: 'status-' UnitStatus · 'state-' LeaseState · 'due-' DueStatus · 'zone-' CommonAreaType · 'edge-' EdgeType
+ *           · 'request-' RequestStatus
  */
 const format = {
   cssClass(prefix, enumName) {
@@ -22,10 +23,14 @@ const format = {
   },
 
   date(isoDate) {
-    // TODO: "2026-10-24" → "Oct 24, 2026"
+    if (!isoDate) return '';
+    // "2026-10-24" → "Oct 24, 2026" (the time part, if any, is ignored)
+    const d = new Date(String(isoDate).slice(0, 10) + 'T00:00:00');
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   },
 
   badge(prefix, enumName) {
-    // TODO: return an element/HTML like <span class="badge state-expiring-soon">Expiring soon</span>
+    // <span class="badge state-expiring-soon">Expiring soon</span>
+    return `<span class="badge ${this.cssClass(prefix, enumName)}">${this.label(enumName)}</span>`;
   }
 };
