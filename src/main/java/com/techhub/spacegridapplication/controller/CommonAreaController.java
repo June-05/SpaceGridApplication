@@ -75,8 +75,10 @@ public class CommonAreaController {
         throw new UnsupportedOperationException("TODO");
     }
 
+    /** Deletes the common area and clears its spots. Saved at once. */
     @DeleteMapping("/common-areas/{id}")
     public void delete(@PathVariable int id, HttpSession session) {
-        // TODO: get the user from sessionManager, call the service, return the result
+        User landlord = sessionManager.requireRole(session, Role.LANDLORD);
+        commonAreaService.deleteCommonArea(id, landlord);
     }
 }

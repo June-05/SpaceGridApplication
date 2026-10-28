@@ -78,7 +78,12 @@ public class CommonAreaService {
         throw new UnsupportedOperationException("TODO");
     }
 
+    /** Deletes a common area of the landlord's property; its spots are cleared with it. Nothing else refers to it. */
+    @Transactional
     public void deleteCommonArea(int areaId, User landlord) {
-        // TODO
+        CommonArea area = commonAreaDao.findById(areaId)
+                .orElseThrow(() -> new NotFoundException("Common area not found."));
+        propertyService.getOwnedProperty(area.getPropertyId(), landlord);
+        commonAreaDao.deleteById(areaId);
     }
 }

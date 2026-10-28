@@ -1,6 +1,7 @@
 package com.techhub.spacegridapplication.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.techhub.spacegridapplication.exception.ConflictException;
 import com.techhub.spacegridapplication.exception.ValidationException;
 
 import java.math.BigDecimal;
@@ -85,7 +86,10 @@ public class RentableUnit extends GridZone {
 
     /** Package-private: call Property.archiveUnit(unit) so the spots are cleared too. */
     void archive() {
-        // TODO: not allowed while OCCUPIED; status -> ARCHIVED
+        if (status == UnitStatus.OCCUPIED) {
+            throw new ConflictException(getName() + " is occupied. End or terminate its lease first.");
+        }
+        this.status = UnitStatus.ARCHIVED;
     }
 
     @Override

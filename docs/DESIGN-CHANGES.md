@@ -130,6 +130,37 @@ No change to classes, tables, endpoints or saved data.
 
 ---
 
+## 2026-10-28 · Delete / archive units, delete common areas, unit legend (design change)
+
+**Unit removal rules** (decided with the owner: delete or archive is decided for the landlord, open requests are auto-declined):
+
+| Unit has… | Result |
+|---|---|
+| an ACTIVE lease (running or upcoming) | Neither delete nor archive (409): "End or terminate it first." |
+| past leases only | Archive only: status ARCHIVED, spots cleared, leases and payments kept |
+| never been leased | Delete for good |
+| open lease requests (PENDING / APPROVED) | Declined in the same transaction (delete and archive) |
+
+**Design changes** (re-run `spacegrid_db.sql`):
+- `lease_requests.rentable_unit_id` is now NULL-able with `ON DELETE SET NULL` (was RESTRICT), and two new columns `unit_label`, `property_label` keep the names from when the request was made. The view `lease_request_details` uses LEFT JOINs and falls back to those names. Checked on MariaDB 10.4: the SET NULL works next to the `pending_key` generated column.
+- `LeaseRequest.unitId` is an `Integer` (null = unit removed) with `isUnitRemoved()`; JSON gains `unitRemoved`. `requests.html` shows "This unit was removed by the owner." and no "Create lease" for those.
+- New value object `UnitRemovalCheck(canDelete, canArchive, openRequests, reason)` and endpoint `GET /api/units/{id}/removal-check`.
+- `LeaseRequestDao.countOpenByUnitId`, `declineOpenByUnitId`; `RentableUnitService.removalCheck`.
+- Now implemented (were TODO): `DELETE /api/units/{id}`, `POST /api/units/{id}/archive`, `DELETE /api/common-areas/{id}`, `RentableUnitService.archiveUnit/deleteUnit`, `CommonAreaService.deleteCommonArea`, `RentableUnit.archive`, `Property.archiveUnit/removeZone`, `JdbcRentableUnitDao.update/deleteById`, `JdbcCommonAreaDao` row mapper / `findById` / `findByPropertyId` / `deleteById`, `JdbcLeaseContractDao` row mapper / `findActiveByUnitId` / `existsByUnitId`.
+
+**Plotter:**
+- A trash button on every zone row (on hover / keyboard focus; always on touch), and the **Delete** key for the selected zone, open a dialog: common area → Delete; unit → the server's check decides Delete (with "N open lease requests will be declined"), Archive (with the reason), or only the reason. Saved at once.
+- After a delete/archive the zone's spots are removed from the layout **and from every undo/redo snapshot**, so undo or Save can't bring them back.
+- **Unit colors legend** (bottom-left, above Resize grid): Available / Occupied / Under maintenance with counts; collapsible (header or **L**), remembered in the browser.
+- The numbers ("4 × 6 · 9/24 spots · 2/2 units placed · 3 wall edits") moved under the property name (top-left); the Resize grid pill no longer hides them.
+- Fixed the common-area color icon: it was an invalid CSS `background` (a color before a gradient), so the badge rendered as an empty ring. It is now a square swatch with a small pencil badge.
+
+**Checked:** Maven build + tests; live API on a scratch DB (never-leased unit with requests → deleted, requests declined with unit NULL and names kept; past-lease unit → delete 409, archive 200, spots cleared, lease kept, request declined; active lease → both 409; common area delete; 403/404/401 cases; new requests store the name copies); a jsdom run of the real page (101 checks, incl. undo after delete); the renderer tests. Not tried in a real browser: the look of the dialog, legend and icon.
+
+**Next (TODO, not built):** lease timing markers on the plotter: a dot on occupied units for "Expiring soon" (30 days or fewer) or "Upcoming", plus a legend row. Needs each unit's lease state in the grid page's data, after the lease methods are done.
+
+---
+
 ## PROPOSED (not built) · Commercial ready, permits, bigger grid with zoom
 
 Status: **decided, not implemented.** Nothing below exists in the code yet. When a part is built, move it into a dated section above and update the docs listed at the end.

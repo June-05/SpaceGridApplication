@@ -66,6 +66,9 @@ public class LeaseRequestService {
     @Transactional
     public LeaseRequest approve(int requestId, User landlord) {
         LeaseRequest request = getRequestForLandlord(requestId, landlord);
+        if (request.isUnitRemoved()) {
+            throw new ConflictException("This unit was removed.");
+        }
         RentableUnit unit = rentableUnitDao.findById(request.getUnitId())
                 .orElseThrow(() -> new NotFoundException("Unit not found."));
         if (unit.getStatus() != UnitStatus.AVAILABLE) {

@@ -18,7 +18,7 @@ public class LeaseRequest extends BaseEntity {
     public static final int MAX_MONTHS = 60;
     public static final int MAX_MESSAGE_LENGTH = 500;
 
-    private final int unitId;
+    private final Integer unitId;               // null once the landlord deleted the unit
     private final int renterId;
     private final LocalDate desiredStart;
     private final int months;
@@ -57,8 +57,8 @@ public class LeaseRequest extends BaseEntity {
         this.status = RequestStatus.PENDING;
     }
 
-    /** From database (lease_request_details view). */
-    public LeaseRequest(int id, LocalDateTime createdAt, int unitId, int renterId, LocalDate desiredStart,
+    /** From database (lease_request_details view). unitId is null when the unit was deleted. */
+    public LeaseRequest(int id, LocalDateTime createdAt, Integer unitId, int renterId, LocalDate desiredStart,
                         int months, String message, RequestStatus status, LocalDateTime decidedAt,
                         int propertyId, int landlordId, String unitName, String propertyName,
                         String renterName, BigDecimal monthlyRate) {
@@ -78,7 +78,10 @@ public class LeaseRequest extends BaseEntity {
         this.monthlyRate = monthlyRate;
     }
 
-    public int getUnitId() { return unitId; }
+    public Integer getUnitId() { return unitId; }
+
+    /** True when the landlord deleted the unit after the request was made (the names are kept, the rate is not). */
+    public boolean isUnitRemoved() { return unitId == null; }
     public int getRenterId() { return renterId; }
     public LocalDate getDesiredStart() { return desiredStart; }
     public int getMonths() { return months; }

@@ -128,8 +128,11 @@ public class Property extends BaseEntity {
         }
     }
 
+    /** Takes a zone (and so its spots) off the property, e.g. before it is deleted. */
     public void removeZone(GridZone zone) {
-        // TODO
+        if (zone != null) {
+            zones.remove(zone);
+        }
     }
 
     @JsonIgnore
@@ -156,7 +159,11 @@ public class Property extends BaseEntity {
 
     /** Archives a unit: it must have no ACTIVE lease (checked by the service); its spots are cleared. */
     public void archiveUnit(RentableUnit unit) {
-        // TODO: unit.clearPositions(); unit.archive();
+        if (unit == null || !zones.contains(unit)) {
+            throw new ValidationException("This unit doesn't belong to this property.");
+        }
+        unit.archive();                       // checks first, so nothing is cleared if it is not allowed
+        unit.clearPositions();
     }
 
     // ---------------------------------------------------------------- grid

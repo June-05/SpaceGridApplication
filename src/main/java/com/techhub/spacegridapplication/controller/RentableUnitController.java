@@ -3,6 +3,7 @@ package com.techhub.spacegridapplication.controller;
 import com.techhub.spacegridapplication.model.Dimensions;
 import com.techhub.spacegridapplication.model.RentableUnit;
 import com.techhub.spacegridapplication.model.Role;
+import com.techhub.spacegridapplication.model.UnitRemovalCheck;
 import com.techhub.spacegridapplication.model.User;
 import com.techhub.spacegridapplication.security.SessionManager;
 import com.techhub.spacegridapplication.service.RentableUnitService;
@@ -85,13 +86,24 @@ public class RentableUnitController {
         // TODO: get the user from sessionManager, call the service, return the result
     }
 
-    @PostMapping("/units/{id}/archive")
-    public void archive(@PathVariable int id, HttpSession session) {
-        // TODO: get the user from sessionManager, call the service, return the result
+    /** Before deleting or archiving: may it be deleted, only archived, or neither (and why), and how many open requests. */
+    @GetMapping("/units/{id}/removal-check")
+    public UnitRemovalCheck removalCheck(@PathVariable int id, HttpSession session) {
+        User landlord = sessionManager.requireRole(session, Role.LANDLORD);
+        return unitService.removalCheck(id, landlord);
     }
 
+    /** Only a unit with no ACTIVE lease. Its spots are cleared; its leases and payments are kept. 409 otherwise. */
+    @PostMapping("/units/{id}/archive")
+    public void archive(@PathVariable int id, HttpSession session) {
+        User landlord = sessionManager.requireRole(session, Role.LANDLORD);
+        unitService.archiveUnit(id, landlord);
+    }
+
+    /** Only a unit that was never leased (409 otherwise: archive it). Open lease requests are declined. */
     @DeleteMapping("/units/{id}")
     public void delete(@PathVariable int id, HttpSession session) {
-        // TODO: get the user from sessionManager, call the service, return the result
+        User landlord = sessionManager.requireRole(session, Role.LANDLORD);
+        unitService.deleteUnit(id, landlord);
     }
 }

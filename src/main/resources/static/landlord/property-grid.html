@@ -37,6 +37,8 @@
     <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
     <symbol id="i-chevron" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
     <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+    <symbol id="i-pencil" viewBox="0 0 24 24"><path d="M15.5 4.5l4 4L8 20H4v-4zM13 7l4 4"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></symbol>
     <symbol id="i-resize" viewBox="0 0 24 24"><path d="M4 4h10v10H4zM14 9h6v11H9v-6M17 17l3 3M20 17v3h-3"/></symbol>
     <symbol id="i-spots" viewBox="0 0 24 24"><path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4z"/><path d="M13 13h7v7h-7z" stroke-dasharray="2 2"/></symbol>
   </svg>
@@ -51,7 +53,10 @@
     <a href="/landlord/dashboard.html" class="icon-btn tip-below" data-tip="Back to dashboard" aria-label="Back to dashboard">
       <svg class="ico"><use href="#i-back"/></svg>
     </a>
-    <h1 id="propertyName" class="pl-name">Loading…</h1>
+    <div class="pl-title-text">
+      <h1 id="propertyName" class="pl-name">Loading…</h1>
+      <p id="summary" class="pl-stats"></p>
+    </div>
   </header>
 
   <!-- top-right: undo, redo, save, menu -->
@@ -117,8 +122,15 @@
     <button id="btnSize" class="text-btn resize-btn" type="button" data-tip="Resize the grid (or drag its edges)" data-key="G" aria-haspopup="dialog" aria-expanded="false">
       <svg class="ico"><use href="#i-resize"/></svg>Resize grid<span id="sizeLabel" class="size-chip">– × –</span>
     </button>
-    <span id="summary" class="pl-stats"></span>
   </div>
+
+  <!-- bottom-left, above Resize grid: what the unit colors mean (L to show / hide) -->
+  <section id="legend" class="pl-float pl-legend" aria-label="Legend">
+    <button id="btnLegend" class="pl-legend-head" type="button" aria-expanded="true" data-tip="Show / hide the legend" data-key="L">
+      <span>Unit colors</span><svg class="ico"><use href="#i-chevron"/></svg>
+    </button>
+    <ul id="legendList" class="pl-legend-list"></ul>
+  </section>
   <div id="sizePop" class="pl-popover size-pop" role="dialog" aria-label="Grid size" hidden>
     <h3>Grid size <span class="zone-meta">(max 60 × 60)</span></h3>
     <div class="size-row">Rows
@@ -233,6 +245,23 @@
           <button class="btn btn-primary" type="submit">Add common area</button>
         </div>
       </form>
+    </div>
+  </dialog>
+
+  <!-- delete / archive a zone (saved at once). Units: GET /api/units/{id}/removal-check decides what is allowed. -->
+  <dialog id="removeDialog" class="pl-dialog remove-dialog" aria-labelledby="removeTitle">
+    <div class="pl-dialog-head">
+      <h2 id="removeTitle">Delete</h2>
+      <button class="icon-btn" type="button" data-close aria-label="Close"><svg class="ico"><use href="#i-close"/></svg></button>
+    </div>
+    <div class="pl-dialog-body remove-body">
+      <p id="removeText"></p>
+      <p id="removeNote" class="remove-note"></p>
+      <div class="form-actions">
+        <button class="btn" type="button" data-close id="btnRemoveCancel">Cancel</button>
+        <button class="btn" type="button" id="btnArchive" hidden>Archive</button>
+        <button class="btn btn-danger" type="button" id="btnDelete" hidden>Delete</button>
+      </div>
     </div>
   </dialog>
 

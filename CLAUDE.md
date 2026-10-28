@@ -58,8 +58,12 @@ value objects, with no SQL or web code.
 - **Units:**
   - Status is AVAILABLE / OCCUPIED / UNDER_MAINTENANCE / ARCHIVED.
   - OCCUPIED only from AVAILABLE. No maintenance while occupied.
-  - **Archive instead of delete:** only allowed with no ACTIVE lease. Archiving clears the unit's spots and keeps its history.
-  - Delete only if the unit was never leased.
+  - **Taking a unit off the grid** (`GET /api/units/{id}/removal-check` → `UnitRemovalCheck` tells the page which applies):
+    - ACTIVE lease (running or upcoming) → neither delete nor archive (409): end or terminate the lease first.
+    - Leased before, not now → **archive only** (`POST /api/units/{id}/archive`): status ARCHIVED, its spots cleared, leases and payments kept.
+    - Never leased → **delete** (`DELETE /api/units/{id}`): the zone, unit row and spots go.
+    - Either way, its PENDING / APPROVED lease requests are **declined** in the same transaction.
+  - Common areas can always be deleted (`DELETE /api/common-areas/{id}`); their spots go with them.
   - Zone names don't need to be unique.
 - **Leases:**
   - **Terms can't be edited.** A unit can have one ACTIVE lease, and the renter must have the RENTER role.
@@ -73,7 +77,7 @@ value objects, with no SQL or web code.
   - Due status per month: PAID / OVERDUE / DUE (within 7 days) / UPCOMING.
   - Methods are GCASH / MAYA / CARD. The fake gateway declines account numbers ending in `0000`, saving the payment as FAILED so it can be retried.
 - **Browsing (public homepage):** `homepage.html` lists every ACTIVE property that has at least one AVAILABLE unit. A **block = one AVAILABLE unit**. `GET /api/browse` (and `/{id}`) needs no login. Search, filter, sort and pagination run in the browser. "Power included" = at least one free unit includes electricity. "Saved" spaces live only in the browser (localStorage).
-- **Lease requests:** a logged-in renter asks for an AVAILABLE unit (start date, 1–60 months, optional message). One PENDING request per renter per unit. The landlord of that property approves or declines; the renter can cancel while PENDING. Only PENDING changes; the rest are final. **Approving does not create the lease**: the landlord still creates it with the lease form (the unit stays AVAILABLE until then). Approve fails if the unit is no longer AVAILABLE.
+- **Lease requests:** a logged-in renter asks for an AVAILABLE unit (start date, 1–60 months, optional message). One PENDING request per renter per unit. The landlord of that property approves or declines; the renter can cancel while PENDING. Only PENDING changes; the rest are final. **Approving does not create the lease**: the landlord still creates it with the lease form (the unit stays AVAILABLE until then). Approve fails if the unit is no longer AVAILABLE. Each request keeps a copy of the unit and property names (`unit_label`, `property_label`); if the landlord deletes the unit, `rentable_unit_id` becomes NULL (`ON DELETE SET NULL`), the request stays (declined) and `LeaseRequest.isUnitRemoved()` is true.
 - The landlord can also create a lease directly by typing the renter's username.
 
 ## Status
@@ -88,13 +92,15 @@ value objects, with no SQL or web code.
 - public homepage (`homepage.html` + `js/pages/homepage.js`, routes in `WebConfig`) with `GET /api/browse`
 - lease requests: `LeaseRequest` model, DAO, service, controller, `requests.html` (both roles)
 - `RentableUnitDao` `findById` / `findByPropertyId`, `User.isLandlord()` / `isRenter()`, `format.date` / `format.badge`
+- delete / archive units and delete common areas (service, controller, DAO, plotter dialog); `JdbcLeaseContractDao` row mapper, `findActiveByUnitId`, `existsByUnitId`; `JdbcCommonAreaDao` reads; `RentableUnitDao.update`
 
-The plotter works end to end against the real database. After pulling these changes, **re-run `database/spacegrid_db.sql`** (new types, `lease_requests` table and view, sample data).
+The plotter works end to end against the real database. After pulling these changes, **re-run `database/spacegrid_db.sql`** (new types, `lease_requests` table, its name copies and `ON DELETE SET NULL`, view, common-area colors, 60×60 cap, sample data).
 
 **TODO (about 79 method bodies + pages), in this order:**
 1. register + `index.html`, landlord dashboard, property form (list/search, create, update, publish, archive)
-2. units page (list, update, maintenance, archive, delete) and common area update/delete
+2. units page (list, update, maintenance; archive/delete endpoints already exist) and common area update
 3. leases: `LeaseContract` logic, DAO, service, controller, `leases.html`, `lease-form.html` (make it read `?requestId=` to prefill renter and dates from an approved request)
+   - then **lease timing markers on the plotter**: a small dot on occupied units, "Expiring soon" (30 days or fewer) or "Upcoming", plus a matching legend row. Needs each unit's current lease state in the grid page's data.
 4. `lease.html` (details, read-only grid, statement, history), renter dashboard, `renter/pay.html` + payments
 5. tests: `PropertyTest`, `LeaseContractTest`, `SpaceGridApplicationTests` (written last)
 

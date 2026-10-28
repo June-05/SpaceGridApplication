@@ -159,7 +159,7 @@ A renter's request to lease an AVAILABLE unit found on the homepage. Only a PEND
 ```
 + MAX_MONTHS: int = 60   «static»
 + MAX_MESSAGE_LENGTH: int = 500   «static»
-- unitId: int {final}
+- unitId: Integer {final}           // null once the landlord deleted the unit
 - renterId: int {final}
 - desiredStart: LocalDate {final}
 - months: int {final}
@@ -176,12 +176,25 @@ A renter's request to lease an AVAILABLE unit found on the homepage. Only a PEND
 
 + LeaseRequest(unitId: int, renterId: int, desiredStart: LocalDate, months: int, message: String)
 + getSuggestedEndDate(): LocalDate     // desiredStart + months - 1 day
++ isUnitRemoved(): boolean             // unitId == null (the names come from the copies saved with the request)
 + isFromRenter(userId: int): boolean
 + isForLandlord(userId: int): boolean
 + approve(): void        // PENDING only, else ConflictException
 + decline(): void
 + cancel(): void
 ```
+
+#### `UnitRemovalCheck`, Class · value object (record)
+
+What the landlord may do to take a unit off the grid (`GET /api/units/{id}/removal-check`).
+
+```
+canDelete: boolean        // never leased → delete for good
+canArchive: boolean       // leased before, not now → archive only (history kept)
+openRequests: int         // PENDING + APPROVED lease requests that will be declined
+reason: String            // why it can't be deleted (null when it can)
+```
+Neither flag is true while the unit has an ACTIVE lease (or is already archived).
 
 #### `PropertyListing`, Class · value object (record)
 
@@ -556,6 +569,8 @@ Generic interface shared by all DAOs.
 + findByRenterId(renterId: int): List<LeaseRequest>
 + findByLandlordId(landlordId: int): List<LeaseRequest>
 + existsPendingByUnitAndRenter(unitId: int, renterId: int): boolean
++ countOpenByUnitId(unitId: int): int        // PENDING + APPROVED
++ declineOpenByUnitId(unitId: int): int      // declines them; returns how many
 ```
 
 #### `JdbcLeaseRequestDao`, Class · repository · implements `LeaseRequestDao`
@@ -702,8 +717,10 @@ Reads the `lease_request_details` view; writes `lease_requests`. `update` change
 ```
 - unitDao: RentableUnitDao
 - leaseDao: LeaseContractDao
+- leaseRequestDao: LeaseRequestDao
 - propertyService: PropertyService
 
++ removalCheck(unitId: int, landlord: User): UnitRemovalCheck
 + getUnits(propertyId: int, landlord: User): List<RentableUnit>
 + addUnit(propertyId: int, landlord: User, name: String, rentalRate: BigDecimal, dimensions: Dimensions, electricity: boolean, water: boolean): RentableUnit
 + updateUnit(unitId: int, landlord: User, name: String, rentalRate: BigDecimal, dimensions: Dimensions, electricity: boolean, water: boolean): RentableUnit
@@ -814,12 +831,14 @@ Reads the `lease_request_details` view; writes `lease_requests`. `update` change
 + create(propertyId, name, rentalRate, exactSize, areaSqm, sizeDescription, electricity, water): RentableUnit
 + update(id, name, rentalRate, exactSize, areaSqm, sizeDescription, electricity, water): RentableUnit
 + setMaintenance(id, underMaintenance): void
++ removalCheck(id): UnitRemovalCheck
 + archive(id): void
 + delete(id): void
 ```
 
 | Endpoint | Method |
 |---|---|
+| `GET /api/units/{id}/removal-check` | `removalCheck` |
 | `GET /api/properties/{propertyId}/units` | `list` |
 | `POST /api/properties/{propertyId}/units` | `create` |
 | `PUT /api/units/{id}` | `update` |
@@ -1103,7 +1122,10 @@ Breaks a rule, e.g. username taken → 409
 
 - Statuses: AVAILABLE, OCCUPIED, UNDER_MAINTENANCE, ARCHIVED. A unit can only become OCCUPIED from AVAILABLE, and can't go into maintenance while OCCUPIED.
 - Archive (`Property.archiveUnit`): only when the unit has no ACTIVE lease. The unit's spots are cleared from the grid, it can't be leased or edited again, and its past leases and payments are kept. Archived units are hidden from the grid and the unit list (shown under an "Archived" filter).
-- Delete is only allowed for a unit that has never been leased (`existsByUnitId` is false). Otherwise `ConflictException` asks the landlord to archive it instead. The database also blocks it (ON DELETE RESTRICT).
+- Delete is only allowed for a unit that has never been leased (`existsByUnitId` is false). Otherwise `ConflictException` asks the landlord to archive it instead. The database also blocks it (ON DELETE RESTRICT on lease_contracts).
+- A unit with an ACTIVE lease (running or upcoming) can be neither deleted nor archived. `removalCheck` tells the page which case applies before anything is done.
+- Deleting or archiving a unit **declines its PENDING / APPROVED lease requests** in the same transaction. The requests stay: they keep a copy of the unit and property names, and after a delete their `unitId` is null (`ON DELETE SET NULL`).
+- Common areas can always be deleted; their spots are cleared with them.
 - Zone names don't have to be unique. Rental rates can't be negative.
 
 **Browsing and lease requests**

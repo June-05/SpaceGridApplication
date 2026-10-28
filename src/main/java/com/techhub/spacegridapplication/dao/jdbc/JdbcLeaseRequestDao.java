@@ -32,7 +32,7 @@ public class JdbcLeaseRequestDao implements LeaseRequestDao {
             return new LeaseRequest(
                     rs.getInt("id"),
                     rs.getTimestamp("created_at").toLocalDateTime(),
-                    rs.getInt("rentable_unit_id"),
+                    rs.getObject("rentable_unit_id", Integer.class),     // null once the unit was deleted
                     rs.getInt("renter_id"),
                     rs.getDate("desired_start").toLocalDate(),
                     rs.getInt("months"),
@@ -53,21 +53,27 @@ public class JdbcLeaseRequestDao implements LeaseRequestDao {
         return jdbcTemplate.query(SELECT_REQUESTS + " WHERE id = ?", rowMapper, id).stream().findFirst();
     }
 
-    /** INSERT, then entity.assignId(generated key). The display fields stay empty: reload with findById if you need them. */
+    /**
+     * INSERT, then entity.assignId(generated key). The unit and property names are copied into the request
+     * (unit_label, property_label) so it still says what it was for if the unit is deleted later.
+     * The display fields stay empty: reload with findById if you need them.
+     */
     @Override
     public LeaseRequest save(LeaseRequest entity) {
         KeyHolder keys = new GeneratedKeyHolder();
         jdbcTemplate.update(connection -> {
             PreparedStatement ps = connection.prepareStatement(
-                    "INSERT INTO lease_requests (rentable_unit_id, renter_id, desired_start, months, message, status) "
-                            + "VALUES (?, ?, ?, ?, ?, ?)",
+                    "INSERT INTO lease_requests (rentable_unit_id, unit_label, property_label, renter_id, desired_start, "
+                            + "months, message, status) "
+                            + "SELECT z.id, z.name, p.name, ?, ?, ?, ?, ? FROM grid_zones z "
+                            + "JOIN properties p ON p.id = z.property_id WHERE z.id = ?",
                     Statement.RETURN_GENERATED_KEYS);
-            ps.setInt(1, entity.getUnitId());
-            ps.setInt(2, entity.getRenterId());
-            ps.setObject(3, entity.getDesiredStart());
-            ps.setInt(4, entity.getMonths());
-            ps.setString(5, entity.getMessage());
-            ps.setString(6, entity.getStatus().name());
+            ps.setInt(1, entity.getRenterId());
+            ps.setObject(2, entity.getDesiredStart());
+            ps.setInt(3, entity.getMonths());
+            ps.setString(4, entity.getMessage());
+            ps.setString(5, entity.getStatus().name());
+            ps.setInt(6, entity.getUnitId());
             return ps;
         }, keys);
         entity.assignId(keys.getKey().intValue());
@@ -96,6 +102,20 @@ public class JdbcLeaseRequestDao implements LeaseRequestDao {
     public List<LeaseRequest> findByLandlordId(int landlordId) {
         return jdbcTemplate.query(SELECT_REQUESTS + " WHERE landlord_id = ? ORDER BY created_at DESC, id DESC",
                 rowMapper, landlordId);
+    }
+
+    @Override
+    public int countOpenByUnitId(int unitId) {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM lease_requests WHERE rentable_unit_id = ? AND status IN ('PENDING', 'APPROVED')",
+                Integer.class, unitId);
+        return count == null ? 0 : count;
+    }
+
+    @Override
+    public int declineOpenByUnitId(int unitId) {
+        return jdbcTemplate.update("UPDATE lease_requests SET status = 'DECLINED', decided_at = NOW() "
+                + "WHERE rentable_unit_id = ? AND status IN ('PENDING', 'APPROVED')", unitId);
     }
 
     @Override

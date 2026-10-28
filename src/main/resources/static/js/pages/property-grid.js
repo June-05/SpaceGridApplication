@@ -27,6 +27,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   const CELL_MIN = 6, CELL_MAX = 96, CELL_BASE = 48, CELL_FIT_MAX = 72;
   const ZOOM_KEY = 'spacegrid.gridZoom';
   const PANEL_KEY = 'spacegrid.zonesPanel';
+  const LEGEND_KEY = 'spacegrid.legend';
+  // Unit colors shown in the legend (same as UnitStatus.java). Archived units are not on the grid, so not listed.
+  const LEGEND_STATUSES = [
+    { status: 'AVAILABLE', label: 'Available', color: '#16a34a' },
+    { status: 'OCCUPIED', label: 'Occupied', color: '#dc2626' },
+    { status: 'UNDER_MAINTENANCE', label: 'Under maintenance', color: '#f59e0b' }
+  ];
   const HISTORY_LIMIT = 100;
   const TOOL_NAMES = { hand: 'Hand', brush: 'Brush', rect: 'Rectangle', [ERASER]: 'Eraser' };
   const EDGE_TYPES = [
@@ -63,7 +70,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     addDialog: $('addDialog'), addTitle: $('addTitle'), addUnitForm: $('addUnitForm'), addAreaForm: $('addAreaForm'),
     unitPreview: $('unitPreview'), areaPreview: $('areaPreview'), areaPalette: $('areaPalette'),
     areaCustom: $('areaCustom'), areaColorNote: $('areaColorNote'),
-    shortcutsDialog: $('shortcutsDialog'), toast: $('toast')
+    shortcutsDialog: $('shortcutsDialog'), toast: $('toast'),
+    legend: $('legend'), legendList: $('legendList'), btnLegend: $('btnLegend'),
+    removeDialog: $('removeDialog'), removeTitle: $('removeTitle'), removeText: $('removeText'),
+    removeNote: $('removeNote'), btnDelete: $('btnDelete'), btnArchive: $('btnArchive')
   };
 
   const propertyId = Number(new URLSearchParams(location.search).get('id'));
@@ -369,9 +379,33 @@ document.addEventListener('DOMContentLoaded', async () => {
     const units = visibleZones().filter(z => z.rentable);
     const counts = spotCounts();
     el.sizeLabel.textContent = `${L.rows} × ${L.cols}`;
-    el.summary.textContent = `${L.cells.size}/${L.rows * L.cols} spots · `
+    el.summary.textContent = `${L.rows} × ${L.cols} · ${L.cells.size}/${L.rows * L.cols} spots · `
       + `${units.filter(u => counts.has(u.id)).length}/${units.length} units placed · `
       + `${plural(L.overrides.size, 'wall edit')}`;
+    renderLegend(units);
+  }
+
+  /** Unit status legend (bottom-left): what the unit colors mean, and how many units have each. */
+  function renderLegend(units) {
+    el.legendList.replaceChildren(...LEGEND_STATUSES.map(({ status, label, color }) => {
+      const li = document.createElement('li');
+      const sw = document.createElement('span');
+      sw.className = `swatch zone zone-unit status-${status.toLowerCase().replaceAll('_', '-')}`;
+      sw.style.setProperty('--zone-color', color);
+      const name = document.createElement('span');
+      name.textContent = label;
+      const count = document.createElement('span');
+      count.className = 'legend-count';
+      count.textContent = units.filter(u => u.status === status).length;
+      li.append(sw, name, count);
+      return li;
+    }));
+  }
+
+  function setLegendOpen(open) {
+    el.legend.classList.toggle('is-collapsed', !open);
+    el.btnLegend.setAttribute('aria-expanded', String(open));
+    try { localStorage.setItem(LEGEND_KEY, open ? 'open' : 'closed'); } catch (err) { /* not remembered */ }
   }
 
   function hintText() {
@@ -395,7 +429,18 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // ---- panel lists
-  function listItem({ key, keyLabel, swatch, name, meta, badge, warn, selected, colorZone }) {
+  /** A small inline icon: <svg class="ico"><use href="#i-name"/></svg> */
+  function icon(name) {
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('class', 'ico');
+    svg.setAttribute('aria-hidden', 'true');
+    const use = document.createElementNS('http://www.w3.org/2000/svg', 'use');
+    use.setAttribute('href', `#i-${name}`);
+    svg.appendChild(use);
+    return svg;
+  }
+
+  function listItem({ key, keyLabel, swatch, name, meta, badge, warn, selected, colorZone, removeZone }) {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'zone-item' + (selected ? ' is-selected' : '');
@@ -413,7 +458,11 @@ document.addEventListener('DOMContentLoaded', async () => {
       swatchEl.tabIndex = 0;
       swatchEl.dataset.color = colorZone.id;
       swatchEl.title = `Change the color of ${colorZone.name}`;
-      swatchEl.appendChild(sw);
+      swatchEl.setAttribute('aria-label', swatchEl.title);
+      const edit = document.createElement('span');
+      edit.className = 'swatch-edit';
+      edit.appendChild(icon('pencil'));
+      swatchEl.append(sw, edit);
     }
     const text = document.createElement('span');
     text.className = 'zone-text';
@@ -426,6 +475,17 @@ document.addEventListener('DOMContentLoaded', async () => {
       b.className = 'badge' + (warn ? ' badge-warn' : '');
       b.textContent = badge;
       btn.appendChild(b);
+    }
+    if (removeZone) {                                 // trash: delete (or archive) this zone
+      const rm = document.createElement('span');
+      rm.className = 'zone-remove';
+      rm.setAttribute('role', 'button');
+      rm.tabIndex = 0;
+      rm.dataset.remove = removeZone.id;
+      rm.title = `Delete ${removeZone.name}`;
+      rm.setAttribute('aria-label', rm.title);
+      rm.appendChild(icon('trash'));
+      btn.appendChild(rm);
     }
     return btn;
   }
@@ -465,7 +525,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         meta: z.rentable ? `${format.label(z.status)} · ${format.peso(z.rentalRate)}/mo` : format.label(z.areaType),
         badge: n ? plural(n, 'spot') : 'Not placed', warn: !n,
         selected: state.tool !== ERASER && state.zoneId === z.id,
-        colorZone: z.rentable ? null : z
+        colorZone: z.rentable ? null : z,
+        removeZone: z
       });
     };
 
@@ -1066,15 +1127,116 @@ document.addEventListener('DOMContentLoaded', async () => {
   el.zoneList.addEventListener('click', (e) => {
     const swatch = e.target.closest('[data-color]');
     if (swatch) { e.stopPropagation(); openColorPop(Number(swatch.dataset.color), swatch); return; }
+    const trash = e.target.closest('[data-remove]');
+    if (trash) { e.stopPropagation(); openRemove(Number(trash.dataset.remove)); return; }
     const item = e.target.closest('.zone-item');
     if (!item) return;
     if (item.dataset.eraser) setTool(ERASER);
     else pickZone(Number(item.dataset.zone));
   });
   el.zoneList.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
     const swatch = e.target.closest('[data-color]');
-    if (swatch && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); e.stopPropagation(); openColorPop(Number(swatch.dataset.color), swatch); }
+    const trash = e.target.closest('[data-remove]');
+    if (!swatch && !trash) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (swatch) openColorPop(Number(swatch.dataset.color), swatch); else openRemove(Number(trash.dataset.remove));
   });
+
+  // ------------------------------------------------------------------ delete / archive a zone (saved at once)
+  let removeZoneId = null;
+
+  /**
+   * Common area → can always be deleted. Unit → the server says what is allowed (GET …/removal-check):
+   * delete (never leased), archive (leased before) or neither (an active lease). Open lease requests are declined.
+   */
+  async function openRemove(zoneId) {
+    const zone = gridRenderer.zoneById(state.layout, zoneId);
+    if (!zone) return;
+    closePopover();
+    removeZoneId = zoneId;
+    const count = spotCounts().get(zoneId) || 0;
+    const spots = count ? `Its ${plural(count, 'spot')} on the grid ${count === 1 ? 'is' : 'are'} cleared.` : 'It is not placed on the grid.';
+    el.btnDelete.hidden = true;
+    el.btnArchive.hidden = true;
+    el.removeNote.textContent = '';
+    el.btnDelete.disabled = el.btnArchive.disabled = false;
+    if (!zone.rentable) {
+      el.removeTitle.textContent = `Delete ${zone.name}?`;
+      el.removeText.textContent = `${spots} This is saved at once and can't be undone.`;
+      el.btnDelete.hidden = false;
+      el.removeDialog.showModal();
+      return;
+    }
+    let check;
+    try {
+      check = await api.get(`/api/units/${zoneId}/removal-check`);
+    } catch (err) {
+      toast(err.message, true);
+      return;
+    }
+    const declined = check.openRequests
+      ? `${plural(check.openRequests, 'open lease request')} for it will be declined; the renters will see that.` : '';
+    if (check.canDelete) {
+      el.removeTitle.textContent = `Delete ${zone.name}?`;
+      el.removeText.textContent = `${zone.name} was never leased, so it can be deleted for good. ${spots} `
+        + 'This is saved at once and can\'t be undone.';
+      el.removeNote.textContent = declined;
+      el.btnDelete.hidden = false;
+    } else if (check.canArchive) {
+      el.removeTitle.textContent = `Archive ${zone.name}?`;
+      el.removeText.textContent = `${check.reason} ${spots}`;
+      el.removeNote.textContent = declined;
+      el.btnArchive.hidden = false;
+    } else {
+      el.removeTitle.textContent = `${zone.name} can't be removed`;
+      el.removeText.textContent = check.reason;
+    }
+    el.removeDialog.showModal();
+  }
+
+  /**
+   * After a zone is deleted or archived on the server: its spots go from the layout AND from every undo/redo
+   * snapshot and the saved snapshot, so neither undo nor Save can bring back spots of a zone that is gone.
+   */
+  function purgeZone(zoneId, archived) {
+    const dropCells = (snap) => { for (const [k, id] of [...snap.cells]) if (id === zoneId) snap.cells.delete(k); };
+    dropCells(state.layout);
+    [...history.undo, ...history.redo, history.saved].forEach(s => s && dropCells(s));
+    if (archived) {
+      const zone = gridRenderer.zoneById(state.layout, zoneId);
+      if (zone) zone.status = 'ARCHIVED';
+    } else {
+      state.layout.zones = state.layout.zones.filter(z => z.id !== zoneId);
+    }
+    if (state.zoneId === zoneId) state.zoneId = null;
+    state.hover = null;
+  }
+
+  async function confirmRemove(archive) {
+    const zone = gridRenderer.zoneById(state.layout, removeZoneId);
+    if (!zone) return;
+    el.btnDelete.disabled = el.btnArchive.disabled = true;
+    try {
+      if (archive) await api.send('POST', `/api/units/${zone.id}/archive`);
+      else if (zone.rentable) await api.send('DELETE', `/api/units/${zone.id}`);
+      else await api.send('DELETE', `/api/common-areas/${zone.id}`);
+    } catch (err) {
+      el.btnDelete.disabled = el.btnArchive.disabled = false;
+      el.removeNote.textContent = err.message;          // e.g. "Booth 2 has an active lease. End or terminate it first."
+      return;
+    }
+    purgeZone(zone.id, archive);
+    el.removeDialog.close();
+    render();
+    toast(`${zone.name} ${archive ? 'archived' : 'deleted'}.`);
+  }
+  el.btnDelete.addEventListener('click', () => confirmRemove(false));
+  el.btnArchive.addEventListener('click', () => confirmRemove(true));
+
+  el.btnLegend.addEventListener('click', () => setLegendOpen(el.legend.classList.contains('is-collapsed')));
+  try { setLegendOpen(localStorage.getItem(LEGEND_KEY) !== 'closed'); } catch (err) { setLegendOpen(true); }
   el.edgeList.addEventListener('click', (e) => {
     const item = e.target.closest('.zone-item');
     if (!item) return;
@@ -1268,11 +1430,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     { group: 'View', keys: ['0'], label: 'Zoom to fit', hidden: true, test: (e) => noMods(e) && !e.shiftKey && e.key === '0', run: () => setZoom('fit') },
     { group: 'View', keys: ['\\'], label: 'Show / hide the panel', test: plain('\\'), run: () => panel.toggle() },
     { group: 'View', keys: ['G'], label: 'Resize grid (or drag the grid\'s edges)', test: plain('g'), run: openSizePop },
+    { group: 'View', keys: ['L'], label: 'Show / hide the unit color legend', test: plain('l'),
+      run: () => setLegendOpen(el.legend.classList.contains('is-collapsed')) },
 
     { group: 'Edit', keys: ['Ctrl', 'Z'], label: 'Undo', test: ctrl('z', false), run: undo },
     { group: 'Edit', keys: ['Ctrl', 'Shift', 'Z'], label: 'Redo (also: Ctrl + Y)', test: ctrl('z', true), run: redo },
     { group: 'Edit', keys: ['Ctrl', 'Y'], label: 'Redo', hidden: true, test: ctrl('y', false), run: redo },
     { group: 'Edit', keys: ['Ctrl', 'S'], label: 'Save', test: ctrl('s', false), run: save, inFields: true },
+    { group: 'Edit', keys: ['Delete'], label: 'Delete (or archive) the selected zone',
+      test: (e) => noMods(e) && e.key === 'Delete',
+      run: () => { if (state.mode === 'spots' && state.zoneId != null) openRemove(state.zoneId); else toast('Select a zone first.'); } },
     { group: 'Edit', keys: ['?'], label: 'This list of shortcuts', test: (e) => !e.ctrlKey && !e.metaKey && e.key === '?', run: () => openShortcuts() }
   ];
 

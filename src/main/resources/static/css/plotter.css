@@ -199,7 +199,11 @@ kbd {
 
 /* ---------------------------------------------------------------- top-left: back + name */
 .pl-title { top: 12px; left: 12px; display: flex; align-items: center; gap: 4px; max-width: calc(50vw - 24px); padding: 4px 14px 4px 4px; }
+.pl-title-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
 .pl-name { margin: 0; overflow: hidden; font-size: 15px; font-weight: 600; white-space: nowrap; text-overflow: ellipsis; }
+/* the numbers under the property name: size · spots · units placed · wall edits */
+.pl-title .pl-stats { margin: 1px 0 0; overflow: hidden; color: #64748b; font-size: 12px; white-space: nowrap; text-overflow: ellipsis; }
+.pl-title .pl-stats:empty { display: none; }
 
 /* ---------------------------------------------------------------- top-right: undo, redo, save, menu */
 .pl-actions { top: 12px; right: 12px; display: flex; align-items: center; gap: 2px; padding: 4px; }
@@ -304,7 +308,35 @@ kbd {
 .pl-flash.is-visible { opacity: 1; transform: translate(-50%, 0) scale(1); }
 
 /* ---------------------------------------------------------------- bottom-left: resize + stats */
-.pl-status { bottom: 16px; left: 12px; display: flex; align-items: center; gap: 8px; max-width: calc(50vw - 260px); padding: 4px 12px 4px 4px; color: #475569; font-size: 12px; }
+.pl-status { bottom: 16px; left: 12px; display: flex; align-items: center; padding: 4px; color: #475569; font-size: 12px; }
+
+/* unit status legend: bottom-left, above the Resize grid button */
+.pl-legend { bottom: 68px; left: 12px; width: 196px; overflow: hidden; }
+.pl-legend-head {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 8px 10px 8px 12px;
+  border: 0;
+  background: transparent;
+  color: #334155;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.pl-legend-head:hover { background: #f8fafc; }
+.pl-legend-head svg { width: 16px; height: 16px; transition: transform 0.15s; }
+.pl-legend.is-collapsed .pl-legend-head svg { transform: rotate(-90deg); }
+.pl-legend-list { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0 12px 10px; list-style: none; font-size: 13px; }
+.pl-legend.is-collapsed .pl-legend-list { display: none; }
+.pl-legend-list li { display: flex; align-items: center; gap: 8px; }
+.pl-legend-list .swatch { width: 16px; height: 16px; border-radius: 4px; }
+.pl-legend-list .legend-count { margin-left: auto; color: #64748b; font-variant-numeric: tabular-nums; }
 .resize-btn { border: 1px solid #c7d2fe; background: #eef2ff; color: #3730a3; font-weight: 600; }
 .resize-btn:hover:not(:disabled) { background: #e0e7ff; }
 .size-chip { padding: 1px 7px; border-radius: 6px; background: #fff; color: #1e1b4b; font-variant-numeric: tabular-nums; }
@@ -445,20 +477,54 @@ kbd {
 .swatch-window { background: #7dd3fc; }
 .swatch-open { background: repeating-linear-gradient(90deg, #94a3b8 0 3px, #fff 3px 6px); }
 .swatch-none { border-style: dashed; background: transparent; }
-/* a common area's swatch is a button that opens the color picker */
-.swatch-btn { position: relative; flex: none; padding: 0; border: 0; border-radius: 6px; background: none; cursor: pointer; }
-.swatch-btn:hover .swatch { box-shadow: 0 0 0 2px #fff, 0 0 0 4px #94a3b8; }
-.swatch-btn::before {
+/* a common area's swatch is a button that opens the color picker: a square in its color with a small pencil badge */
+.swatch-btn {
+  position: relative;
+  display: inline-grid;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: none;
+  cursor: pointer;
+}
+.swatch-btn .swatch { width: 22px; height: 22px; }
+.swatch-btn:hover .swatch, .swatch-btn:focus-visible .swatch { box-shadow: 0 0 0 2px #fff, 0 0 0 4px #94a3b8; }
+.swatch-edit {
   position: absolute;
-  right: -3px;
-  bottom: -3px;
-  width: 11px;
-  height: 11px;
+  right: -5px;
+  bottom: -5px;
+  display: grid;
+  place-items: center;
+  width: 15px;
+  height: 15px;
   border: 1px solid var(--border);
   border-radius: 50%;
-  background: #fff conic-gradient(#f87171, #fbbf24, #4ade80, #60a5fa, #c084fc, #f87171);
-  content: "";
+  background: #fff;
+  color: #334155;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.2);
 }
+.swatch-edit svg { width: 9px; height: 9px; stroke-width: 2.4; }
+
+/* delete / archive button on each zone row (shown on hover or keyboard focus; always on touch screens) */
+.zone-remove {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  margin-left: 2px;
+  border-radius: 6px;
+  color: #94a3b8;
+  opacity: 0;
+  cursor: pointer;
+}
+.zone-remove svg { width: 15px; height: 15px; }
+.zone-item:hover .zone-remove, .zone-item:focus-within .zone-remove, .zone-remove:focus-visible { opacity: 1; }
+.zone-remove:hover, .zone-remove:focus-visible { background: #fee2e2; color: var(--danger); }
+@media (hover: none) { .zone-remove { opacity: 1; } }
 .zone-text { flex: 1; min-width: 0; }
 .zone-name { display: block; overflow: hidden; font-size: 13px; font-weight: 600; white-space: nowrap; text-overflow: ellipsis; }
 .zone-meta { display: block; color: #64748b; font-size: 12px; }
@@ -483,6 +549,13 @@ kbd {
 .pl-dialog-note { margin: 14px 0 0; color: #64748b; font-size: 12px; }
 
 .add-dialog { width: min(440px, calc(100vw - 32px)); }
+.remove-dialog { width: min(440px, calc(100vw - 32px)); }
+.remove-body { padding-top: 14px; font-size: 14px; }
+.remove-body p { margin: 0 0 10px; }
+.remove-note { padding: 8px 10px; border-radius: 8px; background: #fef3c7; color: #92400e; font-size: 13px; }
+.remove-note:empty { display: none; }
+.btn-danger { background: var(--danger); border-color: var(--danger); color: #fff; font-weight: 600; }
+.btn-danger:hover:not(:disabled) { background: #b91c1c; }
 .add-body { padding-top: 16px; }
 .add-form { display: flex; flex-direction: column; gap: 10px; }
 .add-form[hidden] { display: none; }
@@ -524,8 +597,8 @@ kbd {
 /* ---------------------------------------------------------------- narrow screens */
 @media (max-width: 760px) {
   .pl-title { max-width: calc(100vw - 210px); }
-  .pl-stats { display: none; }
-  .pl-status { bottom: 74px; max-width: none; }
+  .pl-status { bottom: 74px; }
+  .pl-legend { bottom: 126px; }
   .pl-zoom { bottom: 74px; }
   .pl-tip { bottom: 128px; }
   .pl-flash { bottom: 164px; }

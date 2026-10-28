@@ -2,6 +2,7 @@ package com.techhub.spacegridapplication.dao.jdbc;
 
 import com.techhub.spacegridapplication.dao.CommonAreaDao;
 import com.techhub.spacegridapplication.model.CommonArea;
+import com.techhub.spacegridapplication.model.CommonAreaType;
 import com.techhub.spacegridapplication.model.GridPosition;
 
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -12,6 +13,7 @@ import org.springframework.stereotype.Repository;
 
 import java.sql.PreparedStatement;
 import java.sql.Statement;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -26,15 +28,27 @@ public class JdbcCommonAreaDao implements CommonAreaDao {
     public JdbcCommonAreaDao(JdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
         this.rowMapper = (rs, rowNum) -> {
-            // TODO: read the columns from rs and call the "from database" constructor of CommonArea
-            throw new UnsupportedOperationException("TODO");
+            int id = rs.getInt("id");
+            return new CommonArea(
+                    id,
+                    rs.getTimestamp("created_at").toLocalDateTime(),
+                    rs.getInt("property_id"),
+                    rs.getString("name"),
+                    loadPositions(id),
+                    CommonAreaType.valueOf(rs.getString("area_type")),
+                    rs.getString("color"));
         };
     }
 
+    private static final String SELECT_AREAS = """
+            SELECT z.id, z.created_at, z.property_id, z.name, c.area_type, c.color
+            FROM grid_zones z
+            JOIN common_areas c ON c.zone_id = z.id
+            """;
+
     @Override
     public Optional<CommonArea> findById(int id) {
-        // TODO: SQL with jdbcTemplate
-        throw new UnsupportedOperationException("TODO");
+        return jdbcTemplate.query(SELECT_AREAS + " WHERE z.id = ?", rowMapper, id).stream().findFirst();
     }
 
     /** INSERT, then entity.assignId(generated key) (use a KeyHolder). */
@@ -67,20 +81,20 @@ public class JdbcCommonAreaDao implements CommonAreaDao {
         // TODO: SQL with jdbcTemplate
     }
 
+    /** Deletes the grid_zones row; the common_areas row and the spots go with it (ON DELETE CASCADE). */
     @Override
     public void deleteById(int id) {
-        // TODO: SQL with jdbcTemplate
+        jdbcTemplate.update("DELETE FROM grid_zones WHERE id = ? AND zone_kind = 'COMMON'", id);
     }
 
     @Override
     public List<CommonArea> findByPropertyId(int propertyId) {
-        // TODO: SQL with jdbcTemplate
-        throw new UnsupportedOperationException("TODO");
+        return jdbcTemplate.query(SELECT_AREAS + " WHERE z.property_id = ? ORDER BY z.id", rowMapper, propertyId);
     }
 
     /** Spots of one zone from zone_cells. */
     private Set<GridPosition> loadPositions(int zoneId) {
-        // TODO: SQL with jdbcTemplate
-        throw new UnsupportedOperationException("TODO");
+        return new HashSet<>(jdbcTemplate.query("SELECT row_idx, col_idx FROM zone_cells WHERE zone_id = ?",
+                (rs, rowNum) -> new GridPosition(rs.getInt("row_idx"), rs.getInt("col_idx")), zoneId));
     }
 }
