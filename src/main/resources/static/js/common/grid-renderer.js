@@ -14,6 +14,8 @@
  * Manual overrides (WALL, DOOR, WINDOW, OPEN) replace the automatic result; OPEN means "no wall".
  */
 const gridRenderer = {
+  LABEL_MIN_CELL: 16,     // below this size (px) zone names are not drawn on the grid
+  BORDER_MIN_CELL: 10,    // below this size (px) the thin line between spots is dropped
   cellKey: (r, c) => `${r},${c}`,
   edgeKey: (orientation, r, c) => `${orientation}:${r}:${c}`,
 
@@ -33,6 +35,78 @@ const gridRenderer = {
       for (const e of edges) layout.overrides.set(this.edgeKey(e.orientation, e.row, e.col), type);
     }
     return layout;
+  },
+
+  /** A copy of the editable parts of a layout (size, spots, edge overrides), for undo / redo. Zones are not included. */
+  snapshot(layout) {
+    return { rows: layout.rows, cols: layout.cols, cells: new Map(layout.cells), overrides: new Map(layout.overrides) };
+  },
+
+  /** Puts a snapshot back into the layout (copies it again, so the snapshot can be reused). */
+  restore(layout, snap) {
+    layout.rows = snap.rows;
+    layout.cols = snap.cols;
+    layout.cells = new Map(snap.cells);
+    layout.overrides = new Map(snap.overrides);
+  },
+
+  /** True when two snapshots hold the same size, spots and edge overrides. */
+  sameSnapshot(a, b) {
+    if (!a || !b || a.rows !== b.rows || a.cols !== b.cols) return false;
+    if (a.cells.size !== b.cells.size || a.overrides.size !== b.overrides.size) return false;
+    for (const [k, v] of a.cells) if (b.cells.get(k) !== v) return false;
+    for (const [k, v] of a.overrides) if (b.overrides.get(k) !== v) return false;
+    return true;
+  },
+
+  /**
+   * Where a spot or line ends up after a resize to rows × cols with the content shifted by dr rows and dc columns
+   * (dr / dc are not 0 when rows or columns are added to / removed from the top or the left). Null = it falls outside.
+   */
+  shiftedCell(rows, cols, dr, dc, r, c) {
+    const nr = r + dr, nc = c + dc;
+    return nr >= 0 && nr < rows && nc >= 0 && nc < cols ? [nr, nc] : null;
+  },
+
+  shiftedEdge(rows, cols, dr, dc, orientation, r, c) {
+    const nr = r + dr, nc = c + dc;
+    const inside = orientation === 'HORIZONTAL'
+      ? nr >= 0 && nr <= rows && nc >= 0 && nc < cols
+      : nr >= 0 && nr < rows && nc >= 0 && nc <= cols;
+    return inside ? [nr, nc] : null;
+  },
+
+  /** What a resize would drop: { cellsOut: [cell keys], edgesOut: [edge keys] }. */
+  resizeLoss(layout, rows, cols, dr = 0, dc = 0) {
+    const cellsOut = [...layout.cells.keys()].filter(k => {
+      const [r, c] = k.split(',').map(Number);
+      return !this.shiftedCell(rows, cols, dr, dc, r, c);
+    });
+    const edgesOut = [...layout.overrides.keys()].filter(k => {
+      const [o, r, c] = k.split(':');
+      return !this.shiftedEdge(rows, cols, dr, dc, o, Number(r), Number(c));
+    });
+    return { cellsOut, edgesOut };
+  },
+
+  /** Resizes the layout to rows × cols, moving the spots and edge overrides by (dr, dc) and dropping what falls outside. */
+  resizeLayout(layout, rows, cols, dr = 0, dc = 0) {
+    const cells = new Map();
+    for (const [k, zoneId] of layout.cells) {
+      const [r, c] = k.split(',').map(Number);
+      const to = this.shiftedCell(rows, cols, dr, dc, r, c);
+      if (to) cells.set(this.cellKey(to[0], to[1]), zoneId);
+    }
+    const overrides = new Map();
+    for (const [k, type] of layout.overrides) {
+      const [o, r, c] = k.split(':');
+      const to = this.shiftedEdge(rows, cols, dr, dc, o, Number(r), Number(c));
+      if (to) overrides.set(this.edgeKey(o, to[0], to[1]), type);
+    }
+    layout.rows = rows;
+    layout.cols = cols;
+    layout.cells = cells;
+    layout.overrides = overrides;
   },
 
   /** Body for PUT /api/properties/{id}/grid: { "zoneId": [{row, col}, ...] } */
@@ -56,7 +130,11 @@ const gridRenderer = {
   },
 
   zoneById(layout, id) {
-    return layout.zones.find(z => z.id === id) || null;
+    // index by id: big grids (60 × 60) call this thousands of times per draw
+    if (!layout.zoneIndex || layout.zoneIndex.size !== layout.zones.length) {
+      layout.zoneIndex = new Map(layout.zones.map(z => [z.id, z]));
+    }
+    return layout.zoneIndex.get(id) || null;
   },
 
   zoneAt(layout, r, c) {
@@ -86,16 +164,65 @@ const gridRenderer = {
   },
 
   /**
+   * Applies one plotter tool to one line and returns true only if something changed.
+   *   'erase'  → the line ends up with no wall, door or window (OPEN over an automatic wall, otherwise no override)
+   *   'WALL'   → a wall (an automatic wall just comes back when the override is removed)
+   *   'DOOR' / 'WINDOW' → that edge
+   */
+  applyEdgeTool(layout, tool, orientation, r, c) {
+    const key = this.edgeKey(orientation, r, c);
+    const current = layout.overrides.get(key);
+    const auto = this.autoWall(layout, orientation, r, c);
+    if (tool === 'erase') {
+      if (auto) {
+        if (current === 'OPEN') return false;
+        layout.overrides.set(key, 'OPEN');
+        return true;
+      }
+      return layout.overrides.delete(key);
+    }
+    if (tool === 'WALL' && auto) return layout.overrides.delete(key);   // back to the automatic wall
+    if (current === tool) return false;
+    layout.overrides.set(key, tool);
+    return true;
+  },
+
+  /** The lines around the cells top..bottom × left..right, as [orientation, r, c] (a walled box). */
+  rectOutlineEdges(top, left, bottom, right) {
+    const lines = [];
+    for (let c = left; c <= right; c++) lines.push(['HORIZONTAL', top, c], ['HORIZONTAL', bottom + 1, c]);
+    for (let r = top; r <= bottom; r++) lines.push(['VERTICAL', r, left], ['VERTICAL', r, right + 1]);
+    return lines;
+  },
+
+  /** Every line inside or on the outline of that rectangle (used to erase an area). */
+  rectAllEdges(top, left, bottom, right) {
+    const lines = [];
+    for (let r = top; r <= bottom + 1; r++) for (let c = left; c <= right; c++) lines.push(['HORIZONTAL', r, c]);
+    for (let r = top; r <= bottom; r++) for (let c = left; c <= right + 1; c++) lines.push(['VERTICAL', r, c]);
+    return lines;
+  },
+
+  /**
    * Draws the grid into container.
-   * options: { mode: 'view' | 'spots' | 'edges', brushZoneId, highlightZoneId, minCell, maxCell }
+   * options: { mode: 'view' | 'spots' | 'edges', brushZoneId, highlightZoneId, highlightZoneIds, minCell, maxCell,
+   *             cell }   cell = exact cell size in px (zoom); without it the grid is fitted to the container width
+   *   highlightZoneId  = one zone outlined, the others dimmed (lease.html, the plotter's selected unit)
+   *   highlightZoneIds = a Set of zones kept bright, the others dimmed (the plotter's "highlight by status")
    */
   render(container, layout, options = {}) {
     const mode = options.mode || 'view';
     const width = container.clientWidth || 600;
-    const cell = Math.max(options.minCell || 30, Math.min(options.maxCell || 72, Math.floor((width - 8) / layout.cols)));
+    const cell = options.cell
+      ? Math.round(options.cell)
+      : Math.max(options.minCell || 30, Math.min(options.maxCell || 72, Math.floor((width - 8) / layout.cols)));
+    const showLabels = cell >= this.LABEL_MIN_CELL;
     const stage = document.createElement('div');
-    stage.className = `grid-stage mode-${mode}`;
+    stage.className = `grid-stage mode-${mode}${showLabels ? '' : ' is-small'}${cell < this.BORDER_MIN_CELL ? ' is-tiny' : ''}`;
     stage.style.setProperty('--cell', `${cell}px`);
+    // walls and clickable lines shrink with the cells, so small cells are not covered by thick lines
+    stage.style.setProperty('--edge', `${Math.max(1, Math.min(5, Math.round(cell / 10)))}px`);
+    stage.style.setProperty('--handle', `${Math.max(4, Math.min(12, Math.round(cell / 3)))}px`);
     stage.style.width = `${layout.cols * cell}px`;
     stage.style.height = `${layout.rows * cell}px`;
 
@@ -118,8 +245,10 @@ const gridRenderer = {
           if (zone.id === options.brushZoneId) el.classList.add('is-brush');
           if (options.highlightZoneId != null) {
             el.classList.add(zone.id === options.highlightZoneId ? 'is-highlight' : 'is-dim');
+          } else if (options.highlightZoneIds) {          // several zones at once (e.g. all available units)
+            el.classList.add(options.highlightZoneIds.has(zone.id) ? 'is-picked' : 'is-dim');
           }
-          if (!labelled.has(zone.id)) {                  // name on the zone's first spot
+          if (showLabels && !labelled.has(zone.id)) {    // name on the zone's first spot (hover title when cells are small)
             labelled.add(zone.id);
             const tag = document.createElement('span');
             tag.className = 'cell-label';

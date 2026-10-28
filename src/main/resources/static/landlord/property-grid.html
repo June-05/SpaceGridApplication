@@ -7,99 +7,294 @@
   <link rel="stylesheet" href="/css/base.css">
   <link rel="stylesheet" href="/css/grid.css">
   <link rel="stylesheet" href="/css/zones.css">
+  <link rel="stylesheet" href="/css/plotter.css">
 </head>
-<body>
+<body class="plotter-page">
   <!--
     GRID PLOTTER  (/landlord/property-grid.html?id=1)
-      GET  /api/properties/{id}                    property + zones (with positions) + edgesByType
-      PUT  /api/properties/{id}/grid?rows=&cols=   JSON {"zoneId": [{"row":0,"col":0}, ...]}
-      PUT  /api/properties/{id}/edges              JSON {"DOOR": [{"row":2,"col":0,"orientation":"HORIZONTAL"}]}
-      POST /api/properties/{id}/units              form: name, rentalRate, electricity, water, exactSize, areaSqm
-      POST /api/properties/{id}/common-areas       form: name, areaType
+      GET  /api/properties/{id}                                property + zones (with positions) + edgesByType
+      PUT  /api/properties/{id}/grid?rows=&cols=               JSON {"zoneId": [{"row":0,"col":0}, ...]}
+      PUT  /api/properties/{id}/edges                          JSON {"DOOR": [{"row":2,"col":0,"orientation":"HORIZONTAL"}]}
+      POST /api/properties/{id}/units                          form: name, rentalRate, electricity, water, exactSize, areaSqm
+      POST /api/properties/{id}/common-areas                   form: name, areaType, color (optional "#rrggbb")
+      PUT  /api/properties/{id}/common-areas/{areaId}/color    form: color
+    The grid fills the window; the toolbar, panel and buttons float on top (plotter.css).
+    Keyboard shortcuts: press ? on the page, or see SHORTCUTS in /js/pages/property-grid.js.
   -->
-  <header class="topbar">
-    <a href="/landlord/dashboard.html" class="back-link">← Dashboard</a>
-    <div class="titles">
-      <h1 id="propertyName">Loading…</h1>
-      <p class="subtitle">Plot the property: place units and common areas, then add doors and windows.</p>
-    </div>
-    <div class="topbar-actions">
-      <span id="saveState" class="save-state" aria-live="polite"></span>
-      <button id="btnSave" class="btn btn-primary" type="button" disabled>Save layout</button>
-      <button id="btnLogout" class="btn" type="button">Log out</button>
+
+  <!-- icons (used with <svg><use href="#i-..."/></svg>) -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <symbol id="i-back" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></symbol>
+    <symbol id="i-hand" viewBox="0 0 24 24"><path d="M8 12.5V6a1.5 1.5 0 0 1 3 0v5.5M11 11V4.5a1.5 1.5 0 0 1 3 0V11M14 11V6a1.5 1.5 0 0 1 3 0v8a6 6 0 0 1-6 6h-.6a6 6 0 0 1-4.6-2.2L3.6 14.9a1.6 1.6 0 0 1 2.4-2.1L8 14.5"/></symbol>
+    <symbol id="i-brush" viewBox="0 0 24 24"><path d="M18.4 3.6a2 2 0 0 1 2.8 2.8L12 15.6 8.4 12zM8.4 12c-2.4 0-4.2 1.6-4.2 4 0 1.6-.8 2.6-2 3 4 1.4 8.2.4 9.8-3.4"/></symbol>
+    <symbol id="i-rect" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="2"/><path d="M8 9h8v6H8z" stroke-dasharray="2 2"/></symbol>
+    <symbol id="i-eraser" viewBox="0 0 24 24"><path d="M15.5 3.5l5 5L10 19H5.5l-3-3zM8.5 10.5l5 5M10 19h11"/></symbol>
+    <symbol id="i-wall" viewBox="0 0 24 24"><path d="M3 5h18v14H3zM3 12h18M9 5v7M15 12v7"/></symbol>
+    <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 14L4 9l5-5M4 9h11a5 5 0 0 1 0 10h-4"/></symbol>
+    <symbol id="i-redo" viewBox="0 0 24 24"><path d="M15 14l5-5-5-5M20 9H9a5 5 0 0 0 0 10h4"/></symbol>
+    <symbol id="i-more" viewBox="0 0 24 24"><path d="M5 12h.01M12 12h.01M19 12h.01" stroke-width="3.2"/></symbol>
+    <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-chevron" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+    <symbol id="i-pencil" viewBox="0 0 24 24"><path d="M15.5 4.5l4 4L8 20H4v-4zM13 7l4 4"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></symbol>
+    <symbol id="i-resize" viewBox="0 0 24 24"><path d="M4 4h10v10H4zM14 9h6v11H9v-6M17 17l3 3M20 17v3h-3"/></symbol>
+    <symbol id="i-spots" viewBox="0 0 24 24"><path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4z"/><path d="M13 13h7v7h-7z" stroke-dasharray="2 2"/></symbol>
+  </svg>
+
+  <!-- THE CANVAS: the whole window. The world is bigger than the window, so the grid can always be moved around. -->
+  <main id="gridHost" class="grid-host pl-canvas mode-spots tool-hand" aria-label="Property grid">
+    <div id="gridWorld" class="pl-world"></div>
+  </main>
+
+  <!-- top-left: back + property name -->
+  <header class="pl-float pl-title">
+    <a href="/landlord/dashboard.html" class="icon-btn tip-below" data-tip="Back to dashboard" aria-label="Back to dashboard">
+      <svg class="ico"><use href="#i-back"/></svg>
+    </a>
+    <div class="pl-title-text">
+      <h1 id="propertyName" class="pl-name">Loading…</h1>
+      <p id="summary" class="pl-stats"></p>
     </div>
   </header>
 
-  <main class="plotter">
-    <!-- LEFT: the grid -->
-    <section class="board" aria-label="Property grid">
-      <div class="toolbar">
-        <div class="size-controls">
-          <label>Rows <input id="inpRows" type="number" min="1" max="30"></label>
-          <span class="times">×</span>
-          <label>Columns <input id="inpCols" type="number" min="1" max="30"></label>
-          <button id="btnResize" class="btn" type="button">Apply size</button>
-        </div>
-        <div class="seg-group" role="group" aria-label="Tool">
-          <button class="seg is-active" type="button" data-mode="spots" aria-pressed="true">Spots</button>
-          <button class="seg" type="button" data-mode="edges" aria-pressed="false">Walls &amp; doors</button>
-        </div>
-      </div>
-      <p id="hint" class="hint"></p>
-      <div id="gridHost" class="grid-host"></div>
-      <p id="summary" class="summary"></p>
-    </section>
+  <!-- top-right: undo, redo, save, menu -->
+  <div class="pl-float pl-actions">
+    <div class="pl-viewedit" role="group" aria-label="View or edit the layout">
+      <button class="text-btn is-active tip-below" type="button" data-view="view" data-tip="Look around, select units" data-key="V" aria-pressed="true">View</button>
+      <button class="text-btn tip-below" type="button" data-view="edit" data-tip="Change the layout" data-key="E" aria-pressed="false">Edit</button>
+    </div>
+    <span class="pl-sep edit-only"></span>
+    <button id="btnUndo" class="icon-btn tip-below" type="button" data-tip="Undo" data-key="Ctrl+Z" aria-label="Undo" disabled>
+      <svg class="ico"><use href="#i-undo"/></svg>
+    </button>
+    <button id="btnRedo" class="icon-btn tip-below" type="button" data-tip="Redo" data-key="Ctrl+Shift+Z" aria-label="Redo" disabled>
+      <svg class="ico"><use href="#i-redo"/></svg>
+    </button>
+    <span id="saveState" class="pl-save-state" aria-live="polite"></span>
+    <button id="btnSave" class="btn btn-primary tip-below" type="button" data-tip="Save layout" data-key="Ctrl+S" disabled>Save</button>
+    <button id="btnMenu" class="icon-btn tip-below" type="button" data-tip="More" aria-label="More" aria-haspopup="menu" aria-expanded="false">
+      <svg class="ico"><use href="#i-more"/></svg>
+    </button>
+  </div>
+  <div id="menuPop" class="pl-popover" role="menu" hidden>
+    <button class="menu-item" type="button" role="menuitem" data-action="shortcuts">Keyboard shortcuts <kbd>?</kbd></button>
+    <button class="menu-item" type="button" role="menuitem" data-action="panel">Show / hide panel <kbd>\</kbd></button>
+    <button class="menu-item" type="button" role="menuitem" data-action="reset-edges">Reset walls to automatic</button>
+    <div class="menu-sep"></div>
+    <button id="btnLogout" class="menu-item is-danger" type="button" role="menuitem">Log out</button>
+  </div>
 
-    <!-- RIGHT: tools -->
-    <aside class="sidebar">
-      <!-- Spots mode -->
-      <div id="spotTools">
-        <h2>Zones</h2>
-        <p class="sidebar-help">Pick a zone, then click or drag across spots to place it.</p>
+  <!-- floating panel: zones (Spots) or wall types (Walls). Drag by the header. -->
+  <aside id="panel" class="pl-float pl-panel" aria-labelledby="panelTitle">
+    <div id="panelHead" class="pl-panel-head">
+      <h2 id="panelTitle">Zones</h2>
+      <button id="btnPanelMin" class="icon-btn pl-min-btn tip-below" type="button" data-tip="Minimize" data-key="\" aria-label="Minimize panel">
+        <svg class="ico"><use href="#i-chevron"/></svg>
+      </button>
+    </div>
+    <!-- stays in place while the list below scrolls -->
+    <div id="panelTop" class="pl-panel-top">
+      <div class="add-buttons">
+        <button id="btnAddUnit" class="btn" type="button"><svg class="ico"><use href="#i-plus"/></svg> Unit</button>
+        <button id="btnAddArea" class="btn" type="button"><svg class="ico"><use href="#i-plus"/></svg> Common area</button>
+      </div>
+      <input id="zoneFilter" class="panel-filter" type="search" placeholder="Filter zones…" aria-label="Filter zones" hidden>
+    </div>
+    <!-- View mode: search units (Enter picks the first match) -->
+    <div id="viewTop" class="pl-panel-top" hidden>
+      <input id="unitSearch" class="panel-filter" type="search" placeholder="Search units…" aria-label="Search units">
+    </div>
+    <div class="pl-panel-body">
+      <!-- View mode: the units, or the selected unit's details (GET /api/units/{id}/details) -->
+      <section id="viewTools" class="panel-section" hidden>
+        <div id="unitList" class="zone-list"></div>
+        <div id="unitDetails" class="unit-details" hidden></div>
+      </section>
+      <section id="spotTools" class="panel-section">
         <div id="zoneList" class="zone-list"></div>
-
-        <details class="add-form" open>
-          <summary>Add a unit</summary>
-          <form id="addUnitForm" novalidate>
-            <label class="field"><span>Unit name</span><input name="name" maxlength="100" placeholder="e.g. Unit 105" required></label>
-            <label class="field"><span>Monthly rate (₱)</span><input name="rentalRate" type="number" min="0" step="0.01" required></label>
-            <label class="field"><span>Area in sqm (optional)</span><input name="areaSqm" type="number" min="0.01" step="0.01"></label>
-            <label class="check"><input name="electricity" type="checkbox"> Includes electricity</label>
-            <label class="check"><input name="water" type="checkbox"> Includes water</label>
-            <button class="btn btn-block" type="submit">+ Add unit</button>
-          </form>
-        </details>
-
-        <details class="add-form">
-          <summary>Add a common area</summary>
-          <form id="addAreaForm" novalidate>
-            <label class="field"><span>Name</span><input name="name" maxlength="100" placeholder="e.g. Hallway" required></label>
-            <label class="field"><span>Type</span>
-              <select name="areaType">
-                <option value="WALKWAY">Walkway</option>
-                <option value="GRASS">Grass</option>
-                <option value="BATHROOM">Bathroom</option>
-                <option value="KITCHEN">Kitchen</option>
-                <option value="LAUNDRY">Laundry</option>
-                <option value="LOBBY">Lobby</option>
-                <option value="PARKING">Parking</option>
-                <option value="STAIRS">Stairs</option>
-              </select>
-            </label>
-            <button class="btn btn-block" type="submit">+ Add common area</button>
-          </form>
-        </details>
-      </div>
-
-      <!-- Walls & doors mode -->
-      <div id="edgeTools" hidden>
-        <h2>Walls &amp; doors</h2>
-        <p class="sidebar-help">Walls appear automatically around units and indoor areas. Pick a tool, then click a line on the grid.</p>
+      </section>
+      <section id="edgeTools" class="panel-section" hidden>
         <div id="edgeList" class="zone-list"></div>
+        <p class="panel-help">Walls appear on their own around units and rooms. Erase one to make an opening; it then shows as a dashed grey line.</p>
         <button id="btnResetEdges" class="btn btn-block" type="button">Reset all to automatic</button>
+      </section>
+    </div>
+  </aside>
+
+  <!-- color picker for a common area (opened from its swatch in the list) -->
+  <div id="colorPop" class="pl-popover color-pop" role="dialog" aria-label="Pick a color" hidden>
+    <h3 id="colorTitle">Color</h3>
+    <div id="colorPalette" class="palette"></div>
+    <label class="custom-color">Custom <input id="colorCustom" type="color" aria-label="Custom color"></label>
+    <p id="colorNote" class="size-note" aria-live="polite"></p>
+  </div>
+
+  <!-- bottom-left: resize + numbers -->
+  <div class="pl-float pl-status">
+    <button id="btnSize" class="text-btn resize-btn" type="button" data-tip="Resize the grid (or drag its edges)" data-key="G" aria-haspopup="dialog" aria-expanded="false">
+      <svg class="ico"><use href="#i-resize"/></svg>Resize grid<span id="sizeLabel" class="size-chip">– × –</span>
+    </button>
+  </div>
+
+  <!-- bottom-left, above Resize grid: what the unit colors mean (L to show / hide) -->
+  <section id="legend" class="pl-float pl-legend" aria-label="Legend">
+    <button id="btnLegend" class="pl-legend-head" type="button" aria-expanded="true" data-tip="Show / hide the legend" data-key="L">
+      <span>Unit colors</span><svg class="ico"><use href="#i-chevron"/></svg>
+    </button>
+    <ul id="legendList" class="pl-legend-list"></ul>
+  </section>
+  <div id="sizePop" class="pl-popover size-pop" role="dialog" aria-label="Grid size" hidden>
+    <h3>Grid size <span class="zone-meta">(max 60 × 60)</span></h3>
+    <div class="size-row">Rows
+      <div class="stepper">
+        <button type="button" data-step="rows:-1" aria-label="One row less">−</button>
+        <input id="inpRows" type="number" min="1" max="60" inputmode="numeric" aria-label="Rows">
+        <button type="button" data-step="rows:1" aria-label="One row more">+</button>
       </div>
-    </aside>
-  </main>
+    </div>
+    <div class="size-row">Columns
+      <div class="stepper">
+        <button type="button" data-step="cols:-1" aria-label="One column less">−</button>
+        <input id="inpCols" type="number" min="1" max="60" inputmode="numeric" aria-label="Columns">
+        <button type="button" data-step="cols:1" aria-label="One column more">+</button>
+      </div>
+    </div>
+    <p id="sizeNote" class="size-note" aria-live="polite"></p>
+    <p class="size-tip">Tip: you can also drag the grid's right or bottom edge.</p>
+    <div class="size-actions">
+      <button id="btnSizeCancel" class="btn" type="button">Cancel</button>
+      <button id="btnResize" class="btn btn-primary" type="button">Apply</button>
+    </div>
+  </div>
+
+  <!-- hint and the short "Rectangle" / "Brush" label just above the toolbar -->
+  <p id="hint" class="pl-tip" aria-live="polite"></p>
+  <p id="viewHint" class="pl-float pl-viewhint" hidden>Click a unit to see its details · drag to move around · <kbd>E</kbd> to edit</p>
+  <p id="flash" class="pl-flash" aria-hidden="true"></p>
+
+  <!-- bottom-center toolbar: always Spots | Walls · Hand · Brush/Rectangle · Eraser · Preview -->
+  <div id="toolbar" class="pl-float pl-toolbar" role="toolbar" aria-label="Plotter tools">
+    <div class="pl-modes" role="group" aria-label="Mode">
+      <button class="text-btn is-active" type="button" data-mode="spots" data-tip="Spots" data-key="S" aria-pressed="true">
+        <svg class="ico"><use href="#i-spots"/></svg><span class="pl-mode-label">Spots</span>
+      </button>
+      <button class="text-btn" type="button" data-mode="edges" data-tip="Walls &amp; doors" data-key="W" aria-pressed="false">
+        <svg class="ico"><use href="#i-wall"/></svg><span class="pl-mode-label">Walls</span>
+      </button>
+    </div>
+    <span class="pl-sep"></span>
+    <button class="icon-btn" type="button" data-tool="hand" data-tip="Hand: move around" data-key="H" aria-label="Hand"><svg class="ico"><use href="#i-hand"/></svg></button>
+    <button id="btnDraw" class="icon-btn draw-btn" type="button" data-tool="draw" data-tip="Brush · click again for Rectangle" data-key="B" aria-label="Brush">
+      <svg class="ico"><use id="drawIcon" href="#i-brush"/></svg><span class="cycle-badge" aria-hidden="true">⇄</span>
+    </button>
+    <button class="icon-btn" type="button" data-tool="erase" data-tip="Eraser" data-key="E" aria-label="Eraser"><svg class="ico"><use href="#i-eraser"/></svg></button>
+    <span class="pl-sep"></span>
+    <button id="preview" class="pl-preview" type="button" data-tip="Show it in the panel" aria-label="Selection">
+      <span id="previewSwatch" class="swatch"></span>
+      <span class="preview-text"><span id="previewName" class="preview-name">Nothing selected</span><span id="previewMeta" class="preview-meta"></span></span>
+    </button>
+  </div>
+
+  <!-- bottom-right: zoom -->
+  <div class="pl-float pl-zoom">
+    <button id="btnZoomOut" class="icon-btn" type="button" data-tip="Zoom out" data-key="−" aria-label="Zoom out"><svg class="ico"><use href="#i-minus"/></svg></button>
+    <button id="btnZoomMenu" class="text-btn" type="button" data-tip="Zoom options" aria-haspopup="menu" aria-expanded="false"><span id="zoomLabel">100%</span></button>
+    <button id="btnZoomIn" class="icon-btn" type="button" data-tip="Zoom in" data-key="+" aria-label="Zoom in"><svg class="ico"><use href="#i-plus"/></svg></button>
+  </div>
+  <div id="zoomPop" class="pl-popover" role="menu" hidden>
+    <button class="menu-item" type="button" role="menuitem" data-zoom="fit">Zoom to fit <kbd>Shift+1</kbd></button>
+    <button class="menu-item" type="button" role="menuitem" data-zoom="0.5">50%</button>
+    <button class="menu-item" type="button" role="menuitem" data-zoom="1">100% <kbd>Shift+0</kbd></button>
+    <button class="menu-item" type="button" role="menuitem" data-zoom="2">200%</button>
+  </div>
+
+  <!-- add or edit a unit / common area (saved on the server at once).
+       Edit: PUT /api/units/{id} (+ POST /api/units/{id}/maintenance), PUT /api/common-areas/{id} (+ PUT …/color) -->
+  <dialog id="addDialog" class="pl-dialog add-dialog" aria-labelledby="addTitle">
+    <div class="pl-dialog-head">
+      <h2 id="addTitle">New unit</h2>
+      <button class="icon-btn" type="button" data-close aria-label="Close"><svg class="ico"><use href="#i-close"/></svg></button>
+    </div>
+    <div class="pl-dialog-body add-body">
+      <form id="addUnitForm" class="add-form" novalidate>
+        <label class="field"><span>Unit name</span><input name="name" maxlength="100" placeholder="e.g. Booth 12" required></label>
+        <!-- step="any": the arrows move by 1, and any amount with up to 2 decimals can be typed (rounded on leaving the field) -->
+        <label class="field"><span>Monthly rate (₱)</span><input name="rentalRate" type="number" min="0" step="any" inputmode="decimal" data-money required></label>
+        <label class="field"><span>Area in sqm (optional)</span><input name="areaSqm" type="number" min="0.01" step="any" inputmode="decimal" data-money></label>
+        <label class="field"><span>Or describe the size (optional)</span><input name="sizeDescription" maxlength="100" placeholder="e.g. Corner booth"></label>
+        <label class="check"><input name="electricity" type="checkbox"> Includes electricity</label>
+        <label class="check"><input name="water" type="checkbox"> Includes water</label>
+        <div id="maintenanceRow" class="maintenance-row" hidden>
+          <label class="check"><input name="maintenance" type="checkbox"> Under maintenance (not offered to renters)</label>
+          <p id="maintenanceNote" class="size-note"></p>
+        </div>
+        <div class="preview-block">
+          <div id="unitPreview" class="zone-preview"><span class="zone-preview-label">New unit</span></div>
+          <p class="panel-help">Units are colored by their status: green while available, red when leased, amber under maintenance.</p>
+        </div>
+        <div class="form-actions">
+          <button class="btn" type="button" data-close>Cancel</button>
+          <button class="btn btn-primary" type="submit" data-add-label="Add unit">Add unit</button>
+        </div>
+      </form>
+
+      <form id="addAreaForm" class="add-form" novalidate hidden>
+        <label class="field"><span>Name</span><input name="name" maxlength="100" placeholder="e.g. Hallway" required></label>
+        <label class="field"><span>Type</span>
+          <select name="areaType">
+            <option value="WALKWAY">Walkway</option>
+            <option value="GRASS">Grass</option>
+            <option value="BATHROOM">Bathroom</option>
+            <option value="KITCHEN">Kitchen</option>
+            <option value="LAUNDRY">Laundry</option>
+            <option value="LOBBY">Lobby</option>
+            <option value="PARKING">Parking</option>
+            <option value="STAIRS">Stairs</option>
+          </select>
+        </label>
+        <div class="field"><span>Color</span>
+          <div id="areaPalette" class="palette"></div>
+          <label class="custom-color">Custom <input id="areaCustom" type="color" aria-label="Custom color"></label>
+          <p id="areaColorNote" class="size-note" aria-live="polite"></p>
+        </div>
+        <div class="preview-block">
+          <div id="areaPreview" class="zone-preview"><span class="zone-preview-label">New area</span></div>
+        </div>
+        <div class="form-actions">
+          <button class="btn" type="button" data-close>Cancel</button>
+          <button class="btn btn-primary" type="submit" data-add-label="Add common area">Add common area</button>
+        </div>
+      </form>
+    </div>
+  </dialog>
+
+  <!-- delete / archive a zone (saved at once). Units: GET /api/units/{id}/removal-check decides what is allowed. -->
+  <dialog id="removeDialog" class="pl-dialog remove-dialog" aria-labelledby="removeTitle">
+    <div class="pl-dialog-head">
+      <h2 id="removeTitle">Delete</h2>
+      <button class="icon-btn" type="button" data-close aria-label="Close"><svg class="ico"><use href="#i-close"/></svg></button>
+    </div>
+    <div class="pl-dialog-body remove-body">
+      <p id="removeText"></p>
+      <p id="removeNote" class="remove-note"></p>
+      <div class="form-actions">
+        <button class="btn" type="button" data-close id="btnRemoveCancel">Cancel</button>
+        <button class="btn" type="button" id="btnArchive" hidden>Archive</button>
+        <button class="btn btn-danger" type="button" id="btnDelete" hidden>Delete</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- keyboard shortcuts (filled from SHORTCUTS in property-grid.js) -->
+  <dialog id="shortcutsDialog" class="pl-dialog" aria-labelledby="shortcutsTitle">
+    <div class="pl-dialog-head">
+      <h2 id="shortcutsTitle">Keyboard shortcuts</h2>
+      <button class="icon-btn" type="button" data-close aria-label="Close"><svg class="ico"><use href="#i-close"/></svg></button>
+    </div>
+    <div id="shortcutsBody" class="pl-dialog-body"></div>
+  </dialog>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
@@ -107,6 +302,7 @@
   <script src="/js/common/auth.js"></script>
   <script src="/js/common/format.js"></script>
   <script src="/js/common/grid-renderer.js"></script>
+  <script src="/js/common/floating-panel.js"></script>
   <script src="/js/pages/property-grid.js"></script>
 </body>
 </html>

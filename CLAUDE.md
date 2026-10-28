@@ -39,24 +39,32 @@ value objects, with no SQL or web code.
 - Grid methods on `GridZone` are package-private, so only `Property` changes spots.
 - Methods not written yet contain `// TODO` + `throw new UnsupportedOperationException("TODO")`.
 - Frontend: each page loads `/css/base.css` (+ `zones.css`, `grid.css` on grid pages), then `/js/common/api.js`, `auth.js`, `format.js` (+ `grid-renderer.js`), then `/js/pages/<page>.js`. Links start with `/`. `auth.js` `requireLogin(role)` redirects to the right page by role.
+- **Plotter page** (`landlord/property-grid.html`) also loads `/css/plotter.css` and `/js/common/floating-panel.js`. The grid fills the window and the toolbar/panel float on top. All its keyboard shortcuts live in the `SHORTCUTS` list in `property-grid.js` (the `?` dialog is built from it). Undo/redo uses `gridRenderer.snapshot/restore` (size, spots, edge overrides; adding a zone is not undoable).
+  - It has two states: **View** (opens first: click a unit or pick it in the list → details card from `GET /api/units/{id}/details` = unit + current ACTIVE lease + open requests; legend rows highlight units by status; search zooms to a unit) and **Edit** (the editor). `?mode=edit` opens Edit; keys E (View → Edit) and V (Edit → View). Each `SHORTCUTS` entry lists the `modes` it works in (default: Edit only).
 - **Exception:** `homepage.html` uses the Tailwind CDN + Font Awesome (not `base.css`) and loads only `api.js` + `js/pages/homepage.js`. It checks login with a plain `fetch('/api/auth/me')` (a 401 means guest), not `auth.requireLogin`.
 - Colors come from enum `cssClass` + `defaultColor`. Spots get classes like `zone zone-unit status-occupied` and `--zone-color`. `css/zones.css` is the file to edit for custom looks.
 
 ## Business rules (summary)
 - **Accounts:** usernames are unique. Passwords are at least 8 characters, hashed with BCrypt. Login failures give one generic message.
-- **Properties:** only the owner can see or change one. A new property is DRAFT with a 1×1 grid. The grid is at most 30×30. Status is DRAFT / ACTIVE / ARCHIVED. Types: APARTMENT, CONDOMINIUM, TOWNHOUSE, COMMERCIAL, NIGHT_MARKET, OPEN_SPACE.
+- **Properties:** only the owner can see or change one. A new property is DRAFT with a 1×1 grid. The grid is at most 60×60 (`Property.MAX_GRID_SIZE`, the CHECKs in `spacegrid_db.sql` and `MAX` in `property-grid.js` must match). Status is DRAFT / ACTIVE / ARCHIVED. Types: APARTMENT, CONDOMINIUM, TOWNHOUSE, COMMERCIAL, NIGHT_MARKET, OPEN_SPACE.
 - **Grid:**
   - abstract `GridZone` → `RentableUnit`, `CommonArea`.
   - Common area types: WALKWAY, GRASS, BATHROOM, KITCHEN, LAUNDRY, LOBBY, PARKING, STAIRS. Indoor ones are bathroom, kitchen, laundry, lobby, stairs.
-  - One zone per spot. Shrinking the grid drops spots and edges outside it.
+  - **Common-area colors:** `common_areas.color` (`#rrggbb`, NULL = type default). Set on create (`color` field) or `PUT /api/properties/{id}/common-areas/{areaId}/color`. Must differ from every other common area's color in the same property and from the 4 unit status colors (409). Units are always colored by status.
+  - One zone per spot. Shrinking the grid drops spots and edges outside it. In the plotter the grid can be resized from all four sides; the top/left bars move the drawing with them (`gridRenderer.resizeLayout`), and the saved layout is still just rows, cols and absolute spots.
   - **Walls are automatic** on a line between different zones when at least one side is enclosed (a unit or indoor area), and on the border next to an enclosed spot.
   - Manual overrides are WALL / DOOR / WINDOW / OPEN. Each line is stored once, as the line above (HORIZONTAL) or left of (VERTICAL) a spot.
+  - The plotter's toolbar is always Spots | Walls · Hand · Brush/Rectangle · Eraser · Preview. In Walls mode the Brush draws the Wall/Door/Window picked in the panel and the Rectangle draws it around an area (`gridRenderer.rectOutlineEdges`). Eraser over an automatic wall stores OPEN; Wall over an automatic wall removes the override (`gridRenderer.applyEdgeTool`).
   - Save layout = `PUT /grid`, then `PUT /edges`.
 - **Units:**
   - Status is AVAILABLE / OCCUPIED / UNDER_MAINTENANCE / ARCHIVED.
   - OCCUPIED only from AVAILABLE. No maintenance while occupied.
-  - **Archive instead of delete:** only allowed with no ACTIVE lease. Archiving clears the unit's spots and keeps its history.
-  - Delete only if the unit was never leased.
+  - **Taking a unit off the grid** (`GET /api/units/{id}/removal-check` → `UnitRemovalCheck` tells the page which applies):
+    - ACTIVE lease (running or upcoming) → neither delete nor archive (409): end or terminate the lease first.
+    - Leased before, not now → **archive only** (`POST /api/units/{id}/archive`): status ARCHIVED, its spots cleared, leases and payments kept.
+    - Never leased → **delete** (`DELETE /api/units/{id}`): the zone, unit row and spots go.
+    - Either way, its PENDING / APPROVED lease requests are **declined** in the same transaction.
+  - Common areas can always be deleted (`DELETE /api/common-areas/{id}`); their spots go with them.
   - Zone names don't need to be unique.
 - **Leases:**
   - **Terms can't be edited.** A unit can have one ACTIVE lease, and the renter must have the RENTER role.
@@ -70,7 +78,7 @@ value objects, with no SQL or web code.
   - Due status per month: PAID / OVERDUE / DUE (within 7 days) / UPCOMING.
   - Methods are GCASH / MAYA / CARD. The fake gateway declines account numbers ending in `0000`, saving the payment as FAILED so it can be retried.
 - **Browsing (public homepage):** `homepage.html` lists every ACTIVE property that has at least one AVAILABLE unit. A **block = one AVAILABLE unit**. `GET /api/browse` (and `/{id}`) needs no login. Search, filter, sort and pagination run in the browser. "Power included" = at least one free unit includes electricity. "Saved" spaces live only in the browser (localStorage).
-- **Lease requests:** a logged-in renter asks for an AVAILABLE unit (start date, 1–60 months, optional message). One PENDING request per renter per unit. The landlord of that property approves or declines; the renter can cancel while PENDING. Only PENDING changes; the rest are final. **Approving does not create the lease**: the landlord still creates it with the lease form (the unit stays AVAILABLE until then). Approve fails if the unit is no longer AVAILABLE.
+- **Lease requests:** a logged-in renter asks for an AVAILABLE unit (start date, 1–60 months, optional message). One PENDING request per renter per unit. The landlord of that property approves or declines; the renter can cancel while PENDING. Only PENDING changes; the rest are final. **Approving does not create the lease**: the landlord still creates it with the lease form (the unit stays AVAILABLE until then). Approve fails if the unit is no longer AVAILABLE. Each request keeps a copy of the unit and property names (`unit_label`, `property_label`); if the landlord deletes the unit, `rentable_unit_id` becomes NULL (`ON DELETE SET NULL`), the request stays (declined) and `LeaseRequest.isUnitRemoved()` is true.
 - The landlord can also create a lease directly by typing the renter's username.
 
 ## Status
@@ -85,13 +93,16 @@ value objects, with no SQL or web code.
 - public homepage (`homepage.html` + `js/pages/homepage.js`, routes in `WebConfig`) with `GET /api/browse`
 - lease requests: `LeaseRequest` model, DAO, service, controller, `requests.html` (both roles)
 - `RentableUnitDao` `findById` / `findByPropertyId`, `User.isLandlord()` / `isRenter()`, `format.date` / `format.badge`
+- delete / archive units and delete common areas (service, controller, DAO, plotter dialog); `JdbcLeaseContractDao` row mapper, `findActiveByUnitId`, `existsByUnitId`; `JdbcCommonAreaDao` reads; `RentableUnitDao.update`
+- edit units (`PUT /api/units/{id}`, `POST /api/units/{id}/maintenance`) and common areas (`PUT /api/common-areas/{id}`) from the plotter (pencil on each zone, Enter, View's "Edit unit"); `LeaseContract` state / days remaining; plotter View mode (`GET /api/units/{id}/details`)
 
-The plotter works end to end against the real database. After pulling these changes, **re-run `database/spacegrid_db.sql`** (new types, `lease_requests` table and view, sample data).
+The plotter works end to end against the real database. After pulling these changes, **re-run `database/spacegrid_db.sql`** (new types, `lease_requests` table, its name copies and `ON DELETE SET NULL`, view, common-area colors, 60×60 cap, sample data).
 
 **TODO (about 79 method bodies + pages), in this order:**
 1. register + `index.html`, landlord dashboard, property form (list/search, create, update, publish, archive)
-2. units page (list, update, maintenance, archive, delete) and common area update/delete
+2. units page (`units.html`: list + the update / maintenance / archive / delete endpoints, which already exist)
 3. leases: `LeaseContract` logic, DAO, service, controller, `leases.html`, `lease-form.html` (make it read `?requestId=` to prefill renter and dates from an approved request)
+   - then **lease timing markers on the plotter**: a small dot on occupied units, "Expiring soon" (30 days or fewer) or "Upcoming", plus a matching legend row. Needs each unit's current lease state in the grid page's data.
 4. `lease.html` (details, read-only grid, statement, history), renter dashboard, `renter/pay.html` + payments
 5. tests: `PropertyTest`, `LeaseContractTest`, `SpaceGridApplicationTests` (written last)
 

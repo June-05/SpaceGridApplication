@@ -1,6 +1,7 @@
 package com.techhub.spacegridapplication.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.techhub.spacegridapplication.exception.ConflictException;
 import com.techhub.spacegridapplication.exception.ValidationException;
 
 import java.math.BigDecimal;
@@ -53,11 +54,24 @@ public class RentableUnit extends GridZone {
             Dimensions dimensions,
             boolean includesElectricity,
             boolean includesWater) {
-        // TODO: not allowed when ARCHIVED; rename(name) and replace the other fields
+        if (isArchived()) {
+            throw new ConflictException(getName() + " is archived and can't be edited.");
+        }
+        rename(name);
+        this.dimensions = dimensions;
+        this.includesElectricity = includesElectricity;
+        this.includesWater = includesWater;
     }
 
+    /** New monthly rate. Existing leases keep their own rent; it applies to new leases. */
     public void changeRate(BigDecimal rate) {
-        // TODO: reject null or negative
+        if (rate == null || rate.signum() < 0) {
+            throw new ValidationException("Rental rate can't be negative.");
+        }
+        if (isArchived()) {
+            throw new ConflictException(getName() + " is archived and can't be edited.");
+        }
+        this.rentalRate = rate;
     }
 
     @JsonIgnore
@@ -71,11 +85,20 @@ public class RentableUnit extends GridZone {
     }
 
     public void markAvailable() {
-        // TODO: not allowed when ARCHIVED
+        if (isArchived()) {
+            throw new ConflictException(getName() + " is archived.");
+        }
+        this.status = UnitStatus.AVAILABLE;
     }
 
     public void markUnderMaintenance() {
-        // TODO: not allowed while OCCUPIED or ARCHIVED
+        if (status == UnitStatus.OCCUPIED) {
+            throw new ConflictException(getName() + " is occupied, so it can't go under maintenance.");
+        }
+        if (isArchived()) {
+            throw new ConflictException(getName() + " is archived.");
+        }
+        this.status = UnitStatus.UNDER_MAINTENANCE;
     }
 
     @JsonIgnore
@@ -85,7 +108,10 @@ public class RentableUnit extends GridZone {
 
     /** Package-private: call Property.archiveUnit(unit) so the spots are cleared too. */
     void archive() {
-        // TODO: not allowed while OCCUPIED; status -> ARCHIVED
+        if (status == UnitStatus.OCCUPIED) {
+            throw new ConflictException(getName() + " is occupied. End or terminate its lease first.");
+        }
+        this.status = UnitStatus.ARCHIVED;
     }
 
     @Override

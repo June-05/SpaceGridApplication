@@ -1,5 +1,6 @@
 /*
- * grid.css — STRUCTURE of the property grid (sizes, borders, edges, labels) and the plotter page layout.
+ * grid.css — STRUCTURE of the property grid (sizes, borders, edges, labels). Used by the plotter and lease.html.
+ * The plotter's floating toolbar, panel and canvas are styled in plotter.css.
  * Colors and textures of zones go in zones.css.
  *
  * Markup made by grid-renderer.js:
@@ -17,13 +18,18 @@
 /* ---------------------------------------------------------------- grid */
 .grid-host {
   overflow: auto;
+  max-height: 78vh;                  /* big grids pan inside this box (also used by "Fit" in property-grid.js) */
   padding: 12px;
   border-radius: 8px;
   background: repeating-linear-gradient(45deg, #f1f4f8 0 8px, #edf1f6 8px 16px);
 }
 
+/* pan with the space bar or the middle mouse button */
+.grid-host.is-pan-ready, .grid-host.is-pan-ready .cell, .grid-host.is-pan-ready .edge-handle { cursor: grab; }
+.grid-host.is-panning, .grid-host.is-panning .cell, .grid-host.is-panning .edge-handle { cursor: grabbing; }
+
 .grid-stage {
-  --edge: 5px;                       /* wall thickness */
+  --edge: 5px;                       /* wall thickness (grid-renderer.js sets it from the cell size) */
   position: relative;
   margin: 0 auto;
   user-select: none;
@@ -85,11 +91,18 @@
 .mode-edges .edge.is-auto { opacity: 0.55; }        /* automatic walls are lighter while editing */
 
 .edge-handle { z-index: 4; cursor: pointer; border-radius: 3px; }
-.edge-handle.edge-h { height: 12px; }
-.edge-handle.edge-v { width: 12px; }
+.edge-handle.edge-h { height: var(--handle, 12px); }
+.edge-handle.edge-v { width: var(--handle, 12px); }
+
+/* zoomed out: names are hidden (see the hover title); tiny cells also lose the thin line between spots */
+.grid-stage.is-small .cell-label { display: none; }
+.grid-stage.is-tiny .cell { border-width: 0; }
+
+/* rectangle fill: the area that will be painted when the mouse is released */
+.cell.is-preview { box-shadow: inset 0 0 0 100px rgba(37, 99, 235, 0.35); }
 .edge-handle:hover { background: rgba(37, 99, 235, 0.35); }
 
-/* ---------------------------------------------------------------- plotter page layout */
+/* ---------------------------------------------------------------- page header (lease.html) */
 .topbar {
   display: flex;
   align-items: center;
@@ -107,62 +120,7 @@
 .save-state { color: #64748b; font-size: 13px; }
 .save-state.is-dirty { color: #b45309; font-weight: 600; }
 
-.plotter {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 310px;
-  gap: 20px;
-  max-width: 1400px;
-  margin: 0 auto;
-  padding: 20px 24px 40px;
-}
-@media (max-width: 860px) {
-  .plotter { grid-template-columns: 1fr; padding: 16px; }
-}
-.board, .sidebar {
-  min-width: 0;
-  padding: 16px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-}
-
-.toolbar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
-.size-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; color: #64748b; }
-.size-controls input { width: 64px; }
-.seg-group { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
-.seg { border: 0; padding: 7px 12px; background: var(--surface); color: #64748b; cursor: pointer; font: inherit; }
-.seg + .seg { border-left: 1px solid var(--border); }
-.seg.is-active { background: var(--text); color: #fff; }
-.hint { min-height: 20px; margin: 12px 0 8px; color: #64748b; font-size: 13px; }
-.hint.is-error { color: var(--danger); }
-.summary { margin: 12px 0 0; color: #64748b; font-size: 13px; }
-
-.sidebar h2 { margin: 0; font-size: 16px; }
-.sidebar h3 { margin: 14px 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: #64748b; }
-.sidebar-help { margin: 4px 0 10px; color: #64748b; font-size: 13px; }
-.zone-list { display: flex; flex-direction: column; gap: 6px; }
-.zone-item {
-  display: flex; align-items: center; gap: 10px; width: 100%;
-  padding: 8px 10px; text-align: left; font: inherit; color: inherit;
-  background: var(--surface); border: 1px solid var(--border); border-radius: 8px; cursor: pointer;
-}
-.zone-item:hover { border-color: #b6c2d1; }
-.zone-item.is-selected { border-color: var(--primary); box-shadow: 0 0 0 1px var(--primary); background: #eff6ff; }
-.swatch { flex: none; width: 22px; height: 22px; border-radius: 5px; border: 1px solid rgba(15, 23, 42, 0.2); background: var(--zone-color, #cbd5e1); }
-.swatch-erase { background: linear-gradient(135deg, transparent 45%, var(--danger) 45% 55%, transparent 55%), #f8fafc; }
-.swatch-wall { background: #334155; }
-.swatch-door { background: repeating-linear-gradient(90deg, #b45309 0 5px, #fff 5px 8px); }
-.swatch-window { background: #7dd3fc; }
-.swatch-open { background: repeating-linear-gradient(90deg, #94a3b8 0 3px, #fff 3px 6px); }
-.swatch-reset { background: #f8fafc; }
-.zone-text { flex: 1; min-width: 0; }
-.zone-name { display: block; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.zone-meta { display: block; font-size: 12px; color: #64748b; }
 .badge { flex: none; padding: 1px 7px; border-radius: 999px; background: #f1f5f9; color: #64748b; font-size: 11px; }
 .badge-warn { background: #fef3c7; color: #92400e; }
-.empty-note { margin: 2px 0; font-size: 13px; color: #64748b; }
 
-.add-form { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border); }
-.add-form summary { cursor: pointer; font-weight: 600; margin-bottom: 8px; }
-.add-form form { display: flex; flex-direction: column; gap: 10px; }
-#btnResetEdges { margin-top: 14px; }
+/* The plotter page (landlord/property-grid.html) has its own layout in plotter.css. */

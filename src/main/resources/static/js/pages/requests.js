@@ -4,7 +4,8 @@
  * 1. const user = await auth.requireLogin();                      // any role
  * 2. const requests = await api.get('/api/lease-requests');       // renter: own requests · landlord: incoming requests
  *    Each request: id, unitId, renterId, desiredStart, months, message, status, decidedAt, createdAt,
- *                  propertyId, unitName, propertyName, renterName, monthlyRate, suggestedEndDate
+ *                  propertyId, unitName, propertyName, renterName, monthlyRate, suggestedEndDate,
+ *                  unitRemoved (true when the landlord deleted the unit: unitId is null, the names are kept)
  * 3. Buttons call (api.form, no fields):
  *      renter,   PENDING  → POST /api/lease-requests/{id}/cancel
  *      landlord, PENDING  → POST /api/lease-requests/{id}/approve  or  /decline
@@ -46,7 +47,7 @@ document.addEventListener('DOMContentLoaded', async () => {
            <button class="btn" data-action="decline" data-id="${req.id}" type="button">Decline</button>`
         : `<button class="btn" data-action="cancel" data-id="${req.id}" type="button">Cancel request</button>`;
     }
-    if (isLandlord && req.status === 'APPROVED') {
+    if (isLandlord && req.status === 'APPROVED' && !req.unitRemoved) {
       return `<a class="btn btn-primary" href="/landlord/lease-form.html?requestId=${req.id}">Create lease</a>`;
     }
     return '';
@@ -63,7 +64,9 @@ document.addEventListener('DOMContentLoaded', async () => {
           ${format.badge('request-', req.status)}
         </div>
         ${who}
-        <p><strong>Rent:</strong> ${format.peso(req.monthlyRate)} / month</p>
+        ${req.unitRemoved
+          ? '<p class="subtitle">This unit was removed by the owner.</p>'
+          : `<p><strong>Rent:</strong> ${format.peso(req.monthlyRate)} / month</p>`}
         <p><strong>Wants to start:</strong> ${format.date(req.desiredStart)} for ${req.months} ${req.months === 1 ? 'month' : 'months'}
            (until ${format.date(req.suggestedEndDate)})</p>
         ${note}

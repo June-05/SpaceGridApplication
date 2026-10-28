@@ -18,7 +18,7 @@ import java.util.Optional;
  */
 public class Property extends BaseEntity {
 
-    public static final int MAX_GRID_SIZE = 30;
+    public static final int MAX_GRID_SIZE = 60;
 
     private int landlordId;
     private String name;
@@ -128,8 +128,11 @@ public class Property extends BaseEntity {
         }
     }
 
+    /** Takes a zone (and so its spots) off the property, e.g. before it is deleted. */
     public void removeZone(GridZone zone) {
-        // TODO
+        if (zone != null) {
+            zones.remove(zone);
+        }
     }
 
     @JsonIgnore
@@ -140,8 +143,13 @@ public class Property extends BaseEntity {
 
     @JsonIgnore
     public List<CommonArea> getCommonAreas() {
-        // TODO
-        throw new UnsupportedOperationException("TODO");
+        List<CommonArea> areas = new ArrayList<>();
+        for (GridZone zone : zones) {
+            if (zone instanceof CommonArea area) {
+                areas.add(area);
+            }
+        }
+        return areas;
     }
 
     public int countUnitsByStatus(UnitStatus status) {
@@ -151,7 +159,11 @@ public class Property extends BaseEntity {
 
     /** Archives a unit: it must have no ACTIVE lease (checked by the service); its spots are cleared. */
     public void archiveUnit(RentableUnit unit) {
-        // TODO: unit.clearPositions(); unit.archive();
+        if (unit == null || !zones.contains(unit)) {
+            throw new ValidationException("This unit doesn't belong to this property.");
+        }
+        unit.archive();                       // checks first, so nothing is cleared if it is not allowed
+        unit.clearPositions();
     }
 
     // ---------------------------------------------------------------- grid

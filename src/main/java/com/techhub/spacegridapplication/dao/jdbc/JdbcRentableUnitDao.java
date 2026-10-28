@@ -86,14 +86,39 @@ public class JdbcRentableUnitDao implements RentableUnitDao {
         return entity;
     }
 
+    /** Saves the name, rate, size, utilities, status and the unit's own spots (zone_cells). */
     @Override
     public void update(RentableUnit entity) {
-        // TODO: SQL with jdbcTemplate
+        Dimensions size = entity.getDimensions();
+        jdbcTemplate.update("UPDATE grid_zones SET name = ? WHERE id = ?", entity.getName(), entity.getId());
+        jdbcTemplate.update("UPDATE rentable_units SET rental_rate = ?, is_exact_size = ?, size_description = ?, "
+                        + "area_sqm = ?, includes_electricity = ?, includes_water = ?, status = ? WHERE zone_id = ?",
+                entity.getRentalRate(),
+                size == null ? null : size.exact(),
+                size == null ? null : size.description(),
+                size == null ? null : size.areaSqm(),
+                entity.isIncludesElectricity(),
+                entity.isIncludesWater(),
+                entity.getStatus().name(),
+                entity.getId());
+        jdbcTemplate.update("DELETE FROM zone_cells WHERE zone_id = ?", entity.getId());
+        List<Object[]> rows = entity.getPositions().stream()
+                .map(p -> new Object[] {entity.getPropertyId(), p.row(), p.col(), entity.getId()})
+                .toList();
+        if (!rows.isEmpty()) {
+            jdbcTemplate.batchUpdate(
+                    "INSERT INTO zone_cells (property_id, row_idx, col_idx, zone_id) VALUES (?, ?, ?, ?)", rows);
+        }
     }
 
+    /**
+     * Deletes the unit: the grid_zones row, and with it (ON DELETE CASCADE) the rentable_units row and its spots.
+     * Lease requests keep their names and lose the link (ON DELETE SET NULL). A unit with leases can't be deleted:
+     * the service checks it, and lease_contracts' ON DELETE RESTRICT stops it anyway.
+     */
     @Override
     public void deleteById(int id) {
-        // TODO: SQL with jdbcTemplate
+        jdbcTemplate.update("DELETE FROM grid_zones WHERE id = ? AND zone_kind = 'UNIT'", id);
     }
 
     @Override

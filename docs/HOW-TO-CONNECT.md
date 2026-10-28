@@ -94,14 +94,16 @@ The JSON keys are the getter names without `get`/`is` (`getFullName()` → `full
 |---|---|
 | `User` | `id, createdAt, username, fullName, role` |
 | `Property` | `id, landlordId, name, address, propertyType, description, dimensions{exact, description, areaSqm}, status, gridRows, gridColumns, zones[], edgesByType{}` |
-| zone in `zones[]` | `id, propertyId, name, positions[{row, col}], rentable, enclosed, cssClasses, color`, plus unit fields (`rentalRate, status, …`) or `areaType` |
+| zone in `zones[]` | `id, propertyId, name, positions[{row, col}], rentable, enclosed, cssClasses, color`, plus unit fields (`rentalRate, status, …`) or `areaType, customColor` (common area: `color` = picked color, else the type's default; `customColor` = null when not picked) |
 | `RentableUnit` | `id, propertyId, name, positions, rentalRate, dimensions, includesElectricity, includesWater, status, …` |
 | `LeaseContract` | `id, unitId, renterId, startDate, endDate, monthlyRent, previousLeaseId, status, closedOn, unitName, propertyName, renterName, currentState, daysRemaining` |
 | `RentDue` | `billingMonth, dueDate, amountDue, status` |
 | `Payment` | `id, leaseId, billingMonth, amount, method, status, referenceNo, paidAt` |
 | `PropertyListing` (`/api/browse`) | `id, name, address, propertyType, description, landlordName, createdAt, units[], availableBlocks, minRate, maxRate, powerIncluded, waterIncluded` |
 | unit in `units[]` | `id, name, rentalRate, dimensions{exact, description, areaSqm} or null, includesElectricity, includesWater` |
-| `LeaseRequest` | `id, unitId, renterId, desiredStart, months, message, status, decidedAt, createdAt, propertyId, landlordId, unitName, propertyName, renterName, monthlyRate, suggestedEndDate` |
+| `LeaseRequest` | `id, unitId, renterId, desiredStart, months, message, status, decidedAt, createdAt, propertyId, landlordId, unitName, propertyName, renterName, monthlyRate, suggestedEndDate, unitRemoved` (after the unit is deleted: `unitId` null, `unitRemoved` true, the names kept, rate/property/landlord empty) |
+| `UnitDetails` | `unit{…RentableUnit}, currentLease{…LeaseContract incl. currentState, daysRemaining} or null, openRequests` (from `GET /api/units/{id}/details`, the plotter's View mode) |
+| `UnitRemovalCheck` | `canDelete, canArchive, openRequests, reason` (from `GET /api/units/{id}/removal-check`; then `DELETE /api/units/{id}` or `POST /api/units/{id}/archive`, both sent with `api.send(method, url)`) |
 
 To see the real JSON at any time, open a GET URL in the browser while logged in, e.g. `http://localhost:8080/api/auth/me`.
 

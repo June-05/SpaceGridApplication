@@ -91,7 +91,7 @@ Values: LANDLORD, RENTER
 Owns its zones and the grid rules that involve more than one zone (no overlaps, bounds, automatic walls).
 
 ```
-+ MAX_GRID_SIZE: int = 30   «static»
++ MAX_GRID_SIZE: int = 60   «static»
 - landlordId: int
 - name: String
 - address: String
@@ -159,7 +159,7 @@ A renter's request to lease an AVAILABLE unit found on the homepage. Only a PEND
 ```
 + MAX_MONTHS: int = 60   «static»
 + MAX_MESSAGE_LENGTH: int = 500   «static»
-- unitId: int {final}
+- unitId: Integer {final}           // null once the landlord deleted the unit
 - renterId: int {final}
 - desiredStart: LocalDate {final}
 - months: int {final}
@@ -176,12 +176,35 @@ A renter's request to lease an AVAILABLE unit found on the homepage. Only a PEND
 
 + LeaseRequest(unitId: int, renterId: int, desiredStart: LocalDate, months: int, message: String)
 + getSuggestedEndDate(): LocalDate     // desiredStart + months - 1 day
++ isUnitRemoved(): boolean             // unitId == null (the names come from the copies saved with the request)
 + isFromRenter(userId: int): boolean
 + isForLandlord(userId: int): boolean
 + approve(): void        // PENDING only, else ConflictException
 + decline(): void
 + cancel(): void
 ```
+
+#### `UnitDetails`, Class · value object (record)
+
+What the plotter's View mode shows for a selected unit (`GET /api/units/{id}/details`).
+
+```
+unit: RentableUnit
+currentLease: LeaseContract    // the ACTIVE lease (running or upcoming), or null
+openRequests: int              // PENDING + APPROVED lease requests
+```
+
+#### `UnitRemovalCheck`, Class · value object (record)
+
+What the landlord may do to take a unit off the grid (`GET /api/units/{id}/removal-check`).
+
+```
+canDelete: boolean        // never leased → delete for good
+canArchive: boolean       // leased before, not now → archive only (history kept)
+openRequests: int         // PENDING + APPROVED lease requests that will be declined
+reason: String            // why it can't be deleted (null when it can)
+```
+Neither flag is true while the unit has an ACTIVE lease (or is already archived).
 
 #### `PropertyListing`, Class · value object (record)
 
@@ -250,7 +273,7 @@ A space that can be leased. isRentable() and isEnclosed() return true; CSS class
 
 + RentableUnit(propertyId: int, name: String, rentalRate: BigDecimal, dimensions: Dimensions, includesElectricity: boolean, includesWater: boolean)
 + updateDetails(name: String, dimensions: Dimensions, includesElectricity: boolean, includesWater: boolean): void
-+ changeRate(rate: BigDecimal): void
++ changeRate(rate: BigDecimal): void          // existing leases keep their own rent; the new rate is for new leases
 + isAvailable(): boolean
 + markOccupied(): void
 + markAvailable(): void
@@ -280,12 +303,16 @@ Values: AVAILABLE, OCCUPIED, UNDER_MAINTENANCE, ARCHIVED
 
 #### `CommonArea`, Class · entity · extends `GridZone`
 
-A non-rentable zone (walkway, grass, shared bathroom...). isRentable() is false; isEnclosed() follows areaType.isIndoor().
+A non-rentable zone (walkway, grass, shared bathroom...). isRentable() is false; isEnclosed() follows areaType.isIndoor(). getColor() is the picked color, else the type's default.
 
 ```
 - areaType: CommonAreaType
+- customColor: String            // "#rrggbb" picked by the landlord, null = the type's default
 
 + CommonArea(propertyId: int, name: String, areaType: CommonAreaType)
++ CommonArea(propertyId: int, name: String, areaType: CommonAreaType, color: String)
++ getCustomColor(): String
++ changeColor(color: String): void          // checks "#rrggbb", stores lower-case
 + changeType(areaType: CommonAreaType): void
 + isRentable(): boolean
 + isEnclosed(): boolean
@@ -552,6 +579,8 @@ Generic interface shared by all DAOs.
 + findByRenterId(renterId: int): List<LeaseRequest>
 + findByLandlordId(landlordId: int): List<LeaseRequest>
 + existsPendingByUnitAndRenter(unitId: int, renterId: int): boolean
++ countOpenByUnitId(unitId: int): int        // PENDING + APPROVED
++ declineOpenByUnitId(unitId: int): int      // declines them; returns how many
 ```
 
 #### `JdbcLeaseRequestDao`, Class · repository · implements `LeaseRequestDao`
@@ -599,6 +628,7 @@ Reads the `lease_request_details` view; writes `lease_requests`. `update` change
 
 ```
 + findByPropertyId(propertyId: int): List<CommonArea>
++ updateColor(zoneId: int, color: String): void
 ```
 
 #### `JdbcCommonAreaDao`, Class · repository · implements `CommonAreaDao`
@@ -697,12 +727,15 @@ Reads the `lease_request_details` view; writes `lease_requests`. `update` change
 ```
 - unitDao: RentableUnitDao
 - leaseDao: LeaseContractDao
+- leaseRequestDao: LeaseRequestDao
 - propertyService: PropertyService
 
++ removalCheck(unitId: int, landlord: User): UnitRemovalCheck
++ getUnitDetails(unitId: int, landlord: User): UnitDetails
 + getUnits(propertyId: int, landlord: User): List<RentableUnit>
 + addUnit(propertyId: int, landlord: User, name: String, rentalRate: BigDecimal, dimensions: Dimensions, electricity: boolean, water: boolean): RentableUnit
 + updateUnit(unitId: int, landlord: User, name: String, rentalRate: BigDecimal, dimensions: Dimensions, electricity: boolean, water: boolean): RentableUnit
-+ setUnderMaintenance(unitId: int, landlord: User, underMaintenance: boolean): void
++ setUnderMaintenance(unitId: int, landlord: User, underMaintenance: boolean): RentableUnit   // off: only UNDER_MAINTENANCE → AVAILABLE
 + archiveUnit(unitId: int, landlord: User): void
 + deleteUnit(unitId: int, landlord: User): void
 ```
@@ -714,7 +747,9 @@ Reads the `lease_request_details` view; writes `lease_requests`. `update` change
 - propertyService: PropertyService
 
 + getCommonAreas(propertyId: int, landlord: User): List<CommonArea>
-+ addCommonArea(propertyId: int, landlord: User, name: String, areaType: CommonAreaType): CommonArea
++ addCommonArea(propertyId: int, landlord: User, name: String, areaType: CommonAreaType, color: String): CommonArea
++ changeColor(propertyId: int, areaId: int, landlord: User, color: String): CommonArea
+- checkColorFree(property: Property, self: CommonArea, color: String): void   // unique in the property, not a unit status color
 + updateCommonArea(areaId: int, landlord: User, name: String, areaType: CommonAreaType): CommonArea
 + deleteCommonArea(areaId: int, landlord: User): void
 ```
@@ -807,12 +842,16 @@ Reads the `lease_request_details` view; writes `lease_requests`. `update` change
 + create(propertyId, name, rentalRate, exactSize, areaSqm, sizeDescription, electricity, water): RentableUnit
 + update(id, name, rentalRate, exactSize, areaSqm, sizeDescription, electricity, water): RentableUnit
 + setMaintenance(id, underMaintenance): void
++ removalCheck(id): UnitRemovalCheck
++ details(id): UnitDetails
 + archive(id): void
 + delete(id): void
 ```
 
 | Endpoint | Method |
 |---|---|
+| `GET /api/units/{id}/removal-check` | `removalCheck` |
+| `GET /api/units/{id}/details` | `details` |
 | `GET /api/properties/{propertyId}/units` | `list` |
 | `POST /api/properties/{propertyId}/units` | `create` |
 | `PUT /api/units/{id}` | `update` |
@@ -827,7 +866,8 @@ Reads the `lease_request_details` view; writes `lease_requests`. `update` change
 - sessionManager: SessionManager
 
 + list(propertyId): List<CommonArea>
-+ create(propertyId, name, areaType): CommonArea
++ create(propertyId, name, areaType, color?): CommonArea
++ changeColor(propertyId, areaId, color): CommonArea
 + update(id, name, areaType): CommonArea
 + delete(id): void
 ```
@@ -836,6 +876,7 @@ Reads the `lease_request_details` view; writes `lease_requests`. `update` change
 |---|---|
 | `GET /api/properties/{propertyId}/common-areas` | `list` |
 | `POST /api/properties/{propertyId}/common-areas` | `create` |
+| `PUT /api/properties/{propertyId}/common-areas/{areaId}/color` | `changeColor` |
 | `PUT /api/common-areas/{id}` | `update` |
 | `DELETE /api/common-areas/{id}` | `delete` |
 
@@ -1068,7 +1109,7 @@ Breaks a rule, e.g. username taken → 409
 **Properties**
 
 - Only the owner can view or change a property (`isOwnedBy`); anyone else gets `AccessDeniedException`.
-- A new property starts as DRAFT with a 1 × 1 grid. Rows and columns go from 1 to 30 (`MAX_GRID_SIZE`).
+- A new property starts as DRAFT with a 1 × 1 grid. Rows and columns go from 1 to 60 (`MAX_GRID_SIZE`; it was 30 before the zoom feature).
 - Property types: Apartment, Condominium, Townhouse, Commercial, Night Market, Open Space.
 
 **Grid**
@@ -1094,7 +1135,10 @@ Breaks a rule, e.g. username taken → 409
 
 - Statuses: AVAILABLE, OCCUPIED, UNDER_MAINTENANCE, ARCHIVED. A unit can only become OCCUPIED from AVAILABLE, and can't go into maintenance while OCCUPIED.
 - Archive (`Property.archiveUnit`): only when the unit has no ACTIVE lease. The unit's spots are cleared from the grid, it can't be leased or edited again, and its past leases and payments are kept. Archived units are hidden from the grid and the unit list (shown under an "Archived" filter).
-- Delete is only allowed for a unit that has never been leased (`existsByUnitId` is false). Otherwise `ConflictException` asks the landlord to archive it instead. The database also blocks it (ON DELETE RESTRICT).
+- Delete is only allowed for a unit that has never been leased (`existsByUnitId` is false). Otherwise `ConflictException` asks the landlord to archive it instead. The database also blocks it (ON DELETE RESTRICT on lease_contracts).
+- A unit with an ACTIVE lease (running or upcoming) can be neither deleted nor archived. `removalCheck` tells the page which case applies before anything is done.
+- Deleting or archiving a unit **declines its PENDING / APPROVED lease requests** in the same transaction. The requests stay: they keep a copy of the unit and property names, and after a delete their `unitId` is null (`ON DELETE SET NULL`).
+- Common areas can always be deleted; their spots are cleared with them.
 - Zone names don't have to be unique. Rental rates can't be negative.
 
 **Browsing and lease requests**

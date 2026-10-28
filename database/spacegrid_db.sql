@@ -53,8 +53,8 @@ CREATE TABLE properties (
         ON DELETE RESTRICT ON UPDATE RESTRICT,
     CONSTRAINT ck_properties_type   CHECK (property_type IN ('APARTMENT', 'CONDOMINIUM', 'TOWNHOUSE', 'COMMERCIAL', 'NIGHT_MARKET', 'OPEN_SPACE')),
     CONSTRAINT ck_properties_status CHECK (status IN ('DRAFT', 'ACTIVE', 'ARCHIVED')),
-    CONSTRAINT ck_properties_rows   CHECK (grid_rows BETWEEN 1 AND 30),
-    CONSTRAINT ck_properties_cols   CHECK (grid_columns BETWEEN 1 AND 30),
+    CONSTRAINT ck_properties_rows   CHECK (grid_rows BETWEEN 1 AND 60),
+    CONSTRAINT ck_properties_cols   CHECK (grid_columns BETWEEN 1 AND 60),
     CONSTRAINT ck_properties_size   CHECK (
         is_exact_size IS NULL
         OR (is_exact_size = TRUE  AND area_sqm IS NOT NULL AND area_sqm > 0)
@@ -109,11 +109,13 @@ CREATE TABLE rentable_units (
 CREATE TABLE common_areas (
     zone_id    INT         NOT NULL,                       -- same id as grid_zones.id
     area_type  VARCHAR(20) NOT NULL,
+    color      CHAR(7)     NULL,                           -- '#rrggbb' picked by the landlord; NULL = the type's default
     CONSTRAINT pk_common_areas PRIMARY KEY (zone_id),
     CONSTRAINT fk_common_areas_zone FOREIGN KEY (zone_id) REFERENCES grid_zones (id)
         ON DELETE CASCADE ON UPDATE RESTRICT,
     CONSTRAINT ck_common_areas_type CHECK (area_type IN
-        ('WALKWAY', 'GRASS', 'BATHROOM', 'KITCHEN', 'LAUNDRY', 'LOBBY', 'PARKING', 'STAIRS'))
+        ('WALKWAY', 'GRASS', 'BATHROOM', 'KITCHEN', 'LAUNDRY', 'LOBBY', 'PARKING', 'STAIRS')),
+    CONSTRAINT ck_common_areas_color CHECK (color IS NULL OR color REGEXP '^#[0-9a-f]{6}$')
 ) ENGINE = InnoDB;
 
 -- ---------------------------------------------------------------------
@@ -136,8 +138,8 @@ CREATE TABLE zone_cells (
 -- ---------------------------------------------------------------------
 -- 7. edge_overrides  (Java: Property.edgeOverrides  Map<GridEdge, EdgeType>)
 --    Only manual changes are stored; automatic walls are calculated in Java.
---    HORIZONTAL (r, c) = line ABOVE spot (r, c)   rows 0..30 (30 = bottom border)
---    VERTICAL   (r, c) = line LEFT OF spot (r, c) cols 0..30 (30 = right border)
+--    HORIZONTAL (r, c) = line ABOVE spot (r, c)   rows 0..60 (60 = bottom border)
+--    VERTICAL   (r, c) = line LEFT OF spot (r, c) cols 0..60 (60 = right border)
 -- ---------------------------------------------------------------------
 CREATE TABLE edge_overrides (
     property_id  INT         NOT NULL,
@@ -148,8 +150,8 @@ CREATE TABLE edge_overrides (
     CONSTRAINT pk_edge_overrides PRIMARY KEY (property_id, row_idx, col_idx, orientation),
     CONSTRAINT fk_edge_overrides_property FOREIGN KEY (property_id) REFERENCES properties (id)
         ON DELETE CASCADE ON UPDATE RESTRICT,
-    CONSTRAINT ck_edge_overrides_row         CHECK (row_idx BETWEEN 0 AND 30),
-    CONSTRAINT ck_edge_overrides_col         CHECK (col_idx BETWEEN 0 AND 30),
+    CONSTRAINT ck_edge_overrides_row         CHECK (row_idx BETWEEN 0 AND 60),
+    CONSTRAINT ck_edge_overrides_col         CHECK (col_idx BETWEEN 0 AND 60),
     CONSTRAINT ck_edge_overrides_orientation CHECK (orientation IN ('HORIZONTAL', 'VERTICAL')),
     CONSTRAINT ck_edge_overrides_type        CHECK (edge_type IN ('WALL', 'DOOR', 'WINDOW', 'OPEN'))
 ) ENGINE = InnoDB;
@@ -248,7 +250,9 @@ JOIN    users       u ON u.id = l.renter_id;
 -- ---------------------------------------------------------------------
 CREATE TABLE lease_requests (
     id                INT           NOT NULL AUTO_INCREMENT,
-    rentable_unit_id  INT           NOT NULL,
+    rentable_unit_id  INT           NULL,                  -- NULL once the landlord deleted the unit
+    unit_label        VARCHAR(100)  NOT NULL,              -- unit name when the request was made (kept if the unit is deleted)
+    property_label    VARCHAR(100)  NOT NULL,              -- property name when the request was made
     renter_id         INT           NOT NULL,
     desired_start     DATE          NOT NULL,
     months            TINYINT       NOT NULL,
@@ -259,8 +263,9 @@ CREATE TABLE lease_requests (
     pending_key       VARCHAR(30) AS (IF(status = 'PENDING', CONCAT(rentable_unit_id, '-', renter_id), NULL)) STORED,
     CONSTRAINT pk_lease_requests PRIMARY KEY (id),
     CONSTRAINT uq_lease_requests_pending UNIQUE (pending_key),
+    -- Deleting a unit keeps its requests (they are declined first) so the renter still sees what happened.
     CONSTRAINT fk_lease_requests_unit FOREIGN KEY (rentable_unit_id) REFERENCES rentable_units (zone_id)
-        ON DELETE RESTRICT ON UPDATE RESTRICT,
+        ON DELETE SET NULL ON UPDATE RESTRICT,
     CONSTRAINT fk_lease_requests_renter FOREIGN KEY (renter_id) REFERENCES users (id)
         ON DELETE RESTRICT ON UPDATE RESTRICT,
     CONSTRAINT ck_lease_requests_months  CHECK (months BETWEEN 1 AND 60),
@@ -270,20 +275,21 @@ CREATE TABLE lease_requests (
 ) ENGINE = InnoDB;
 
 -- View used by JdbcLeaseRequestDao: request + display names, the unit's rate and the landlord id.
+-- After the unit was deleted the names come from the labels saved with the request, and rate/property/landlord are NULL.
 CREATE VIEW lease_request_details AS
 SELECT  r.id, r.rentable_unit_id, r.renter_id, r.desired_start, r.months, r.message,
         r.status, r.decided_at, r.created_at,
-        z.name        AS unit_name,
-        u.rental_rate AS rental_rate,
-        p.id          AS property_id,
-        p.name        AS property_name,
-        p.landlord_id AS landlord_id,
-        usr.full_name AS renter_name
+        COALESCE(z.name, r.unit_label)     AS unit_name,
+        u.rental_rate                      AS rental_rate,
+        p.id                               AS property_id,
+        COALESCE(p.name, r.property_label) AS property_name,
+        p.landlord_id                      AS landlord_id,
+        usr.full_name                      AS renter_name
 FROM    lease_requests r
-JOIN    grid_zones      z   ON z.id = r.rentable_unit_id
-JOIN    rentable_units  u   ON u.zone_id = z.id
-JOIN    properties      p   ON p.id = z.property_id
-JOIN    users           usr ON usr.id = r.renter_id;
+LEFT JOIN grid_zones     z   ON z.id = r.rentable_unit_id
+LEFT JOIN rentable_units u   ON u.zone_id = z.id
+LEFT JOIN properties     p   ON p.id = z.property_id
+JOIN      users          usr ON usr.id = r.renter_id;
 
 -- =====================================================================
 --  SAMPLE DATA  (today in the story: late October 2026)
@@ -348,13 +354,14 @@ INSERT INTO rentable_units (zone_id, rental_rate, is_exact_size, size_descriptio
     (19, 3000.00, 0, 'Large plot', NULL, 0, 0, 'AVAILABLE'),
     (20, 2200.00, 0, 'Small plot', NULL, 0, 0, 'AVAILABLE');
 
-INSERT INTO common_areas (zone_id, area_type) VALUES
-    (4, 'WALKWAY'),
-    (5, 'BATHROOM'),
-    (7, 'GRASS'),
-    (10, 'LOBBY'),
-    (13, 'PARKING'),
-    (18, 'WALKWAY');
+-- color NULL = the type's default color. The night market walkway shows a picked color.
+INSERT INTO common_areas (zone_id, area_type, color) VALUES
+    (4, 'WALKWAY', NULL),
+    (5, 'BATHROOM', NULL),
+    (7, 'GRASS', NULL),
+    (10, 'LOBBY', NULL),
+    (13, 'PARKING', NULL),
+    (18, 'WALKWAY', '#fde68a');
 
 INSERT INTO zone_cells (property_id, row_idx, col_idx, zone_id) VALUES
     (1, 0, 0, 1),
@@ -481,8 +488,8 @@ INSERT INTO payments (lease_id, renter_id, billing_month, amount, method, status
     (5, 5, '2026-10-01', 6000.00, 'CARD', 'PAID', 'SG-20260929-0038', '2026-09-29 10:15:00');
 
 -- Lease requests made from the homepage. Request 4 was approved: the landlord still has to create the lease.
-INSERT INTO lease_requests (id, rentable_unit_id, renter_id, desired_start, months, message, status, decided_at) VALUES
-    (1, 3, 4, '2026-11-15', 12, 'Looking for a studio near the city center.', 'PENDING', NULL),
-    (2, 12, 3, '2026-12-01', 6, 'Planning to open a small food stall.', 'PENDING', NULL),
-    (3, 12, 5, '2026-09-01', 6, NULL, 'DECLINED', '2026-08-25 09:00:00'),
-    (4, 14, 5, '2026-11-10', 3, 'Selling handmade crafts on weekends.', 'APPROVED', '2026-10-26 14:30:00');
+INSERT INTO lease_requests (id, rentable_unit_id, unit_label, property_label, renter_id, desired_start, months, message, status, decided_at) VALUES
+    (1, 3, 'Unit 103', 'SpaceGrid Suites Bajada', 4, '2026-11-15', 12, 'Looking for a studio near the city center.', 'PENDING', NULL),
+    (2, 12, 'Stall 2', 'Agdao Market Stalls', 3, '2026-12-01', 6, 'Planning to open a small food stall.', 'PENDING', NULL),
+    (3, 12, 'Stall 2', 'Agdao Market Stalls', 5, '2026-09-01', 6, NULL, 'DECLINED', '2026-08-25 09:00:00'),
+    (4, 14, 'Booth 1', 'Roxas Night Market - Section C', 5, '2026-11-10', 3, 'Selling handmade crafts on weekends.', 'APPROVED', '2026-10-26 14:30:00');

@@ -3,6 +3,8 @@ package com.techhub.spacegridapplication.controller;
 import com.techhub.spacegridapplication.model.Dimensions;
 import com.techhub.spacegridapplication.model.RentableUnit;
 import com.techhub.spacegridapplication.model.Role;
+import com.techhub.spacegridapplication.model.UnitDetails;
+import com.techhub.spacegridapplication.model.UnitRemovalCheck;
 import com.techhub.spacegridapplication.model.User;
 import com.techhub.spacegridapplication.security.SessionManager;
 import com.techhub.spacegridapplication.service.RentableUnitService;
@@ -72,26 +74,47 @@ public class RentableUnitController {
             @RequestParam(defaultValue = "false") boolean electricity,
             @RequestParam(defaultValue = "false") boolean water,
             HttpSession session) {
-        // TODO: get the user from sessionManager, call the service, return the result
-        throw new UnsupportedOperationException("TODO");
+        User landlord = sessionManager.requireRole(session, Role.LANDLORD);
+        Dimensions size = (exactSize == null) ? null
+                : exactSize ? Dimensions.exact(areaSqm) : Dimensions.approximate(sizeDescription == null ? "" : sizeDescription);
+        return unitService.updateUnit(id, landlord, name, rentalRate, size, electricity, water);
     }
 
-    /** Form field: underMaintenance=true|false */
+    /** Form field: underMaintenance=true|false. Not while the unit is occupied (409). */
     @PostMapping("/units/{id}/maintenance")
     public void setMaintenance(
             @PathVariable int id,
             @RequestParam boolean underMaintenance,
             HttpSession session) {
-        // TODO: get the user from sessionManager, call the service, return the result
+        User landlord = sessionManager.requireRole(session, Role.LANDLORD);
+        unitService.setUnderMaintenance(id, landlord, underMaintenance);
     }
 
+    /** The plotter's View mode: the unit, its current (ACTIVE) lease or null, and how many lease requests are open. */
+    @GetMapping("/units/{id}/details")
+    public UnitDetails details(@PathVariable int id, HttpSession session) {
+        User landlord = sessionManager.requireRole(session, Role.LANDLORD);
+        return unitService.getUnitDetails(id, landlord);
+    }
+
+    /** Before deleting or archiving: may it be deleted, only archived, or neither (and why), and how many open requests. */
+    @GetMapping("/units/{id}/removal-check")
+    public UnitRemovalCheck removalCheck(@PathVariable int id, HttpSession session) {
+        User landlord = sessionManager.requireRole(session, Role.LANDLORD);
+        return unitService.removalCheck(id, landlord);
+    }
+
+    /** Only a unit with no ACTIVE lease. Its spots are cleared; its leases and payments are kept. 409 otherwise. */
     @PostMapping("/units/{id}/archive")
     public void archive(@PathVariable int id, HttpSession session) {
-        // TODO: get the user from sessionManager, call the service, return the result
+        User landlord = sessionManager.requireRole(session, Role.LANDLORD);
+        unitService.archiveUnit(id, landlord);
     }
 
+    /** Only a unit that was never leased (409 otherwise: archive it). Open lease requests are declined. */
     @DeleteMapping("/units/{id}")
     public void delete(@PathVariable int id, HttpSession session) {
-        // TODO: get the user from sessionManager, call the service, return the result
+        User landlord = sessionManager.requireRole(session, Role.LANDLORD);
+        unitService.deleteUnit(id, landlord);
     }
 }

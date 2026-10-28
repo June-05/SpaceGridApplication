@@ -42,15 +42,27 @@ public class CommonAreaController {
         throw new UnsupportedOperationException("TODO");
     }
 
-    /** Form fields: name, areaType (e.g. WALKWAY). */
+    /** Form fields: name, areaType (e.g. WALKWAY), color (optional, "#rrggbb"; leave out for the type's default). */
     @PostMapping("/properties/{propertyId}/common-areas")
     public CommonArea create(
             @PathVariable int propertyId,
             @RequestParam String name,
             @RequestParam CommonAreaType areaType,
+            @RequestParam(required = false) String color,
             HttpSession session) {
         User landlord = sessionManager.requireRole(session, Role.LANDLORD);
-        return commonAreaService.addCommonArea(propertyId, landlord, name, areaType);
+        return commonAreaService.addCommonArea(propertyId, landlord, name, areaType, color);
+    }
+
+    /** Form field: color ("#rrggbb"). 409 if another common area of the property already has it. */
+    @PutMapping("/properties/{propertyId}/common-areas/{areaId}/color")
+    public CommonArea changeColor(
+            @PathVariable int propertyId,
+            @PathVariable int areaId,
+            @RequestParam String color,
+            HttpSession session) {
+        User landlord = sessionManager.requireRole(session, Role.LANDLORD);
+        return commonAreaService.changeColor(propertyId, areaId, landlord, color);
     }
 
     @PutMapping("/common-areas/{id}")
@@ -59,12 +71,14 @@ public class CommonAreaController {
             @RequestParam String name,
             @RequestParam CommonAreaType areaType,
             HttpSession session) {
-        // TODO: get the user from sessionManager, call the service, return the result
-        throw new UnsupportedOperationException("TODO");
+        User landlord = sessionManager.requireRole(session, Role.LANDLORD);
+        return commonAreaService.updateCommonArea(id, landlord, name, areaType);
     }
 
+    /** Deletes the common area and clears its spots. Saved at once. */
     @DeleteMapping("/common-areas/{id}")
     public void delete(@PathVariable int id, HttpSession session) {
-        // TODO: get the user from sessionManager, call the service, return the result
+        User landlord = sessionManager.requireRole(session, Role.LANDLORD);
+        commonAreaService.deleteCommonArea(id, landlord);
     }
 }
