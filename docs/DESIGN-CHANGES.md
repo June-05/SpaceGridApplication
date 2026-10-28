@@ -73,3 +73,71 @@ New: `homepage.html`, `requests.html` (+ `js/pages/homepage.js`, `js/pages/reque
 
 ### How it was checked
 Compiled with Maven (offline, JDK 25). Loaded the SQL into a scratch database, started the app on port 8099 against it, and called the endpoints with `curl` as guest, renter and landlord (success cases plus 400/401/403/404/409 cases). The pages were **not opened in a browser** by Claude; check them by hand (see the test steps in the reply).
+
+---
+
+## PROPOSED (not built) · Commercial ready, permits, bigger grid with zoom
+
+Status: **decided, not implemented.** Nothing below exists in the code yet. When a part is built, move it into a dated section above and update the docs listed at the end.
+
+### Decisions (all defaults accepted)
+1. Grid cap rises from 30×30 to **60×60**.
+2. Commercial ready = **two landlord-set flags** on the property (not computed).
+3. Permits are **attached to each request** (not a reusable renter profile).
+4. Permit types: **Business permit** (always) + **Food / Sanitary permit** (food businesses only).
+5. Permit files are stored **in a folder on disk**, outside `static` (not in the database).
+6. A permit that expires before the lease ends only **warns** the landlord; it does not block approval.
+
+### A. Zoom and bigger grid (smallest, independent; build first)
+- `Property.MAX_GRID_SIZE` 30 → 60; `properties` CHECKs for `grid_rows` / `grid_columns` 1–30 → 1–60 (TINYINT is enough). The renderer redraws every cell on each change, so do not go above 60 without partial redraws.
+- `grid-renderer.js`: lower the 30 px minimum cell so "fit to width" can shrink big grids. Add zoom −/+, slider with %, **Fit to screen**, Ctrl+wheel; remember the zoom in `localStorage`.
+- Below ~16 px: hide cell labels (show as tooltip) and scale wall thickness (`--edge`) with the cell size.
+- Pan by dragging (space bar or middle mouse). Add a **rectangle fill** tool for painting large areas.
+- Same zoom on the read-only grid in `lease.html`.
+- No endpoint changes; no data changes beyond the size cap.
+
+### B. Commercial ready flags
+- `properties` gets `commercial_ready BOOLEAN` and `permits_required BOOLEAN` (both default FALSE; the property form defaults `permits_required` on when the type is COMMERCIAL, NIGHT_MARKET or OPEN_SPACE). Only commercial types may set them.
+- `Property` gets both fields with getters and an `updateCommercialSettings(...)` method; the create/update endpoints take them as optional params; `PropertyListing` exposes them.
+- Homepage: "Commercial ready" badge on cards; the **Power included** toggle stays and a **Commercial ready** toggle is added next to it.
+
+### C. Business / food permits with manual landlord review
+**Flow:** renter picks a block → if the property has `permits_required`, the form asks business name + Food / Non-food → renter uploads the required permits → landlord views each file and marks it Approved / Rejected with a note → a rejected permit is re-uploaded (the request stays PENDING, shown as "Needs documents") → the landlord can approve the request only when every required permit is Approved → creating the lease stays a separate step.
+
+**Rules**
+- Required: Business permit always; Food / Sanitary permit when the business is Food.
+- Each permit has a number, an expiry date and one file (JPG, PNG or PDF, max 5 MB).
+- Expiry must be after the requested start date (400). If it is before the lease end, the landlord sees a warning only.
+- Permits can only be added or replaced while the request is PENDING.
+- Manual check only: no lookup against any government system.
+- Only the renter and the property's landlord can open a file, through a login-checked endpoint. Files are never reachable by a static URL.
+
+**Data**
+- New table `request_permits`: id, request_id (FK), permit_type (BUSINESS / FOOD_SANITARY), permit_number, expires_on, original_name, stored_path, content_type, status (PENDING / APPROVED / REJECTED), reviewer_note, reviewed_at, created_at. One current permit per type per request.
+- `lease_requests` gets `business_name VARCHAR(100)` and `business_category` (FOOD / NON_FOOD), both nullable.
+
+**Model / code (names are proposals)**
+- model: `PermitType`, `PermitStatus` (enums), `RequestPermit` (entity, with `approve()`, `reject(note)`, `replaceFile(...)`). `LeaseRequest.approve()` needs the permit check, so `LeaseRequestService.approve` loads the permits and refuses with `ConflictException` ("Some permits are not approved yet.").
+- dao: `RequestPermitDao` + `JdbcRequestPermitDao`. service: `PermitService` (upload, review, open file) or added to `LeaseRequestService`. controller: `PermitController`.
+- File storage: a configurable folder (new `application.properties` key, e.g. `spacegrid.permit-dir`), files saved under generated names; multipart limit 5 MB.
+
+**Endpoints (proposed)**
+
+| Method + URL | Who | Purpose |
+|---|---|---|
+| `POST /api/lease-requests/{id}/permits` (multipart: `type`, `permitNumber`, `expiresOn`, `file`) | RENTER owner | Add or replace a permit while PENDING |
+| `GET /api/lease-requests/{id}/permits` | renter owner or landlord owner | List permits with status and notes |
+| `GET /api/permits/{permitId}/file` | renter owner or landlord owner | Download / view the file |
+| `POST /api/permits/{permitId}/approve` · `/reject` (`note`) | LANDLORD owner | Review one permit |
+
+`POST /api/lease-requests` also gets optional `businessName` and `businessCategory`.
+
+**Pages**: `homepage.html` request form gets the business fields and a note that permits are uploaded next; `requests.html` shows the permit list, upload buttons (renter) and View / Approve / Reject (landlord); the Approve button is disabled until all required permits are approved.
+
+**Design exceptions to record when built:** the first multipart endpoint (the "simple request params" convention does not cover files); the first sensitive data in the project (access limited to the two people above).
+
+### Suggested build order
+A (zoom) → B (flags) → C (permits). C also touches `lease-form.js`, which is still a stub, and depends on `LeaseService.create` for the full flow.
+
+### Docs to update when built
+`CLAUDE.md` (business rules, size cap, upload exception), `SpaceGrid-Phase1-Spec.md` (new classes, endpoints, `MAX_GRID_SIZE`, counts), `SpaceGrid-Phase3-FileStructure.md` (files and pages), `HOW-TO-CONNECT.md` (multipart example, JSON shapes), `spacegrid_db.sql`, and the `.drawio` class diagram and ERD (already behind).
