@@ -2,3 +2,10 @@ target/
 
 # Uploaded photos, site plans and contracts (FileService)
 uploads/
+
+# Office lock files
+~$*
+
+# Images waiting to be sorted (see docs/projectfiles/image-manifest.md)
+incoming-images/*
+!incoming-images/.gitkeep

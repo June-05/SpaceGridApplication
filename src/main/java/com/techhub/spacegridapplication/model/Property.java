@@ -96,7 +96,8 @@ public class Property extends BaseEntity {
 
     /** First property photo, for cards and the homepage ("/api/files/7"), or null when there is none. */
     public String getCoverPhotoUrl() {
-        return StoredFile.urlOf(coverPhotoId);
+        String uploaded = StoredFile.urlOf(coverPhotoId);
+        return (uploaded != null || getId() == null) ? uploaded : DemoImages.coverOfProperty(getId());
     }
     public int getGridRows() { return gridRows; }
     public int getGridColumns() { return gridColumns; }

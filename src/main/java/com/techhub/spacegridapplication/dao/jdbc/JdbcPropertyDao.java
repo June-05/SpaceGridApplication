@@ -4,6 +4,7 @@ import com.techhub.spacegridapplication.dao.PropertyDao;
 import com.techhub.spacegridapplication.model.Amenities;
 import com.techhub.spacegridapplication.model.CommonArea;
 import com.techhub.spacegridapplication.model.CommonAreaType;
+import com.techhub.spacegridapplication.model.DemoImages;
 import com.techhub.spacegridapplication.model.Dimensions;
 import com.techhub.spacegridapplication.model.EdgeType;
 import com.techhub.spacegridapplication.model.GridEdge;
@@ -262,12 +263,18 @@ public class JdbcPropertyDao implements PropertyDao {
                 rs.getString("landlord_name"),
                 rs.getTimestamp("created_at").toLocalDateTime(),
                 readAmenities(rs),
-                StoredFile.urlOf(rs.getObject("cover_photo_id", Integer.class)),
+                coverUrl(rs.getObject("cover_photo_id", Integer.class), rs.getInt("id")),
                 unitsByProperty.getOrDefault(rs.getInt("id"), List.of()));
         List<PropertyListing> listings = (propertyId == null)
                 ? jdbcTemplate.query(sql, mapper)
                 : jdbcTemplate.query(sql, mapper, propertyId);
         return listings.stream().filter(listing -> !listing.units().isEmpty()).toList();
+    }
+
+    /** The uploaded cover ("/api/files/7") or, when none, the demo photo that ships with the project. */
+    private static String coverUrl(Integer coverFileId, int propertyId) {
+        String uploaded = StoredFile.urlOf(coverFileId);
+        return (uploaded != null) ? uploaded : DemoImages.coverOfProperty(propertyId);
     }
 
     /** Reads the five amenity columns. */

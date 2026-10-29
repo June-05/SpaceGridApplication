@@ -11,7 +11,7 @@ simulated payment step. The project was converted from a Java Swing app to an HT
 - jBCrypt for passwords. devtools is on.
 - Frontend: plain HTML/CSS/JS in `src/main/resources/static`, served at `http://localhost:8080/`. No framework, no build step.
 - `database/spacegrid_db.sql` is run **by hand** in MySQL Workbench (`spring.sql.init.mode=never`). It drops and recreates the database with sample data.
-- Sample logins (password `password123`): landlords `maria.santos`, `jose.reyes`; renters `ana.cruz`, `paolo.garcia`, `liza.mendoza`.
+- Sample logins (password `password123`): landlords `maria.santos`, `jose.reyes`; renters `ana.cruz`, `paolo.garcia`, `liza.mendoza`. Demo accounts (same password, "DEMO ACCOUNTS" section of the SQL, plan in `docs/projectfiles/dummy-data-plan.md`, story date 2026-10-29): landlords `landlord`, `landlord2`, `landlord3`; renters `renter`, `renter2`, `renter3`, `renter4`, `renter5`.
 - pom.xml must keep `<start-class>` and `<exec.mainClass>` = `com.techhub.spacegridapplication.SpaceGridApplication`.
 
 ## Package
@@ -116,8 +116,10 @@ value objects, with no SQL or web code.
 - leases: `LeaseContract` logic, DAO, service, controller (+ `GET /api/renters`, `GET /api/leases/{id}/property`), `leases.html`, `lease-form.html` (new / `?unitId=` / `?requestId=` / `?renew=`), tenant contact, payment terms
 - payments: statement by billing period, pay rent, history, `FakePaymentGateway`; `lease.html` (both roles), `renter/pay.html`
 - uploads: property photos, site plans, unit photos, contract PDFs (`StoredFile`, `FileService`, `FileController`); cover photos on the dashboard and homepage, the unit photo on the renter's lease card (`lease.imageUrl`)
+- demo data and photos: 8 demo accounts with interlocking data, and 32 demo photos in `static/images/properties|units/` found by file name (`model/DemoImages.java`; an uploaded photo always wins; credits in `docs/projectfiles/image-credits.md`)
+- docs reorganized into `docs/projectfiles/`, with `docs/instructions.md` and a rewritten README
 
-Everything except the tests works end to end against the real database. After pulling these changes, **re-run `database/spacegrid_db.sql`** (new property columns, lease contact + payment terms, `uploaded_files`, `lease_details` view, `zone_cells` 0–59 fix, sample data).
+Everything except the tests works end to end against the real database. After pulling these changes, **re-run `database/spacegrid_db.sql`** (new property columns, lease contact + payment terms, `uploaded_files`, `lease_details` view, `zone_cells` 0–59 fix, sample data, the demo accounts).
 
 **TODO, in this order:**
 1. **lease timing markers on the plotter**: a small dot on occupied units, "Expiring soon" (30 days or fewer) or "Upcoming", plus a matching legend row. Needs each unit's current lease state in the grid page's data.
@@ -126,8 +128,8 @@ Everything except the tests works end to end against the real database. After pu
 
 **Done (2026-10-29): the PR #7 (`457066d`) renter-redesign problems were fixed in Phase 7 with the owner's OK:** the renter dashboard and pay pages were rebuilt (names escaped, `requireLogin` without try/catch, the real `amountDue`), `base.css`'s `.btn` is white again (`--btnbg` removed), and the unused `css/renter-css/` files were deleted.
 
-## Reference docs (in `docs/`)
-- `SpaceGrid-Phase1-Spec.md` + `SpaceGrid-Phase1-ClassDiagram.drawio`: every class, field, method and endpoint.
+## Reference docs (in `docs/projectfiles/`; the setup guide is `docs/instructions.md`)
+- `SpaceGrid-Phase1-Spec.md` + `SpaceGrid-UML-Diagrams.drawio` (17 pages: package, class diagrams per package, sequence "renter pays rent"; built from the code, 2026-10-29): every class, field, method and endpoint.
 - `SpaceGrid-Phase2-ERD.drawio` (schema in `database/spacegrid_db.sql`).
 - `SpaceGrid-Phase3-FileStructure.md`: the page list with each page's endpoints.
 - `HOW-TO-CONNECT.md`: matching pages to controllers (`@RequestParam` vs `@RequestBody`, date/enum formats).

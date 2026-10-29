@@ -22,7 +22,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <java.version>17</java.version>
         <start-class>com.techhub.spacegridapplication.SpaceGridApplication</start-class>
-        <exec.mainClass>com.techhub.spacegridhtml.SpaceGridApplication</exec.mainClass>
+        <exec.mainClass>com.techhub.spacegridapplication.SpaceGridApplication</exec.mainClass>
     </properties>
      <dependencies>
         <!-- Web layer: @RestController, embedded Tomcat, serves the HTML/CSS/JS in src/main/resources/static,

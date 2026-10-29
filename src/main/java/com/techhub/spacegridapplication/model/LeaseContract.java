@@ -138,7 +138,10 @@ public class LeaseContract extends BaseEntity {
     public String getRenterUsername() { return renterUsername; }
 
     /** The unit's first photo ("/api/files/7"), or null; the renter dashboard shows it on the lease card. */
-    public String getImageUrl() { return StoredFile.urlOf(unitPhotoId); }
+    public String getImageUrl() {
+        String uploaded = StoredFile.urlOf(unitPhotoId);
+        return (uploaded != null) ? uploaded : DemoImages.photoOfUnit(unitId);
+    }
 
     /** UPCOMING, ACTIVE, EXPIRING_SOON, EXPIRED, ENDED, TERMINATED or RENEWED for the given day. */
     public LeaseState getCurrentState(LocalDate today) {
