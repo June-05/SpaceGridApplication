@@ -42,15 +42,27 @@ was converted to a web frontend (plain HTML, CSS and JavaScript) served by Sprin
 
 ## Screenshots
 
-**To be added.** The screenshots are not in the repository yet. Put the images in `docs/projectfiles/screenshots/` with these names, then replace this table with image links.
+Taken with the demo data (accounts `landlord` and `renter`, see [Demo accounts](#demo-accounts)).
 
-| File | Shows |
-|---|---|
-| `homepage.png` | The public homepage with property cards and filters |
-| `grid-plotter.png` | The grid plotter (landlord) |
-| `landlord-dashboard.png` | The landlord dashboard with property cards |
-| `lease-page.png` | A lease page with the payment statement |
-| `renter-pay.png` | The renter's pay page |
+**Public homepage**
+
+![The public homepage with property cards and filters](docs/projectfiles/screenshots/homepage.png)
+
+**Grid plotter (landlord)**
+
+![The grid plotter](docs/projectfiles/screenshots/grid-plotter.png)
+
+**Landlord dashboard**
+
+![The landlord dashboard with property cards](docs/projectfiles/screenshots/landlord-dashboard.png)
+
+**Lease page with the payment statement**
+
+![A lease page with the payment statement](docs/projectfiles/screenshots/lease-page.png)
+
+**Renter pay page**
+
+![The renter's pay page](docs/projectfiles/screenshots/renter-pay.png)
 
 ## Features
 
