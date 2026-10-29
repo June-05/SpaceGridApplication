@@ -415,9 +415,10 @@ Until then the app is tested by hand: log in with the demo accounts and try each
 
 | Name | Role |
 |---|---|
-| *(name)* | *(role)* |
-| *(name)* | *(role)* |
-| *(name)* | *(role)* |
+| Kit Jasper Caballero | Project Manager |
+| Jun Mari Manla | Main Developer |
+| Ethan Gabriele Delos Santos | Front End Developer |
+| Christian Reynz Agosto | Front End Developer |
 
 ## Credits and acknowledgments
 

@@ -641,4 +641,4 @@ JOIN users u ON u.id = l.renter_id;
 - Diagrams: the `.drawio` diagrams were already updated on 2026-10-29 (UML file and ERD); they do not mention `DemoImages` or the new demo data.
 
 ### Not done yet / follow-ups
-- Four unit photos are missing (see `image-manifest.md`); screenshots for the README are not taken yet; the manuscript still has to be updated from the new `G7_SpaceGrid_Submission` file.
+- Four unit photos are missing (see `image-manifest.md`); screenshots for the README are not taken yet.
