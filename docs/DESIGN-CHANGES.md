@@ -421,6 +421,24 @@ The sample data gives the two landlords and Ana and Paolo an email and phone; **
 
 ---
 
+## 2026-10-29 · Units page: Map / List view, compact cards, "Rate for new leases" (UI only, no design change)
+
+Phase 6 of the UI plan. Front-end only: no Java, SQL or API change. Answers "too much text on the units page / a plotter-like visual would help" and "changing a unit's rent needs more clarity".
+
+### What changed
+- **Map / List toggle** on `landlord/units.html`. **Map** draws the property's grid read-only with `grid-renderer.js` (from `GET /api/properties/{id}`), units in their status colors with a legend. The status filters and the search dim the other units. Clicking a unit opens Quick Edit; common areas do nothing. Changing the layout still happens in "View/Edit Grid Layout". **List** is the cards.
+- Default (agreed with the owner): Map when units are placed on the grid, otherwise List; the last choice is remembered in the browser (`localStorage.unitsView`). An empty map says where to draw units.
+- **Compact cards:** name, size, status, rate, tenant and one link (View lease / Create lease). Clicking the card opens Quick Edit. The rate box on each card was removed; the rate is edited in Quick Edit.
+- **Quick Edit:** the rent field is now **"Rate for new leases"** with a note: for an occupied unit "Ana Cruz's current lease stays at ₱… / month until …. A new rate only applies to new leases (and renewals you create)"; for a vacant unit "This is the rent filled in when you create the next lease for this unit."
+
+### How it was checked
+`units-map-test.js` (23 checks: default view, toggle and remembered choice, map cells and legend, clicks on units vs common areas, filter/search dimming, compact cards and links, escaped names, the rent notes, the empty map) plus all earlier jsdom suites.
+
+### Not done yet / follow-ups
+- Next in the plan: Phase 7 (renter dashboard and pay pages rebuilt in Tailwind with the shared bar).
+
+---
+
 ## PROPOSED (not built) · Commercial ready, permits, bigger grid with zoom
 
 Status: **decided, not implemented.** Nothing below exists in the code yet. When a part is built, move it into a dated section above and update the docs listed at the end.

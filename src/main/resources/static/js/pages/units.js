@@ -1,13 +1,16 @@
 /*
  * units.js — script for landlord/units.html (?propertyId=; without it the first property is shown)
  *
- * 1. Load: GET /api/properties (for the "Viewing:" picker), GET /api/properties/{id}/units
- *    and GET /api/properties/{id}/leases (the ACTIVE lease of a unit gives its tenant).
- * 2. Each card: the rate can be changed right on the card (Enter or leaving the box saves it).
- *    Rate change = PUT /api/units/{id} with the unit's other fields unchanged.
- * 3. Quick Edit: status AVAILABLE <-> UNDER_MAINTENANCE (POST /api/units/{id}/maintenance), rate,
- *    and unit photos (GET/POST /api/units/{id}/files, DELETE /api/files/{id}).
- *    OCCUPIED can't be picked: it comes from a lease. "Create Lease" → lease-form.html?unitId=
+ * 1. Load: GET /api/properties (for the "Viewing:" picker), GET /api/properties/{id} (the grid, for the Map),
+ *    GET /api/properties/{id}/units and GET /api/properties/{id}/leases (the ACTIVE lease of a unit gives its tenant).
+ * 2. Two views of the same units (localStorage unitsView remembers the choice):
+ *      Map  = the property's grid, read-only (grid-renderer.js). The status/search filters dim the other units.
+ *             Clicking a unit opens Quick Edit. Shown first when units are placed on the grid.
+ *      List = one compact card per unit (name, status, rate, tenant); clicking a card opens Quick Edit.
+ * 3. Quick Edit: status AVAILABLE <-> UNDER_MAINTENANCE (POST /api/units/{id}/maintenance),
+ *    "Rate for new leases" (PUT /api/units/{id} with the unit's other fields unchanged; a running lease keeps
+ *    its own rent, and the note under the field says so), and unit photos (GET/POST /api/units/{id}/files,
+ *    DELETE /api/files/{id}). OCCUPIED can't be picked: it comes from a lease. "Create Lease" → lease-form.html?unitId=
  */
 const $ = (id) => document.getElementById(id);
 
@@ -23,6 +26,8 @@ let activeLeases = {};       // unit id → its ACTIVE lease
 let currentFilter = 'all';
 let currentSearch = '';
 let editing = null;          // unit open in the Quick Edit modal
+let property = null;         // GET /api/properties/{id}: the grid for the Map view
+let view = null;             // 'map' or 'list'
 
 document.addEventListener('DOMContentLoaded', async () => {
   await auth.requireLogin('LANDLORD');
@@ -43,24 +48,64 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('editPropertyLink').href = `property-form.html?id=${propertyId}`;
   $('gridLink').href = `property-grid.html?id=${propertyId}`;
 
+  $('mapEmptyLink').href = `property-grid.html?id=${propertyId}`;
+
   document.querySelectorAll('.filter-pill').forEach((pill) => pill.addEventListener('click', () => setFilter(pill)));
-  $('unitSearch').addEventListener('input', (e) => { currentSearch = e.target.value.trim().toLowerCase(); renderGrid(); });
-  $('blockGrid').addEventListener('change', (e) => { if (e.target.matches('.rate-input')) saveRate(e.target); });
-  $('blockGrid').addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.matches('.rate-input')) e.target.blur(); });
+  $('unitSearch').addEventListener('input', (e) => { currentSearch = e.target.value.trim().toLowerCase(); render(); });
+  $('viewToggle').addEventListener('click', (e) => {
+    const button = e.target.closest('[data-view]');
+    if (button) setView(button.dataset.view, true);
+  });
+  $('blockGrid').addEventListener('click', (e) => {
+    const card = e.target.closest('[data-unit-id]');
+    if (card && !e.target.closest('a, button')) openEditModal(Number(card.dataset.unitId));
+  });
+  $('mapHost').addEventListener('click', (e) => {
+    const cell = e.target.closest('.cell');
+    const zoneId = cell && mapLayout ? mapLayout.cells.get(gridRenderer.cellKey(Number(cell.dataset.row), Number(cell.dataset.col))) : null;
+    if (zoneId != null && units.some((u) => u.id === zoneId)) openEditModal(zoneId);
+  });
   $('modalPhotoInput').addEventListener('change', uploadPhotos);
   await loadUnits();
+  let saved = null;
+  try { saved = localStorage.getItem('unitsView'); } catch (e) { /* storage blocked */ }
+  setView(saved === 'list' || saved === 'map' ? saved : (hasPlacedUnits() ? 'map' : 'list'), false);
 });
 
+let mapLayout = null;        // the layout drawn in the Map view (cell → zone id, for clicks)
+
+/** True when at least one unit has spots on the grid (otherwise the Map has nothing to show). */
+function hasPlacedUnits() {
+  return Boolean(property && property.zones.some((z) => z.rentable && (z.positions || []).length > 0));
+}
+
+function setView(next, remember) {
+  view = next;
+  if (remember) { try { localStorage.setItem('unitsView', next); } catch (e) { /* storage blocked */ } }
+  document.querySelectorAll('#viewToggle [data-view]').forEach((b) => {
+    const on = b.dataset.view === view;
+    b.classList.toggle('bg-indigo-600', on);
+    b.classList.toggle('text-white', on);
+    b.classList.toggle('text-slate-600', !on);
+    b.setAttribute('aria-pressed', String(on));
+  });
+  $('unitMap').classList.toggle('hidden', view !== 'map');
+  $('blockGrid').classList.toggle('hidden', view !== 'list');
+  render();
+}
+
 async function loadUnits() {
-  const [list, leases] = await Promise.all([
+  const [list, leases, prop] = await Promise.all([
     api.get(`/api/properties/${propertyId}/units`),
-    api.get(`/api/properties/${propertyId}/leases`)
+    api.get(`/api/properties/${propertyId}/leases`),
+    api.get(`/api/properties/${propertyId}`)
   ]);
   units = list;
+  property = prop;
   activeLeases = {};
   leases.filter((l) => l.status === 'ACTIVE').forEach((l) => { activeLeases[l.unitId] = l; });
   updateStats();
-  renderGrid();
+  render();
 }
 
 function updateStats() {
@@ -85,7 +130,7 @@ function setFilter(pill) {
     p.classList.toggle('text-white', on);
     ['bg-white', 'border', 'border-slate-200', 'text-slate-700', 'hover:bg-slate-50'].forEach((c) => p.classList.toggle(c, !on));
   });
-  renderGrid();
+  render();
 }
 
 function sizeText(unit) {
@@ -94,48 +139,68 @@ function sizeText(unit) {
   return d.exact ? `${Number(d.areaSqm)} sq.m.` : `Approx. ${format.escape(d.description)}`;
 }
 
-function renderGrid() {
-  const shown = units.filter((u) => (currentFilter === 'all' || u.status === currentFilter)
+/** The units that pass the status filter and the search. */
+function shownUnits() {
+  return units.filter((u) => (currentFilter === 'all' || u.status === currentFilter)
     && (!currentSearch || u.name.toLowerCase().includes(currentSearch)));
+}
+
+function render() {
+  if (!view) return;
+  if (view === 'map') renderMap(); else renderList();
+}
+
+/** One compact card per unit: name, status, rate, tenant. The card opens Quick Edit. */
+function renderList() {
+  const shown = shownUnits();
   $('emptyState').classList.toggle('hidden', shown.length > 0);
   $('blockGrid').innerHTML = shown.map((unit) => {
     const [label, color] = STATUS_STYLE[unit.status];
     const lease = activeLeases[unit.id];
+    const link = lease
+      ? `<a href="/lease.html?id=${lease.id}" class="text-xs font-semibold text-emerald-700 hover:underline">View lease</a>`
+      : unit.status === 'AVAILABLE'
+        ? `<a href="lease-form.html?unitId=${unit.id}" class="text-xs font-semibold text-indigo-600 hover:underline">Create lease</a>`
+        : '';
     return `
-      <div class="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs hover:shadow-md transition">
-        <div class="p-4">
-          <div class="flex items-start justify-between mb-3">
-            <div>
-              <h3 class="text-base font-bold text-slate-900">${format.escape(unit.name)}</h3>
-              <p class="text-xs text-slate-500">${sizeText(unit)}</p>
-            </div>
-            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${color}">${label}</span>
+      <div data-unit-id="${unit.id}" title="Click to edit" class="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs hover:shadow-md hover:border-indigo-200 transition cursor-pointer">
+        <div class="flex items-start justify-between gap-2">
+          <div class="min-w-0">
+            <h3 class="text-sm font-bold text-slate-900 truncate">${format.escape(unit.name)}</h3>
+            <p class="text-[11px] text-slate-400">${sizeText(unit)}</p>
           </div>
-          <div class="mb-3 space-y-2">
-            ${lease ? `<div><p class="text-xs text-slate-500">Current Tenant</p>
-                         <p class="text-sm font-semibold text-slate-900">${format.escape(lease.tenantName)}</p></div>` : ''}
-            <div>
-              <label class="text-xs text-slate-500" for="rate-${unit.id}">Monthly Rent (Enter to save)</label>
-              <div class="relative mt-0.5">
-                <span class="absolute left-2.5 top-1.5 text-indigo-400 text-sm font-bold">₱</span>
-                <input id="rate-${unit.id}" data-unit-id="${unit.id}" class="rate-input w-full pl-7 pr-2 py-1 text-sm font-bold text-indigo-600 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-600"
-                       type="number" min="0" step="any" value="${Number(unit.rentalRate)}">
-              </div>
-            </div>
-          </div>
-          <div class="flex items-center gap-2">
-            <button onclick="openEditModal(${unit.id})" class="flex-1 py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-semibold rounded-xl transition border border-slate-200 flex items-center justify-center gap-2">
-              <i class="fa-solid fa-pen text-xs"></i> Quick Edit
-            </button>
-            ${lease
-              ? `<a href="/lease.html?id=${lease.id}" class="flex-1 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-semibold rounded-xl transition border border-emerald-100 flex items-center justify-center gap-2"><i class="fa-solid fa-file-contract text-xs"></i> View Lease</a>`
-              : unit.status === 'AVAILABLE'
-                ? `<a href="lease-form.html?unitId=${unit.id}" class="flex-1 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 text-xs font-semibold rounded-xl transition border border-indigo-100 flex items-center justify-center gap-2"><i class="fa-solid fa-file-contract text-xs"></i> Create Lease</a>`
-                : ''}
-          </div>
+          <span class="flex-shrink-0 px-2 py-0.5 rounded-full text-[11px] font-semibold ${color}">${label}</span>
+        </div>
+        <p class="mt-3 text-base font-extrabold text-indigo-600">${format.peso(unit.rentalRate)}<span class="text-[11px] font-medium text-slate-400"> / mo</span></p>
+        <div class="mt-2 flex items-center justify-between gap-2 text-xs">
+          <span class="truncate ${lease ? 'text-slate-700' : 'text-slate-400'}">${lease ? '<i class="fa-solid fa-user mr-1 text-slate-400"></i>' + format.escape(lease.tenantName) : 'No tenant'}</span>
+          ${link}
         </div>
       </div>`;
   }).join('');
+}
+
+/** The grid, read-only; units outside the filter/search are dimmed. */
+function renderMap() {
+  const placed = hasPlacedUnits();
+  $('mapEmpty').classList.toggle('hidden', placed);
+  $('mapHost').classList.toggle('hidden', !placed);
+  $('emptyState').classList.add('hidden');
+  if (!placed) { $('mapLegend').innerHTML = ''; mapLayout = null; return; }
+  mapLayout = gridRenderer.fromProperty(property);
+  const filtering = currentFilter !== 'all' || currentSearch;
+  const keep = new Set(shownUnits().map((u) => u.id));
+  gridRenderer.render($('mapHost'), mapLayout, filtering ? { mode: 'view', highlightZoneIds: keep } : { mode: 'view' });
+  const unitIds = new Set(units.map((u) => u.id));
+  $('mapHost').querySelectorAll('.cell').forEach((cell) => {
+    const id = mapLayout.cells.get(gridRenderer.cellKey(Number(cell.dataset.row), Number(cell.dataset.col)));
+    if (unitIds.has(id)) cell.classList.add('is-unit');
+  });
+  // legend: one chip per unit status on this property, in the grid's own colors
+  const seen = new Map();
+  for (const z of property.zones) if (z.rentable && z.status && z.status !== 'ARCHIVED' && !seen.has(z.status)) seen.set(z.status, z.color);
+  $('mapLegend').innerHTML = [...seen].map(([status, colorValue]) =>
+    `<span class="inline-flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm border border-slate-300" style="background:${colorValue}"></span>${(STATUS_STYLE[status] || [format.label(status)])[0]}</span>`).join('');
 }
 
 /** PUT /api/units/{id} needs every field: send the unit's current ones with the new rate. */
@@ -149,22 +214,6 @@ function unitFields(unit, rentalRate) {
   return fields;
 }
 
-async function saveRate(input) {
-  const unit = units.find((u) => u.id === Number(input.dataset.unitId));
-  const rate = input.value.trim();
-  if (!unit || rate === '' || Number(rate) === Number(unit.rentalRate)) return;
-  try {
-    const saved = await api.form('PUT', `/api/units/${unit.id}`, unitFields(unit, rate));
-    Object.assign(unit, saved);
-    input.classList.add('border-emerald-500');
-    setTimeout(() => input.classList.remove('border-emerald-500'), 1200);
-    updateStats();
-  } catch (err) {
-    alert(err.message);
-    input.value = Number(unit.rentalRate);
-  }
-}
-
 async function openEditModal(id) {
   editing = units.find((u) => u.id === id);
   if (!editing) return;
@@ -173,6 +222,9 @@ async function openEditModal(id) {
   $('modalStatus').value = editing.status;
   $('modalStatus').disabled = editing.status === 'OCCUPIED';
   $('modalRent').value = Number(editing.rentalRate);
+  $('modalRentNote').textContent = lease
+    ? `${lease.tenantName}'s current lease stays at ${format.peso(lease.monthlyRent)} / month until ${format.date(lease.endDate)}. A new rate only applies to new leases (and renewals you create).`
+    : 'This is the rent filled in when you create the next lease for this unit.';
   $('modalTenant').innerHTML = lease
     ? `${format.escape(lease.tenantName)} (${format.escape(lease.renterUsername)}) · <a class="text-indigo-600 font-semibold" href="/lease.html?id=${lease.id}">View lease</a>`
     : editing.status === 'AVAILABLE'
