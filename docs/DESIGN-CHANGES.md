@@ -464,7 +464,44 @@ Asked by the owner after Phase 6. Choices: the cover photo stays and the layout 
 
 ### Not done yet / follow-ups
 - Class diagram (`.drawio`): add `GridPreview`.
-- Next in the plan: Phase 7 (renter dashboard and pay pages rebuilt in Tailwind with the shared bar).
+- Phase 7 is built: see the next entry.
+
+---
+
+## 2026-10-29 · Renter dashboard and pay page rebuilt; teammate's CSS cleaned up (UI only, no design change)
+
+Phase 7, the last phase of the UI plan. No Java, SQL or API change. With the owner's OK this also fixes the PR #7 (`457066d`) problems listed in CLAUDE.md.
+
+### What changed
+- **`renter/dashboard.html` + `renter-dashboard.js` (rewritten):** Tailwind + the shared bar.
+  - Tiles: active leases, next payment (earliest DUE/OVERDUE line of all leases), overdue months.
+  - An amber link when requests are still waiting for the owner.
+  - "Current" and collapsible "Past leases" cards. Each card shows the unit's photo, or the layout with the renter's unit outlined (`GET /api/leases/{id}/property`), the Lease Status badge with what it means, the next amount due, and View lease / Pay (oldest unpaid month).
+  - Search; an empty state with Browse spaces / My requests.
+  - Fixes: names are escaped, `requireLogin('RENTER')` is no longer inside a try/catch that ignored failures, and the "next amount due" uses the real `amountDue` field (the old card read `amount` and called a missing `format.currency`, so it always showed ₱0.00).
+- **`renter/pay.html` + `pay.js` (restyled, same rules):** Tailwind + the shared bar.
+  - A back link to the lease, and a summary card (lease, period, amount, due date, DUE/OVERDUE).
+  - Method cards (GCash / Maya / Card) that change the account field's label.
+  - Declines are shown in a red box and the button turns back on.
+  - A receipt with the reference number and a "Pay next" link when another month is unpaid.
+- **`css/base.css`:** `.btn` is white again (`var(--surface)`); the teammate's `--btnbg` gray, which had also turned the plotter's buttons gray, is removed.
+- **Deleted** the unused `css/renter-css/dashboard.css`, `pay.css`, `lease.css`, `request.css` (no page linked them any more; git history keeps them).
+- All logged-in pages now share the Tailwind look and the top bar; `base.css` is only for login, register, index and the plotter.
+
+### How it was checked
+`renter-pages-test.js` (26 checks: shared bar, renter role, tiles, current/past sections, escaping, photo vs layout thumbnail vs placeholder, Pay link month, expiring-soon line, search, empty state; pay summary, method label, empty account, declined, paid receipt + Pay next, all paid, no leaseId) plus all earlier jsdom suites, including the plotter suites after the `.btn` change.
+
+### Not done yet / follow-ups
+- All 7 UI phases are done. Remaining from CLAUDE.md: lease timing markers on the plotter, the map pin, the unit tests, and the draw.io diagrams (new fields and classes from Phases 3, 5 and the layout previews).
+
+### Follow-up: the homepage uses the shared top bar too (UI only)
+Renters found "My Requests" hard to reach: on the homepage it was hidden in the profile dropdown. The homepage's own bar is replaced by the shared one (`nav.js`, new **public mode** `data-public="true"`):
+- **Logged-in renter:** Browse spaces (highlighted) · My Leases · My Requests in the bar, plus the bell. The profile menu has only the name and **Log Out** (on phone-width screens the links also appear there, as on every page).
+- **Landlord:** their usual links.
+- **Guest:** List your space · Log in · Register, and no redirect to the login page.
+- The search box and the Saved button moved from the bar into the page, above the listings, with the same ids.
+- `homepage.js` lost its own profile menu, logout and pending-count code; the bell covers the pending count.
+- Checked with `homebar-test.js` (14 checks) plus all earlier suites.
 
 ---
 

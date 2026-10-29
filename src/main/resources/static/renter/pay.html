@@ -3,65 +3,84 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Pay Rent · SpaceGrid</title>
-  <link rel="stylesheet" href="/css/base.css">
-  <link rel="stylesheet" href="/css/zones.css">
-  <!-- Dedicated Pay Page Stylesheet -->
-  <link rel="stylesheet" href="/css/renter-css/pay.css">
+  <title>Pay Rent - SpaceGrid</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+    body { font-family: 'Plus Jakarta Sans', sans-serif; }
+    .method-card:has(input:checked) { border-color: #4f46e5; background: #eef2ff; }
+  </style>
 </head>
-<body class="pay-page">
+<body class="bg-[#f8fafc] text-slate-900 min-h-screen flex flex-col antialiased">
+  <!-- Shared top bar (built by /js/common/nav.js) -->
+  <header id="appNav" data-page="leases"></header>
 
-  <!-- Full-width Topbar matching Dashboard -->
-  <header class="topbar">
-    <div class="titles">
-      <h1>SpaceGrid</h1>
-      <p class="subtitle">Pay Rent</p>
+  <main class="flex-1 max-w-xl mx-auto w-full px-4 sm:px-6 py-8 space-y-5">
+    <div>
+      <a id="backLink" href="/renter/dashboard.html" class="text-xs font-semibold text-slate-500 hover:text-indigo-600 transition"><i class="fa-solid fa-arrow-left mr-1"></i><span id="backText">My leases</span></a>
+      <h1 class="text-2xl font-extrabold text-slate-900 tracking-tight mt-1">Pay Rent</h1>
+      <p class="text-sm text-slate-500 mt-0.5">Simulated payment gateway: no real money is moved.</p>
     </div>
-    <div class="topbar-actions">
-      <a href="/renter/dashboard.html" class="btn">← Back to Dashboard</a>
-    </div>
-  </header>
 
-  <!-- Centered Payment Container -->
-  <main class="pay-container">
-    <div class="pay-card">
-      <div class="pay-card-header">
-        <h2>Rent Payment</h2>
-        <p class="subtitle">Simulated Payment Gateway</p>
-        <p id="amountInfo" class="subtitle"></p>
+    <!-- What is being paid -->
+    <section id="summary" class="hidden bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-2">
+      <div class="flex items-start justify-between gap-3">
+        <div class="min-w-0">
+          <p id="sumLease" class="text-sm font-bold text-slate-900 truncate"></p>
+          <p id="sumPeriod" class="text-xs text-slate-500"></p>
+        </div>
+        <span id="sumStatus" class="flex-shrink-0 text-[11px] font-bold px-2 py-0.5 rounded-md"></span>
       </div>
+      <p id="amountInfo" class="text-2xl font-extrabold text-indigo-600"></p>
+      <p id="sumDue" class="text-xs text-slate-500"></p>
+    </section>
 
-      <form id="payForm" novalidate>
-        <label class="field">
-          <span>Billing Month</span>
-          <input name="billingMonth" type="month" id="billingMonth" required>
-        </label>
+    <form id="payForm" novalidate class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
+      <!-- the billing period is chosen on the lease page; kept here so the form shows it -->
+      <input name="billingMonth" type="hidden" id="billingMonth">
 
-        <label class="field">
-          <span>Payment Method</span>
-          <select name="method" id="method" required>
-            <option value="GCASH">GCash</option>
-            <option value="MAYA">Maya</option>
-            <option value="CARD">Credit / Debit Card</option>
-          </select>
-        </label>
+      <fieldset>
+        <legend class="text-xs font-bold text-slate-700 mb-2">Payment method</legend>
+        <div id="methods" class="grid grid-cols-3 gap-2">
+          <label class="method-card cursor-pointer border border-slate-200 rounded-xl p-3 text-center text-xs font-bold text-slate-700 transition">
+            <input type="radio" name="method" value="GCASH" class="sr-only" checked><i class="fa-solid fa-mobile-screen block text-lg mb-1 text-sky-600"></i>GCash
+          </label>
+          <label class="method-card cursor-pointer border border-slate-200 rounded-xl p-3 text-center text-xs font-bold text-slate-700 transition">
+            <input type="radio" name="method" value="MAYA" class="sr-only"><i class="fa-solid fa-wallet block text-lg mb-1 text-emerald-600"></i>Maya
+          </label>
+          <label class="method-card cursor-pointer border border-slate-200 rounded-xl p-3 text-center text-xs font-bold text-slate-700 transition">
+            <input type="radio" name="method" value="CARD" class="sr-only"><i class="fa-solid fa-credit-card block text-lg mb-1 text-indigo-600"></i>Card
+          </label>
+        </div>
+      </fieldset>
 
-        <label class="field">
-          <span>Account / Card Number</span>
-          <input name="accountNumber" id="accountNumber" placeholder="e.g. 09171234567" required>
-          <small class="help-text">Note: Numbers ending in 0000 simulate a declined payment.</small>
-        </label>
+      <label class="block">
+        <span id="accountLabel" class="text-xs font-bold text-slate-700">GCash mobile number</span>
+        <input name="accountNumber" id="accountNumber" required inputmode="numeric" placeholder="e.g. 09171234567"
+               class="mt-1 w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-600">
+        <span class="block text-[11px] text-slate-500 mt-1">Test tip: a number ending in 0000 simulates a declined payment.</span>
+      </label>
 
-        <button class="btn btn-primary btn-block pay-btn" type="submit">Complete Payment</button>
-        <p id="error" class="error" aria-live="polite"></p>
-        <!-- shown after a successful payment (pay.js) -->
-        <p id="result" aria-live="polite" style="color: #15803d; font-weight: 600;"></p>
-      </form>
-    </div>
+      <p id="error" class="hidden text-sm font-semibold text-rose-700 bg-rose-50 border border-rose-200 rounded-xl px-4 py-3" aria-live="polite"></p>
+      <button id="payBtn" type="submit" class="w-full py-3 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-sm font-bold rounded-xl transition shadow-sm shadow-indigo-200">Complete Payment</button>
+    </form>
+
+    <!-- shown after a successful payment (pay.js) -->
+    <section id="result" class="hidden bg-emerald-50 border border-emerald-200 rounded-2xl p-5 space-y-3" aria-live="polite">
+      <p class="text-base font-extrabold text-emerald-800"><i class="fa-solid fa-circle-check mr-1"></i>Payment received</p>
+      <p class="text-sm text-emerald-900">Reference no. <strong id="refNo"></strong> · <span id="refMethod"></span></p>
+      <div class="flex flex-wrap gap-2">
+        <a id="resultLeaseLink" href="/" class="px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold">Back to the lease</a>
+        <a id="payNextLink" href="/" class="hidden px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold"></a>
+      </div>
+    </section>
   </main>
 
   <script src="/js/common/api.js"></script>
   <script src="/js/common/auth.js"></script>
+  <script src="/js/common/nav.js"></script>
   <script src="/js/common/format.js"></script>
   <script src="/js/pages/pay.js"></script>
 </body>

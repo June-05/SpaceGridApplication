@@ -254,7 +254,7 @@ Links start with `/` so they work from inside the `landlord/` and `renter/` fold
 | Page | Who | Purpose | Script | Grid? | Endpoints |
 |---|---|---|---|---|---|
 | `index.html` | everyone | Old welcome page, Login / Register / Browse buttons | none | | none |
-| `homepage.html` | everyone | **Front door (`/`).** Browse spaces with free blocks: search, type / min-blocks / power filters, sort, pagination, saved spaces, details window. Each card shows the layout (free units bright); the details window has a bigger map where a renter clicks a free unit to pick it. Renters send a lease request there; guests are sent to log in. Uses Tailwind CDN, not `base.css` | `homepage.js` | ✔ read-only | `GET /api/browse`, `GET /api/browse/{id}`, `GET /api/browse/{id}/layout`, `GET /api/auth/me` (plain fetch), `POST /api/lease-requests`, `POST /api/auth/logout` |
+| `homepage.html` | everyone | **Front door (`/`).** Browse spaces with free blocks: search, type / min-blocks / power filters, sort, pagination, saved spaces, details window. Each card shows the layout (free units bright); the details window has a bigger map where a renter clicks a free unit to pick it. Renters send a lease request there; guests are sent to log in. Uses Tailwind CDN, not `base.css`, and the shared top bar in public mode (`nav.js`, guests get Log in / Register) | `homepage.js` | ✔ read-only | `GET /api/browse`, `GET /api/browse/{id}`, `GET /api/browse/{id}/layout`, `GET /api/auth/me` (plain fetch), `POST /api/lease-requests`, `POST /api/auth/logout` |
 | `requests.html` | both | Renter: own requests + Cancel. Landlord: incoming requests + Approve / Decline, "Create lease" on approved ones | `requests.js` | | `GET /api/lease-requests`, `POST …/{id}/approve`, `…/decline`, `…/cancel` |
 | `login.html` | everyone | Login, then redirect by role | `login.js` | | `POST /api/auth/login` |
 | `register.html` | everyone | Create an account (choose role), then logged in right away | `register.js` | | `POST /api/auth/register`, `POST /api/auth/login` |
@@ -266,14 +266,14 @@ Links start with `/` so they work from inside the `landlord/` and `renter/` fold
 | `landlord/lease-form.html` | landlord | New lease (`?unitId=`, `?requestId=` prefill), or renew (`?renew=<leaseId>`): renter account + contact details, unit, dates, rent, payment terms, contract PDF | `lease-form.js` | | `GET /api/renters`, `GET /api/properties`, `GET …/{id}/units`, `POST /api/leases`, `POST /api/leases/{id}/renew`, `POST /api/leases/{id}/files` |
 | `lease.html` | both | Lease details, unit location on the grid, statement by billing period, payment history, contract. **Landlord:** End / Terminate / Renew, upload contract. **Renter:** "Pay" on the oldest unpaid period. | `lease.js` | ✔ read-only | `GET /api/leases/{id}`, `GET …/{id}/property`, `GET …/{id}/statement`, `GET …/{id}/payments`, `GET/POST …/{id}/files`, `POST …/{id}/end`, `POST …/{id}/terminate` |
 | `contract.html` | both | Generic lease agreement filled in from the lease (parties, premises, term, rent and payment terms, standard clauses, signature lines). "Print / Save as PDF" prints only the document. The signed scan is uploaded on `lease.html` as the "Signed copy". | `contract.js` | | `GET /api/leases/{id}`, `GET …/{id}/property` |
-| `renter/dashboard.html` | renter | My leases (unit photo), days remaining, next amount due | `renter-dashboard.js` | | `GET /api/leases`, `GET /api/leases/{id}/statement` |
-| `renter/pay.html` | renter | Simulated checkout for one period (`?leaseId=&month=`): method (GCash / Maya / Card), account number, confirm | `pay.js` | | `GET /api/leases/{id}/statement`, `POST /api/leases/{id}/payments` |
+| `renter/dashboard.html` | renter | "My Leases": tiles (active leases, next payment, overdue months), pending-requests link, Current and Past lease cards (unit photo or the layout with the unit outlined, Lease Status + meaning, next due, View lease / Pay), search | `renter-dashboard.js` | ✔ read-only | `GET /api/leases`, `GET /api/leases/{id}/statement`, `GET /api/leases/{id}/property`, `GET /api/lease-requests` |
+| `renter/pay.html` | renter | Simulated checkout for one period (`?leaseId=&month=`): summary (lease, period, amount, due date, status), method cards (GCash / Maya / Card), account number, receipt with reference number and "Pay next" | `pay.js` | | `GET /api/leases/{id}`, `GET /api/leases/{id}/statement`, `POST /api/leases/{id}/payments` |
 
 ### Shared CSS and JS
 
 | File | Responsibility |
 |---|---|
-| `css/base.css` | Colors, layout, nav bar, buttons, forms, tables, cards, badges, toasts |
+| `css/base.css` | Only for `login.html`, `register.html`, `index.html` and the plotter (the other pages use Tailwind): colors, buttons, forms, cards, badges, toasts |
 | `css/grid.css` | Grid structure only: cell size, edge thickness, door/window shapes, labels |
 | `css/zones.css` | **The file to edit to customize the look.** One rule per CSS class from the enums: `.zone-walkway`, `.zone-grass`, `.zone-bathroom`, …, `.status-available`, `.status-occupied`, …, `.edge-wall`, `.edge-door`, `.edge-window`, plus lease/due badges (`.state-expiring-soon`, `.due-overdue`, …). Default rule: `.zone { background: var(--zone-color); }` |
 | `js/common/api.js` | `fetch` wrapper: JSON in/out, shows `{"error": …}` messages, 401 → `/login.html` |

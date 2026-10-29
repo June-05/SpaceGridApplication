@@ -11,7 +11,7 @@
              GET /api/browse/{id}           (one space, for the details window)
              GET /api/auth/me               (who is logged in, optional)
              POST /api/lease-requests       (renter asks to lease a unit)
-             POST /api/auth/logout
+             (top bar: js/common/nav.js, public mode)
   Script: /js/pages/homepage.js
   This page keeps Tailwind (CDN) and Font Awesome on purpose: it is the one page that is not styled by base.css.
 -->
@@ -35,55 +35,10 @@ body { font-family: 'Plus Jakarta Sans', sans-serif; }
 </style>
 </head>
 <body class="bg-[#f8fafc] text-slate-900 min-h-screen flex flex-col">
-<!-- ================= TOP NAVIGATION BAR ================= -->
-<header class="bg-white border-b border-slate-200 sticky top-0 z-30">
-<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between gap-6">
-<!-- Brand Logo -->
-<a href="/" class="flex items-center gap-2 flex-shrink-0">
-<span class="text-2xl font-black tracking-tight text-slate-900">Space<span class="text-indigo-600">Grid</span></span>
-</a>
-<!-- Search Bar -->
-<div class="flex-1 max-w-2xl mx-auto">
-<div class="relative flex items-center">
-<i class="fa-solid fa-magnifying-glass absolute left-4 text-slate-400 text-sm"></i>
-<input id="searchInput" type="text" placeholder="Search by property name, location, or owner..." class="w-full pl-11 pr-24 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition" >
-<button id="searchBtn" class="absolute right-1.5 px-4 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-semibold rounded-lg transition"> Search </button>
-</div>
-</div>
-<!-- Right User Actions -->
-<div class="flex items-center gap-3 flex-shrink-0 relative">
-<!-- Saved spaces (kept in this browser only) -->
-<button id="savedBtn" type="button" class="flex items-center gap-2 px-3 py-2 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-xl text-xs font-semibold transition" title="Show only the spaces you saved">
-<i class="fa-regular fa-heart"></i>
-<span class="hidden md:inline">Saved</span>
-<span id="savedCount" class="text-[11px] bg-white border border-slate-200 px-1.5 rounded-full">0</span>
-</button>
-<!-- Role shortcut: filled in by homepage.js (List your space / My dashboard) -->
-<a id="workspaceLink" href="/register.html" class="hidden md:flex items-center gap-2 px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl text-xs font-semibold transition">
-<i class="fa-solid fa-repeat text-indigo-500"></i>
-<span id="workspaceText">List your space</span>
-</a>
-<!-- Shown when nobody is logged in -->
-<div id="guestActions" class="flex items-center gap-2 pl-2 border-l border-slate-200">
-<a href="/login.html" class="px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 rounded-xl transition">Log in</a>
-<a href="/register.html" class="px-4 py-2 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl transition">Register</a>
-</div>
-<!-- Shown when logged in -->
-<div id="profileDropdownBtn" class="hidden flex items-center gap-2.5 pl-2 border-l border-slate-200 cursor-pointer select-none">
-<div id="profileInitials" class="w-9 h-9 rounded-full bg-slate-800 text-white flex items-center justify-center font-bold text-xs ring-2 ring-indigo-600/10"> ? </div>
-<span id="profileName" class="text-sm font-semibold text-slate-800 hidden sm:inline">Name</span>
-<i class="fa-solid fa-chevron-down text-xs text-slate-400"></i>
-</div>
-<!-- Profile Dropdown Menu -->
-<div id="profileMenu" class="hidden absolute right-0 top-14 w-52 bg-white border border-slate-200 rounded-xl shadow-lg py-2 z-50">
-<a id="menuDashboard" href="/" class="block px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">My Dashboard</a>
-<a id="menuRequests" href="/requests.html" class="block px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">Lease Requests <span id="menuRequestsCount" class="hidden ml-1 text-[10px] bg-rose-500 text-white px-1.5 py-0.5 rounded-full font-bold"></span></a>
-<div class="border-t border-slate-100 my-1"></div>
-<button id="logoutBtn" type="button" class="block w-full text-left px-4 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50">Log Out</button>
-</div>
-</div>
-</div>
-</header>
+<!-- ================= TOP NAVIGATION BAR: the shared bar (js/common/nav.js) =================
+     Logged in: the same bar as the other pages (renter: Browse spaces · My Leases · My Requests, bell, Log Out).
+     Guest: List your space · Log in · Register (data-public = no redirect to the login page). -->
+<header id="appNav" data-page="browse" data-public="true"></header>
 <!-- ================= MAIN CONTAINER ================= -->
 <main class="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 flex flex-col md:flex-row gap-8">
 <!-- ========== LEFT SIDEBAR: FILTERS ========== -->
@@ -187,6 +142,20 @@ body { font-family: 'Plus Jakarta Sans', sans-serif; }
 <!-- ========== RIGHT MAIN CONTENT: LISTINGS ========== -->
 <section class="flex-1 min-w-0 flex flex-col justify-between">
 <div>
+<!-- Search + Saved (moved here from the old top bar; same ids) -->
+<div class="flex flex-col sm:flex-row gap-3 mb-6">
+<div class="relative flex items-center flex-1">
+<i class="fa-solid fa-magnifying-glass absolute left-4 text-slate-400 text-sm"></i>
+<input id="searchInput" type="text" placeholder="Search by property name, location, or owner..." class="w-full pl-11 pr-24 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition">
+<button id="searchBtn" class="absolute right-1.5 px-4 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-semibold rounded-lg transition">Search</button>
+</div>
+<!-- Saved spaces (kept in this browser only) -->
+<button id="savedBtn" type="button" class="flex items-center justify-center gap-2 px-4 py-2.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-xl text-xs font-semibold transition flex-shrink-0" title="Show only the spaces you saved">
+<i class="fa-regular fa-heart"></i>
+<span>Saved</span>
+<span id="savedCount" class="text-[11px] bg-slate-50 border border-slate-200 px-1.5 rounded-full">0</span>
+</button>
+</div>
 <!-- Section Header & Filter Badges -->
 <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
 <div>
@@ -307,6 +276,8 @@ body { font-family: 'Plus Jakarta Sans', sans-serif; }
 <div id="toast" class="hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] bg-slate-900 text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow-lg"></div>
 
 <script src="/js/common/api.js"></script>
+<script src="/js/common/auth.js"></script>
+<script src="/js/common/nav.js"></script>
 <script src="/js/common/grid-renderer.js"></script>
 <script src="/js/pages/homepage.js"></script>
 </body>

@@ -3,49 +3,99 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>My Leases · SpaceGrid</title>
-    <link rel="stylesheet" href="/css/base.css">
-    <link rel="stylesheet" href="/css/zones.css">
-    <!-- Links directly to your updated folder path -->
-    <link rel="stylesheet" href="/css/renter-css/dashboard.css">
+  <title>My Leases - SpaceGrid</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- grid.css + zones.css draw the layout thumbnails (grid-renderer.js) -->
+  <link rel="stylesheet" href="/css/grid.css">
+  <link rel="stylesheet" href="/css/zones.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+    body { font-family: 'Plus Jakarta Sans', sans-serif; }
+    :root { --surface: #ffffff; --border: #d9dee5; }   /* used by grid.css */
+    .grid-thumb { display: flex; align-items: center; justify-content: center; overflow: hidden; }
+    .grid-thumb .grid-stage { pointer-events: none; }
+  </style>
 </head>
-<body class="dashboard-page">
-  <header class="topbar">
-    <div class="titles">
-      <h1>SpaceGrid</h1>
-      <p class="subtitle">Renter Workspace</p>
-    </div>
-    <div class="topbar-actions">
-      <a href="/" class="btn btn-primary">Browse spaces</a>
-      <a href="/requests.html" class="btn">My requests</a>
-      <button id="btnLogout" class="btn" type="button">Log out</button>
-    </div>
-  </header>
+<body class="bg-[#f8fafc] text-slate-900 min-h-screen flex flex-col antialiased">
+  <!-- Shared top bar (built by /js/common/nav.js) -->
+  <header id="appNav" data-page="leases"></header>
 
-  <main class="container">
-    <section class="section-header">
-      <h2>My Active Leases</h2>
+  <main class="flex-1 max-w-6xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+    <!-- Title, search, main action -->
+    <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+      <div>
+        <h1 class="text-2xl font-extrabold text-slate-900 tracking-tight">My Leases</h1>
+        <p class="text-sm text-slate-500 mt-0.5">Your spaces, what you owe next, and your past leases.</p>
+      </div>
+      <div class="flex flex-wrap items-center gap-2">
+        <div class="relative">
+          <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-2.5 text-slate-400 text-sm"></i>
+          <input id="leaseSearchInput" type="text" placeholder="Search property or unit..." class="w-60 pl-10 pr-4 py-2 text-sm bg-white border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-600">
+        </div>
+        <a href="/" class="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow-sm shadow-indigo-200">
+          <i class="fa-solid fa-magnifying-glass text-xs"></i><span>Browse spaces</span>
+        </a>
+      </div>
+    </div>
+
+    <!-- Requests still waiting for the owner (hidden when there are none) -->
+    <a id="pendingCard" href="/requests.html" class="hidden flex items-center justify-between gap-4 px-5 py-4 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-2xl transition">
+      <span class="flex items-center gap-3 text-sm font-bold text-amber-800"><i class="fa-solid fa-hourglass-half"></i><span id="pendingCardText"></span></span>
+      <span class="text-xs font-bold text-amber-700">My requests <i class="fa-solid fa-chevron-right ml-1"></i></span>
+    </a>
+
+    <!-- Summary tiles -->
+    <div id="tiles" class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div class="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
+        <p class="text-xs text-slate-500 font-medium">Active leases</p>
+        <p id="tileActive" class="text-xl font-extrabold text-slate-900 mt-0.5">0</p>
+      </div>
+      <div class="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
+        <p class="text-xs text-slate-500 font-medium">Next payment</p>
+        <p id="tileNext" class="text-xl font-extrabold text-indigo-600 mt-0.5">—</p>
+        <p id="tileNextNote" class="text-[11px] text-slate-500"></p>
+      </div>
+      <div id="tileOverdueBox" class="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
+        <p class="text-xs text-slate-500 font-medium">Overdue months</p>
+        <p id="tileOverdue" class="text-xl font-extrabold text-slate-900 mt-0.5">0</p>
+      </div>
+    </div>
+
+    <p id="error" class="text-sm font-semibold text-rose-600" aria-live="polite"></p>
+
+    <!-- Current leases -->
+    <section id="currentSection">
+      <h2 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Current</h2>
+      <div id="leases" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5"></div>
+      <p id="noCurrent" class="hidden text-sm text-slate-500">No lease is running right now.</p>
     </section>
 
-    <!-- Isolated search bar container -->
-    <div class="dashboard-search-container">
-      <input 
-        type="text" 
-        id="leaseSearchInput" 
-        class="search-input" 
-        placeholder="Search property or unit..."
-      />
-    </div>
+    <!-- Past leases (ended, terminated, renewed) -->
+    <details id="pastSection" class="hidden">
+      <summary class="cursor-pointer text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 select-none">Past leases (<span id="pastCount">0</span>)</summary>
+      <div id="pastLeases" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 mt-3"></div>
+    </details>
 
-    <!-- Active Leases Grid -->
-    <div id="leases" class="card-grid">
-      <!-- Dynamic content from renter-dashboard.js -->
+    <!-- No lease at all -->
+    <div id="emptyState" class="hidden py-16 text-center bg-white border border-slate-200 rounded-2xl">
+      <i class="fa-solid fa-file-contract text-4xl text-slate-300 mb-3"></i>
+      <h3 class="text-base font-bold text-slate-800">You have no leases yet</h3>
+      <p class="text-xs text-slate-500 mt-1 mb-4">Find a space and send a request. When the owner creates your lease, it shows up here.</p>
+      <div class="flex justify-center gap-2">
+        <a href="/" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold">Browse spaces</a>
+        <a href="/requests.html" class="px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold">My requests</a>
+      </div>
     </div>
+    <p id="noMatch" class="hidden text-sm text-slate-500">No lease matches your search.</p>
   </main>
 
   <script src="/js/common/api.js"></script>
   <script src="/js/common/auth.js"></script>
+  <script src="/js/common/nav.js"></script>
   <script src="/js/common/format.js"></script>
+  <script src="/js/common/grid-renderer.js"></script>
   <script src="/js/pages/renter-dashboard.js"></script>
 </body>
 </html>

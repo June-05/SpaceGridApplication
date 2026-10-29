@@ -6,7 +6,7 @@
  *                  availableBlocks, minRate, maxRate, powerIncluded, waterIncluded, units[]
  * 2. Search / filter / sort / pagination all happen here in the browser, on that list.
  * 3. GET /api/auth/me is called with plain fetch (not auth.requireLogin) because this page is public:
- *    a 401 just means "guest".
+ *    a 401 just means "guest". The top bar (links, bell, Log Out / Log in) is js/common/nav.js in public mode.
  * 4. A logged-in renter can send a lease request: POST /api/lease-requests (LeaseRequestController.create)
  *    with the form fields unitId, startDate, months, message.
  *    The renter needs an email and a phone on the account: the form shows both (filled from the account) and
@@ -128,37 +128,6 @@ async function loadMe() {
   } catch (err) {
     me = null;
   }
-  renderUser();
-}
-
-function renderUser() {
-  const link = $('workspaceLink');
-  if (!me) {
-    $('guestActions').classList.remove('hidden');
-    $('profileDropdownBtn').classList.add('hidden');
-    link.href = '/register.html';
-    $('workspaceText').textContent = 'List your space';
-    return;
-  }
-  $('guestActions').classList.add('hidden');
-  $('profileDropdownBtn').classList.remove('hidden');
-  $('profileName').textContent = me.fullName;
-  $('profileInitials').textContent = me.fullName.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase();
-  const home = me.role === 'LANDLORD' ? '/landlord/dashboard.html' : '/renter/dashboard.html';
-  link.href = home;
-  $('workspaceText').textContent = me.role === 'LANDLORD' ? 'My workspace' : 'My leases';
-  $('menuDashboard').href = home;
-  $('menuRequests').firstChild.textContent = me.role === 'LANDLORD' ? 'Lease Requests ' : 'My Requests ';
-  if (me.role === 'LANDLORD') showPendingCount();
-}
-
-/** Landlord: number of requests waiting for a decision, next to "Lease Requests" in the profile menu. */
-async function showPendingCount() {
-  try {
-    const pending = (await api.get('/api/lease-requests')).filter((r) => r.status === 'PENDING').length;
-    $('menuRequestsCount').textContent = pending;
-    $('menuRequestsCount').classList.toggle('hidden', pending === 0);
-  } catch (err) { /* the count is optional */ }
 }
 
 /* ---------- loading the listings ---------- */
@@ -589,20 +558,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (openListing) toggleSaved(openListing.id);
   });
   $('requestForm').addEventListener('submit', submitRequest);
-
-  // profile menu
-  $('profileDropdownBtn').addEventListener('click', (event) => {
-    event.stopPropagation();
-    $('profileMenu').classList.toggle('hidden');
-  });
-  document.addEventListener('click', () => $('profileMenu').classList.add('hidden'));
-  $('logoutBtn').addEventListener('click', async () => {
-    try {
-      await api.form('POST', '/api/auth/logout');
-    } finally {
-      location.href = '/';
-    }
-  });
 
   updateSavedUi();
   await Promise.all([loadMe(), loadListings()]);
