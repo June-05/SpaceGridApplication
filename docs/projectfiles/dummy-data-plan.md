@@ -20,7 +20,7 @@ Checked against `database/spacegrid_db.sql` (schema and sample data), the model 
 | `properties` | 5 | 6-16 |
 | `grid_zones` (units and common areas share ids) | 20 | 21-92 |
 | `lease_contracts` | 5 | 6-21 |
-| `payments` | 38 | 39 and up (explicit ids, in lease order) |
+| `payments` | 39 | 40 and up (explicit ids, in lease order) |
 | `lease_requests` | 4 | 5-15 |
 | `uploaded_files` | none | depends on the image decision (see `image-manifest.md`) |
 
@@ -92,7 +92,8 @@ P15 3x5   r0: 85 85 85 86 86               P16 4x5   r0: 90 90 .. .. ..
 | 7 | DOOR `(2,0)` and `(3,0)` HORIZONTAL; WINDOW `(0,4)` HORIZONTAL | DOOR, WINDOW |
 | 8 | WALL `(3,0)` HORIZONTAL (a fence between driveway and garden; no automatic wall there) | WALL |
 | 9 | OPEN `(3,2)` HORIZONTAL (Shop 6 opens to the walkway); DOOR `(1,0)` and `(2,0)` | OPEN, DOOR |
-| 10, 13, 14, 15 | one DOOR each where a restroom/commissary meets the walkway | DOOR |
+| 8 | DOORs from the units to the driveway | DOOR |
+| 10, 13, 14 | DOORs where the commissary, shops or restroom meet the walkway | DOOR |
 | 12 | WINDOW `(0,0)` HORIZONTAL | WINDOW |
 
 **Common areas** (all 8 types are used): WALKWAY 27, 41, 54, 63, 74, 82, 89; STAIRS 28; LOBBY 29, 38; PARKING 30, 46, 55, 75; LAUNDRY 31, 83; GRASS 32, 47, 67, 88; KITCHEN 39, 64; BATHROOM 40, 56, 84; plus 69 (WALKWAY, "Driveway" in the draft duplex) and 91 (WALKWAY "Hallway") and 92 is a unit. Some have a picked color (`#rrggbb`), the others use the type default (NULL).
@@ -160,7 +161,7 @@ All four `UnitStatus` values appear. OCCUPIED comes only from leases (ACTIVE lea
 | 6 | 21 | renter | | 2025-03-01 | 2026-02-28 | 13,500 | MONTHLY_ADVANCE | RENEWED | RENEWED | 2026-02-28 | | |
 | 7 | 21 | renter | 6 | 2026-03-01 | 2027-02-28 | 14,500 | MONTHLY_ADVANCE | ACTIVE | ACTIVE | | | rent rose |
 | 8 | 33 | renter | | 2025-11-20 | 2026-11-19 | 18,000 | MONTHLY_ADVANCE | ACTIVE | EXPIRING_SOON (21 days) | | | |
-| 9 | 42 | renter | | 2025-10-30 | 2026-10-29 | 15,500 | MONTHLY_ADVANCE | ACTIVE | EXPIRED ("ending today") | | | job has not run yet |
+| 9 | 42 | renter | | 2025-10-29 | 2026-10-28 | 15,500 | MONTHLY_ADVANCE | ACTIVE | EXPIRED, then ENDED at startup | | | `LeaseContract` says EXPIRED only when the end date is before today. `LeaseExpiryJob` ends it at startup (ENDED, automatic, awaiting move-out), so it shows EXPIRED only if the script is loaded while the app is already running |
 | 10 | 70 | renter | | 2025-01-01 | 2025-12-31 | 24,000 | MONTHLY_ADVANCE | ENDED | ENDED | 2025-12-31 | 2025-12-31 | landlord2 |
 | 11 | 49 | renter | | 2026-02-01 | 2027-01-31 | 20,000 | MONTHLY_ADVANCE | TERMINATED | TERMINATED | 2026-09-15 | 2026-09-30 | reason "Repeated late payments and an unauthorized sublease."; September stays unpaid |
 | 12 | 24 | renter | | 2026-12-01 | 2027-11-30 | 11,500 | MONTHLY_ADVANCE | ACTIVE | UPCOMING | | | |
@@ -186,7 +187,7 @@ Amount = rent x months in the billing period. Each period is one row per attempt
 | 6 | 12 x PAID, GCASH, 2025-03 to 2026-02 | all PAID |
 | 7 | PAID 2026-03 to 2026-10 (MAYA); one FAILED CARD attempt for 2026-05 before its PAID | 2026-11 **DUE** (due 2026-11-01, within 7 days) |
 | 8 | PAID 2025-11 to 2026-10 (CARD); one **PENDING** GCASH row for 2026-11 | 2026-11 UPCOMING (due 2026-11-20) |
-| 9 | PAID 2025-10 to 2026-09 (MAYA) | 2026-10 DUE (due 2026-10-30) |
+| 9 | PAID 2025-10 to 2026-09 (MAYA) | 2026-10 DUE (due 2026-10-29) |
 | 10 | 12 x PAID, 2025-01 to 2025-12 (GCASH, MAYA and CARD in turns) | all PAID |
 | 11 | PAID 2026-02 to 2026-08 (GCASH); FAILED CARD for 2026-09 | 2026-09 **OVERDUE**, kept payable after closing |
 | 12 | none | 2026-12 UPCOMING |
