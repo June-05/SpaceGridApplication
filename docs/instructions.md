@@ -112,9 +112,6 @@ All passwords are `password123`. Today in the demo story is **2026-10-29**; the 
 
 | Username | Role | What it demonstrates |
 |---|---|---|
-| `maria.santos` | Landlord | Original sample data: 3 properties, units, leases, payments |
-| `jose.reyes` | Landlord | Original sample data: market stalls and a night market |
-| `ana.cruz`, `paolo.garcia`, `liza.mendoza` | Renter | Original sample leases, payments and requests |
 | `landlord` | Landlord | The fullest account: 7 properties (all six types; ACTIVE, ARCHIVED, DRAFT), every unit status, leases in several states, a lease waiting for its move-out, overdue rent |
 | `landlord2` | Landlord | A smaller mix (commercial, night market, open space); an auto-ended lease waiting for its move-out; an approved request that still needs a lease |
 | `landlord3` | Landlord | Almost new: one DRAFT property with an unfinished grid, no leases (empty state) |
@@ -123,6 +120,9 @@ All passwords are `password123`. Today in the demo story is **2026-10-29**; the 
 | `renter3` | Renter | A renewal chain of three leases, a TERMINATED lease and an auto-ended one, both waiting for the move-out |
 | `renter4` | Renter | No leases, only PENDING and DECLINED requests |
 | `renter5` | Renter | Brand new, nothing at all, no e-mail or phone (empty state; cannot send a request yet) |
+| `maria.santos` | Landlord | Original sample data: 3 properties, units, leases, payments |
+| `jose.reyes` | Landlord | Original sample data: market stalls and a night market |
+| `ana.cruz`, `paolo.garcia`, `liza.mendoza` | Renter | Original sample leases, payments and requests |
 
 The `LeaseExpiryJob` runs at startup and ends leases whose end date is before today, so lease 9 (`renter`, Townhouse 1) shows up as automatically ENDED, not EXPIRED.
 
