@@ -1,7 +1,7 @@
 # SpaceGrid · Phase 3: Final File Structure (Spring Boot, Maven)
 
 Spring Boot **4.1.1** · Java **17** · Maven project in NetBeans · Base package `com.techhub.spacegridapplication`.
-Related documents: Phase 1 (`SpaceGrid-Phase1-Spec.md`, class diagram), Phase 2 (`spacegrid_db.sql`, ERD).
+Related documents: Phase 1 (`SpaceGrid-Phase1-Spec.md`, `projectfiles/SpaceGrid-UML-Diagrams.drawio`), Phase 2 (`spacegrid_db.sql`, ERD).
 
 > **Updated 2026-10-28:** the tree and page list below now include the public homepage and lease requests
 > (`homepage.html`, `requests.html`, `config/WebConfig`, `BrowseController`, `LeaseRequest*`, ...). See `DESIGN-CHANGES.md`.

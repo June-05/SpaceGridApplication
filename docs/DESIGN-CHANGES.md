@@ -68,7 +68,6 @@ New: `homepage.html`, `requests.html` (+ `js/pages/homepage.js`, `js/pages/reque
 
 ### Not done yet / follow-ups
 - **Approving does not create the lease.** `LeaseService.create` is still a TODO. When it exists, `lease-form.js` should read `?requestId=` (the "Create lease" button on `requests.html` already links there) to prefill renter and dates.
-- `SpaceGrid-Phase1-ClassDiagram.drawio` and `SpaceGrid-Phase2-ERD.drawio` are **not updated** yet (new classes, `lease_requests` table).
 - The rest of the TODO list in CLAUDE.md is unchanged.
 
 ### How it was checked
@@ -272,7 +271,6 @@ The teammate's landlord pages (dashboard, units, leases, lease form, property fo
 - The plotter suites (101 + 41 + 28) and the role checks still pass.
 
 ### Not done yet / follow-ups
-- Class diagram and ERD (`.drawio`) still show the old fields: add the columns/classes above when the diagrams are next opened in draw.io.
 - Map pin (placeholder only), lease timing markers on the plotter, unit tests.
 - The PR #7 renter-dashboard escaping / try-catch items in CLAUDE.md.
 
@@ -492,7 +490,7 @@ Phase 7, the last phase of the UI plan. No Java, SQL or API change. With the own
 `renter-pages-test.js` (26 checks: shared bar, renter role, tiles, current/past sections, escaping, photo vs layout thumbnail vs placeholder, Pay link month, expiring-soon line, search, empty state; pay summary, method label, empty account, declined, paid receipt + Pay next, all paid, no leaseId) plus all earlier jsdom suites, including the plotter suites after the `.btn` change.
 
 ### Not done yet / follow-ups
-- All 7 UI phases are done. Remaining from CLAUDE.md: lease timing markers on the plotter, the map pin, the unit tests, and the draw.io diagrams (new fields and classes from Phases 3, 5 and the layout previews).
+- All 7 UI phases are done. Remaining from CLAUDE.md: lease timing markers on the plotter, the map pin, the unit tests.
 
 ### Follow-up: the homepage uses the shared top bar too (UI only)
 Renters found "My Requests" hard to reach: on the homepage it was hidden in the profile dropdown. The homepage's own bar is replaced by the shared one (`nav.js`, new **public mode** `data-public="true"`):
@@ -627,4 +625,9 @@ JOIN users u ON u.id = l.renter_id;
 
 ### Not done yet / follow-ups
 - A holdover (renter stays and keeps paying monthly) is not modelled; the landlord uses "Lease again".
-- Class diagram and ERD (`.drawio`): add `releasedOn`, `isAwaitingMoveOut`, `release`, `confirmMoveOut`, `UnitDetails.waitingLease`.
+
+## 2026-10-29: UML diagrams and the final project document (documentation only)
+- `docs/projectfiles/SpaceGrid-UML-Diagrams.drawio` (17 pages) replaces `SpaceGrid-Phase1-ClassDiagram.drawio` (deleted). Built from the real code: package diagram (with the browser and the layering analysis), class diagrams per package (model, dao + dao.jdbc, service, controller with endpoints, security/payment/config, exception) and the "Renter pays monthly rent" sequence diagram. PNG copies are in `docs/projectfiles/diagrams/`.
+- `docs/SpaceGrid-Phase2-ERD.drawio` was regenerated from `database/spacegrid_db.sql` (11 tables, 2 views).
+- `docs/projectfiles/SpaceGrid_Final_Project_Document.docx` is the updated manuscript (appendices A-C rebuilt; schema script, project structure, features, phases, limitations brought up to date). The original `docs/G7_SpaceGrid_Submission.docx` is kept unchanged.
+- The code counts 86 types (+1 nested record), not the 74 of the Phase 1 spec; the spec and the code differ in places, the code is the truth. No code or database change.
