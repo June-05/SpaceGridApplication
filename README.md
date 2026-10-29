@@ -222,13 +222,16 @@ for the pages (Tailwind and Font Awesome come from CDNs).
    ```
 
 2. Start **MySQL** in the XAMPP Control Panel.
-3. Create the database and sample data (this deletes any existing `spacegrid_db`):
+3. Create the database and sample data (this deletes any existing `spacegrid_db`). **Recommended: MySQL Workbench.** Open a connection to `localhost` (user `root`, no password), choose *File > Open SQL Script...*, select `database/spacegrid_db.sql` and click the lightning icon (*Execute*).
+
+   Alternative without Workbench (command line):
 
    ```bash
-   C:\xampp\mysql\bin\mysql.exe -u root < database/spacegrid_db.sql
+   C:
+mppmysqlbin\mysql.exe -u root < database/spacegrid_db.sql
    ```
 
-   macOS/Linux: `mysql -u root < database/spacegrid_db.sql`. You can also run the file in MySQL Workbench.
+   macOS/Linux: `mysql -u root < database/spacegrid_db.sql`. phpMyAdmin's Import tab also works (see [docs/instructions.md](docs/instructions.md)).
 4. Check `src/main/resources/application.properties` (default: `localhost:3306`, user `root`, no password).
 5. Run the app (or use NetBeans: Clean and Build, then Run):
 
