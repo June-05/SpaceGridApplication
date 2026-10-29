@@ -1,6 +1,8 @@
-# Image manifest (DRAFT: waiting for the image-support decision)
+# Image manifest
 
-**Status: draft.** The app can show photos, but only files **uploaded through the app** (rows in `uploaded_files`, bytes in the git-ignored `uploads/` folder). A fresh clone has none, so demo photos need one of the options below. The file names and the list do not change with the option. Avatars are **not** in this list: no page shows a user picture today (see the question at the end).
+**Status: option A chosen (2026-10-29).** 32 of the 36 images below were sourced and are in `src/main/resources/static/images/`; the 4 not found are `unit-045-townhouse-4-01`, `unit-050-shop-3-01`, `unit-072-shop-c-01` and `unit-077-booth-2-01` (those units show the layout instead). Credits: `image-credits.md`. Avatars: not wanted.
+
+Background: the app can show photos, but only files **uploaded through the app** (rows in `uploaded_files`, bytes in the git-ignored `uploads/` folder). A fresh clone has none, so demo photos need one of the options below. The file names and the list do not change with the option. Avatars are **not** in this list: no page shows a user picture today (see the question at the end).
 
 ## Where the app shows photos today
 
@@ -65,10 +67,10 @@ Total **36** images: 16 covers (every property gets a card, including the drafts
 | 35 | `unit-076-booth-1-01.jpg` | Unit photo | Unit 76: Booth 1 (Magallanes Street Night Food Market) | Night-market food booth with lights | landscape 4:3, at least 1000 x 750 px |
 | 36 | `unit-077-booth-2-01.jpg` | Unit photo | Unit 77: Booth 2 (Magallanes Street Night Food Market) | Night-market booth, empty, ready to rent | landscape 4:3, at least 1000 x 750 px |
 
-## Decision needed
+## Decision (made)
 
-1. **How demo photos reach a fresh clone.** Pick one:
+1. **How demo photos reach a fresh clone.** Chosen: **A**. The options were:
    - **A (recommended by the plan): no DB change.** Put the files under `src/main/resources/static/images/properties/` and `.../units/`. The model finds a photo by naming convention when there is no uploaded one (small change in `Property.getCoverPhotoUrl`, `LeaseContract.getImageUrl`, `PropertyListing` and the units page). Uploaded photos still win.
    - **B: seed rows.** Insert `uploaded_files` rows with `stored_name = 'property-06-...-cover.jpg'` and add a fallback in `FileService` that reads `static/images/` when the file is not in `uploads/`. No page changes, and the permission rules keep working, but the SQL script gets about 36 more rows.
    - **C: copy by hand.** Leave the app alone; each person uploads the photos through the pages. Least code, but the demo has no photos until someone does it.
-2. **Avatars.** There is no avatar column or display. Adding them is a design change (a column or the same naming convention plus the top bar). Do you want them? (Default: no.)
+2. **Avatars.** Not wanted, so nothing was added.

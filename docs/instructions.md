@@ -108,17 +108,23 @@ After logging in, you are sent to the right dashboard for your role.
 
 ### Test logins
 
-All passwords are `password123`.
+All passwords are `password123`. Today in the demo story is **2026-10-29**; the dates, states (UPCOMING, DUE, OVERDUE...) and payments are fixed for that day. Full plan: [dummy-data-plan.md](projectfiles/dummy-data-plan.md).
 
-| Username | Role |
-|---|---|
-| `maria.santos` | Landlord |
-| `jose.reyes` | Landlord |
-| `ana.cruz` | Renter |
-| `paolo.garcia` | Renter |
-| `liza.mendoza` | Renter |
+| Username | Role | What it demonstrates |
+|---|---|---|
+| `maria.santos` | Landlord | Original sample data: 3 properties, units, leases, payments |
+| `jose.reyes` | Landlord | Original sample data: market stalls and a night market |
+| `ana.cruz`, `paolo.garcia`, `liza.mendoza` | Renter | Original sample leases, payments and requests |
+| `landlord` | Landlord | The fullest account: 7 properties (all six types; ACTIVE, ARCHIVED, DRAFT), every unit status, leases in several states, a lease waiting for its move-out, overdue rent |
+| `landlord2` | Landlord | A smaller mix (commercial, night market, open space); an auto-ended lease waiting for its move-out; an approved request that still needs a lease |
+| `landlord3` | Landlord | Almost new: one DRAFT property with an unfinished grid, no leases (empty state) |
+| `renter` | Renter | The fullest renter: leases in every state, three landlords, all four request statuses |
+| `renter2` | Renter | Two ACTIVE leases with different landlords; quarterly and arrears payment terms; paid ahead; overdue |
+| `renter3` | Renter | A renewal chain of three leases, a TERMINATED lease and an auto-ended one, both waiting for the move-out |
+| `renter4` | Renter | No leases, only PENDING and DECLINED requests |
+| `renter5` | Renter | Brand new, nothing at all, no e-mail or phone (empty state; cannot send a request yet) |
 
-*(The full table with the extra demo accounts is added once the demo data is in.)*
+The `LeaseExpiryJob` runs at startup and ends leases whose end date is before today, so lease 9 (`renter`, Townhouse 1) shows up as automatically ENDED, not EXPIRED.
 
 ## 7. Reset the database
 

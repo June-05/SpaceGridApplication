@@ -631,3 +631,14 @@ JOIN users u ON u.id = l.renter_id;
 - `docs/SpaceGrid-Phase2-ERD.drawio` was regenerated from `database/spacegrid_db.sql` (11 tables, 2 views).
 - `docs/projectfiles/SpaceGrid_Final_Project_Document.docx` is the updated manuscript (appendices A-C rebuilt; schema script, project structure, features, phases, limitations brought up to date). The original `docs/G7_SpaceGrid_Submission.docx` is kept unchanged.
 - The code counts 86 types (+1 nested record), not the 74 of the Phase 1 spec; the spec and the code differ in places, the code is the truth. No code or database change.
+
+## 2026-10-29: demo accounts, demo photos and the docs reorganization
+- **Docs:** everything that was in `docs/` moved into `docs/projectfiles/` (`git mv`); `docs/instructions.md` (setup guide) is new; `README.md` was rewritten; paths in CLAUDE.md, README and the Phase docs were fixed.
+- **Demo data:** a "DEMO ACCOUNTS" section was appended to `database/spacegrid_db.sql` (the sample data above it is unchanged): users 6-13, properties 6-16, zones 21-92, leases 6-21 (id 20 unused), payments 40-146 and lease requests 5-15. Plan and reasoning: `dummy-data-plan.md`. Checked on a scratch database: the script runs from scratch, all 13 users log in, `GET /api/browse` lists the new ACTIVE properties, and every due status appears.
+- **Demo photos (image option A):** 32 JPGs in `src/main/resources/static/images/properties/` and `units/`, credits in `image-credits.md`. New class `model/DemoImages` finds a photo by the id in its file name; `Property.getCoverPhotoUrl`, `LeaseContract.getImageUrl` and the homepage listing (`JdbcPropertyDao`) use it only when nothing was uploaded. No table or endpoint changed. A property or unit with no uploaded or demo photo still shows the usual placeholder.
+- **Build fix:** `exec.mainClass` in `pom.xml` pointed to a package that does not exist (`com.techhub.spacegridhtml`); it now matches `start-class`.
+- **Known limit:** lease 9 (`renter`, Townhouse 1) was meant to show EXPIRED, but `LeaseExpiryJob` ends it at startup, so it shows ENDED (automatic) waiting for the move-out. EXPIRED only appears if the script is loaded while the app is already running.
+- Diagrams: the `.drawio` diagrams were already updated on 2026-10-29 (UML file and ERD); they do not mention `DemoImages` or the new demo data.
+
+### Not done yet / follow-ups
+- Four unit photos are missing (see `image-manifest.md`); screenshots for the README are not taken yet; the manuscript still has to be updated from the new `G7_SpaceGrid_Submission` file.

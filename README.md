@@ -42,7 +42,7 @@ was converted to a web frontend (plain HTML, CSS and JavaScript) served by Sprin
 
 ## Screenshots
 
-**To be added.** Put the images in `docs/projectfiles/screenshots/` with these names, then replace this table with image links.
+**To be added.** The screenshots are not in the repository yet. Put the images in `docs/projectfiles/screenshots/` with these names, then replace this table with image links.
 
 | File | Shows |
 |---|---|
@@ -154,7 +154,7 @@ SpaceGridApplication/
     │   │   ├── controller/       REST controllers
     │   │   ├── dao/              DAO interfaces (+ jdbc/ implementations)
     │   │   ├── exception/        Error classes and handler
-    │   │   ├── model/            Entities, enums, value objects
+    │   │   ├── model/            Entities, enums, value objects (and DemoImages)
     │   │   ├── payment/          Simulated payment gateway
     │   │   ├── security/         Password hashing, session
     │   │   ├── service/          Business rules
@@ -167,11 +167,11 @@ SpaceGridApplication/
     │           ├── renter/      Dashboard and pay page
     │           ├── css/         Shared styles
     │           ├── js/          common/ helpers and pages/ scripts
-    │           └── images/      Zone images
+    │           └── images/      zones/ (grid images), properties/ and units/ (demo photos)
     └── test/java/                Test classes (not written yet)
 ```
 
-`target/` (build output) and `uploads/` (uploaded files, created when the app runs) are not in git.
+`target/` (build output), `uploads/` (uploaded files, created when the app runs) and `incoming-images/` (photos before sorting) are not in git. The demo photos are in `src/main/resources/static/images/properties/` and `units/`: a property or unit with no uploaded photo shows the demo photo whose file name starts with its id (`property-06-...-cover.jpg`, `unit-021-...-01.jpg`).
 
 ## Database
 
@@ -246,17 +246,24 @@ with an environment variable, for example `SPRING_DATASOURCE_URL` or `SERVER_POR
 
 ## Demo accounts
 
-All passwords are `password123`.
+All passwords are `password123`. Today in the demo story is **2026-10-29**; the dates, states (UPCOMING, DUE, OVERDUE...) and payments are fixed for that day. Full plan: [dummy-data-plan.md](docs/projectfiles/dummy-data-plan.md).
 
-| Username | Role | What it shows |
+| Username | Role | What it demonstrates |
 |---|---|---|
-| `maria.santos` | Landlord | Sample properties, units, leases and requests |
-| `jose.reyes` | Landlord | A second landlord |
-| `ana.cruz` | Renter | Sample leases and payments |
-| `paolo.garcia` | Renter | Sample leases and payments |
-| `liza.mendoza` | Renter | A renter without contact details |
+| `maria.santos` | Landlord | Original sample data: 3 properties, units, leases, payments |
+| `jose.reyes` | Landlord | Original sample data: market stalls and a night market |
+| `ana.cruz`, `paolo.garcia`, `liza.mendoza` | Renter | Original sample leases, payments and requests |
+| `landlord` | Landlord | The fullest account: 7 properties (all six types; ACTIVE, ARCHIVED, DRAFT), every unit status, leases in several states, a lease waiting for its move-out, overdue rent |
+| `landlord2` | Landlord | A smaller mix (commercial, night market, open space); an auto-ended lease waiting for its move-out; an approved request that still needs a lease |
+| `landlord3` | Landlord | Almost new: one DRAFT property with an unfinished grid, no leases (empty state) |
+| `renter` | Renter | The fullest renter: leases in every state, three landlords, all four request statuses |
+| `renter2` | Renter | Two ACTIVE leases with different landlords; quarterly and arrears payment terms; paid ahead; overdue |
+| `renter3` | Renter | A renewal chain of three leases, a TERMINATED lease and an auto-ended one, both waiting for the move-out |
+| `renter4` | Renter | No leases, only PENDING and DECLINED requests |
+| `renter5` | Renter | Brand new, nothing at all, no e-mail or phone (empty state; cannot send a request yet) |
 
-*(Placeholder: the extra demo accounts (`landlord`, `renter`, ...) are added later with the demo data.)*
+The `LeaseExpiryJob` runs at startup and ends leases whose end date is before today, so lease 9 (`renter`, Townhouse 1) shows up as automatically ENDED, not EXPIRED.
+
 
 ## API overview
 
@@ -414,7 +421,7 @@ Until then the app is tested by hand: log in with the demo accounts and try each
 
 ## Credits and acknowledgments
 
-Photo credits: `docs/projectfiles/image-credits.md` (to be added with the demo images).
+Photo credits: [docs/projectfiles/image-credits.md](docs/projectfiles/image-credits.md) (demo photos from Wikimedia Commons, many are stand-ins for the real place).
 
 Third-party libraries and services:
 
