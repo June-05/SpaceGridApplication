@@ -9,6 +9,8 @@
  *    a 401 just means "guest".
  * 4. A logged-in renter can send a lease request: POST /api/lease-requests (LeaseRequestController.create)
  *    with the form fields unitId, startDate, months, message.
+ *    The renter needs an email and a phone on the account: the form shows both (filled from the account) and
+ *    saves them first with PUT /api/auth/me/contact when they changed (the server also refuses a request without them).
  * 5. "Saved" spaces are only remembered in this browser (localStorage). They are not stored in the database.
  * 6. /?space=ID opens that space's details window (used to come back after logging in).
  */
@@ -407,6 +409,9 @@ function renderRequestArea() {
     const today = new Date().toLocaleDateString('en-CA');       // yyyy-MM-dd, the format the server expects
     form.startDate.min = today;
     if (!form.startDate.value || form.startDate.value < today) form.startDate.value = today;
+    form.email.value = me.email || '';
+    form.phone.value = me.phone || '';
+    $('contactHint').classList.toggle('hidden', Boolean(me.email && me.phone));      // only explain it when something is missing
     form.classList.remove('hidden');
   } else {
     notice.textContent = 'You are logged in as a landlord. Only renters can request a lease.';
@@ -432,8 +437,21 @@ async function submitRequest(event) {
     error.textContent = 'Choose when you want to start.';
     return;
   }
+  const email = form.email.value.trim();
+  const phone = form.phone.value.trim();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    error.textContent = 'Enter a valid email address, like name@example.com.';
+    return;
+  }
+  if (!/^[+]?[\d\s\-()]{10,}$/.test(phone)) {
+    error.textContent = 'Enter a valid phone number, like +63 917 555 0101.';
+    return;
+  }
   $('requestSubmit').disabled = true;
   try {
+    if (email !== (me.email || '') || phone !== (me.phone || '')) {
+      me = await api.form('PUT', '/api/auth/me/contact', { email, phone });          // remembered on the account for next time
+    }
     await api.form('POST', '/api/lease-requests', {
       unitId: selectedUnitId,
       startDate: form.startDate.value,

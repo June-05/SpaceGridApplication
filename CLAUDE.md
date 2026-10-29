@@ -47,7 +47,7 @@ value objects, with no SQL or web code.
 - Colors come from enum `cssClass` + `defaultColor`. Spots get classes like `zone zone-unit status-occupied` and `--zone-color`. `css/zones.css` is the file to edit for custom looks.
 
 ## Business rules (summary)
-- **Accounts:** usernames are unique. Passwords are at least 8 characters, hashed with BCrypt. Login failures give one generic message.
+- **Accounts:** usernames are unique. Passwords are at least 8 characters, hashed with BCrypt. Login failures give one generic message. `email` and `phone` are optional (`users.email`, `users.phone`; checked by `User.cleanEmail/cleanPhone`), set at registration or with `PUT /api/auth/me/contact`. **A renter needs both before sending a lease request** (`LeaseRequestService.createRequest` refuses otherwise; the homepage request form shows both fields and saves them first). In the lease form, picking an account fills the tenant's email and phone from it (landlords see renter contact details through `GET /api/renters`).
 - **Properties:** only the owner can see or change one. A new property is DRAFT with a 1×1 grid. The grid is at most 60×60 (`Property.MAX_GRID_SIZE`, the CHECKs in `spacegrid_db.sql` (`grid_rows`/`grid_columns` ≤ 60, `zone_cells` rows/cols 0–59) and `MAX` in `property-grid.js` must match). Status is DRAFT / ACTIVE / ARCHIVED. Types: APARTMENT, CONDOMINIUM, TOWNHOUSE, COMMERCIAL, NIGHT_MARKET, OPEN_SPACE.
   - Address = street (`address`) + `city` + `region`, all required; `getFullAddress()` joins them (the homepage shows that).
   - `defaultRate` (optional) only pre-fills a new unit's rate in the plotter; every unit keeps its own `rentalRate`.

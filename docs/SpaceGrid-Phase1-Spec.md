@@ -68,9 +68,13 @@ An account. The password hash is never sent to the browser.
 - username: String
 - passwordHash: String {@JsonIgnore}
 - fullName: String
+- email: String                                  // optional (null = not given)
+- phone: String                                  // optional
 - role: Role
 
-+ User(username: String, passwordHash: String, fullName: String, role: Role)
++ User(username: String, passwordHash: String, fullName: String, email: String, phone: String, role: Role)
++ hasContact(): boolean                          // email and phone both given
++ updateContact(email: String, phone: String): void   // blank removes one; invalid -> ValidationException
 + isLandlord(): boolean
 + isRenter(): boolean
 + changePassword(newHash: String): void
@@ -784,7 +788,8 @@ Table `uploaded_files`. Files are never updated (upload a new one instead).
 - userDao: UserDao
 - passwordHasher: PasswordHasher
 
-+ register(username: String, rawPassword: String, fullName: String, role: Role): User
++ register(username: String, rawPassword: String, fullName: String, email: String, phone: String, role: Role): User   // email, phone optional
++ updateContact(user: User, email: String, phone: String): User
 + login(username: String, rawPassword: String): User
 ```
 
@@ -815,7 +820,7 @@ Table `uploaded_files`. Files are never updated (upload a new one instead).
 - rentableUnitDao: RentableUnitDao
 - propertyDao: PropertyDao
 
-+ createRequest(renter: User, unitId: int, desiredStart: LocalDate, months: int, message: String): LeaseRequest   // @Transactional
++ createRequest(renter: User, unitId: int, desiredStart: LocalDate, months: int, message: String): LeaseRequest   // @Transactional; the renter needs email + phone (else ValidationException)
 + getRequestsFor(user: User): List<LeaseRequest>
 + approve(requestId: int, landlord: User): LeaseRequest      // @Transactional; unit must still be AVAILABLE
 + decline(requestId: int, landlord: User): LeaseRequest      // @Transactional
@@ -916,7 +921,8 @@ Saves uploads in the uploads folder (`spacegrid.upload-dir`) and checks who may 
 - authService: AuthService
 - sessionManager: SessionManager
 
-+ register(username, password, fullName, role): User
++ register(username, password, fullName, role, email, phone): User   // email, phone optional
++ updateContact(email, phone): User
 + login(username, password): User
 + logout(): void
 + me(): User
@@ -925,6 +931,7 @@ Saves uploads in the uploads folder (`spacegrid.upload-dir`) and checks who may 
 | Endpoint | Method |
 |---|---|
 | `POST /api/auth/register` | `register` |
+| `PUT /api/auth/me/contact` | `updateContact` |
 | `POST /api/auth/login` | `login` |
 | `POST /api/auth/logout` | `logout` |
 | `GET /api/auth/me` | `me` |

@@ -24,6 +24,8 @@ CREATE TABLE users (
     username       VARCHAR(50)  NOT NULL,
     password_hash  CHAR(60)     NOT NULL,                  -- BCrypt hash, always 60 characters
     full_name      VARCHAR(100) NOT NULL,
+    email          VARCHAR(100) NULL,                     -- optional; a renter needs email + phone to send a lease request
+    phone          VARCHAR(30)  NULL,
     role           VARCHAR(20)  NOT NULL,
     created_at     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT pk_users PRIMARY KEY (id),
@@ -352,12 +354,12 @@ JOIN      users          usr ON usr.id = r.renter_id;
 --  SAMPLE DATA  (today in the story: late October 2026)
 -- =====================================================================
 
-INSERT INTO users (id, username, password_hash, full_name, role) VALUES
-    (1, 'maria.santos', '$2a$10$xa6bk8SrcyVlZBTkbUZhaedvRDXVzirEaSAB0MEbzEeHZLo.PCluy', 'Maria Santos', 'LANDLORD'),
-    (2, 'jose.reyes', '$2a$10$UetlukyMfYqTVbQqKT61b.HgkuA6b4wfZPJvNATXQc8FBkAGO02T.', 'Jose Reyes', 'LANDLORD'),
-    (3, 'ana.cruz', '$2a$10$DZM1gRWmxi6JAteggmCKGOBxZMR.Nj1NQaSAU7.dVwvzQafroIQuG', 'Ana Cruz', 'RENTER'),
-    (4, 'paolo.garcia', '$2a$10$QkRkiHaHZpflgYT0WkOVhuISlYhhGCeC2t9ScDzWRnrv2xRsoXUNK', 'Paolo Garcia', 'RENTER'),
-    (5, 'liza.mendoza', '$2a$10$ea1UwbTp0KqG6U0SD6VY4.TsfDn1hLQ42/jNonDQi9r3Qsffr86P.', 'Liza Mendoza', 'RENTER');
+INSERT INTO users (id, username, password_hash, full_name, email, phone, role) VALUES
+    (1, 'maria.santos', '$2a$10$xa6bk8SrcyVlZBTkbUZhaedvRDXVzirEaSAB0MEbzEeHZLo.PCluy', 'Maria Santos', 'maria.santos@example.com', '+63 917 555 0001', 'LANDLORD'),
+    (2, 'jose.reyes', '$2a$10$UetlukyMfYqTVbQqKT61b.HgkuA6b4wfZPJvNATXQc8FBkAGO02T.', 'Jose Reyes', 'jose.reyes@example.com', '+63 917 555 0002', 'LANDLORD'),
+    (3, 'ana.cruz', '$2a$10$DZM1gRWmxi6JAteggmCKGOBxZMR.Nj1NQaSAU7.dVwvzQafroIQuG', 'Ana Cruz', 'ana.cruz@example.com', '+63 917 555 0101', 'RENTER'),
+    (4, 'paolo.garcia', '$2a$10$QkRkiHaHZpflgYT0WkOVhuISlYhhGCeC2t9ScDzWRnrv2xRsoXUNK', 'Paolo Garcia', 'paolo.garcia@example.com', '+63 917 555 0102', 'RENTER'),
+    (5, 'liza.mendoza', '$2a$10$ea1UwbTp0KqG6U0SD6VY4.TsfDn1hLQ42/jNonDQi9r3Qsffr86P.', 'Liza Mendoza', NULL, NULL, 'RENTER');
 
 INSERT INTO properties (id, landlord_id, name, address, city, region, property_type, description,
                         is_exact_size, size_description, area_sqm, default_rate,

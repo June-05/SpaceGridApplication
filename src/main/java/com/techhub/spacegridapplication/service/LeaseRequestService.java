@@ -6,6 +6,7 @@ import com.techhub.spacegridapplication.dao.RentableUnitDao;
 import com.techhub.spacegridapplication.exception.AccessDeniedException;
 import com.techhub.spacegridapplication.exception.ConflictException;
 import com.techhub.spacegridapplication.exception.NotFoundException;
+import com.techhub.spacegridapplication.exception.ValidationException;
 import com.techhub.spacegridapplication.model.LeaseRequest;
 import com.techhub.spacegridapplication.model.Property;
 import com.techhub.spacegridapplication.model.PropertyStatus;
@@ -36,9 +37,15 @@ public class LeaseRequestService {
         this.propertyDao = propertyDao;
     }
 
-    /** The unit must be AVAILABLE in an ACTIVE property, and the renter can't already have a PENDING request for it. */
+    /**
+     * The renter must have an email and a phone on their account. The unit must be AVAILABLE in an ACTIVE property,
+     * and the renter can't already have a PENDING request for it.
+     */
     @Transactional
     public LeaseRequest createRequest(User renter, int unitId, LocalDate desiredStart, int months, String message) {
+        if (!renter.hasContact()) {
+            throw new ValidationException("Add your email and phone number first, so the owner can reach you.");
+        }
         RentableUnit unit = rentableUnitDao.findById(unitId)
                 .orElseThrow(() -> new NotFoundException("Unit not found."));
         Property property = propertyDao.findById(unit.getPropertyId())

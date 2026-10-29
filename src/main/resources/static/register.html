@@ -9,7 +9,7 @@
 <body class="card-page">
   <!--
     REGISTER  →  AuthController.register   POST /api/auth/register
-    Form fields: username, password, fullName, role (LANDLORD / RENTER).
+    Form fields: username, password, fullName, role (LANDLORD / RENTER), email and phone (optional).
   -->
   <main class="card">
     <h1>SpaceGrid</h1>
@@ -20,6 +20,17 @@
         <span>Full Name</span>
         <input name="fullName" placeholder="e.g. Maria Santos" required>
       </label>
+
+      <label class="field">
+        <span>Email (optional)</span>
+        <input name="email" type="email" autocomplete="email" placeholder="e.g. maria@example.com">
+      </label>
+
+      <label class="field">
+        <span>Phone (optional)</span>
+        <input name="phone" type="tel" autocomplete="tel" placeholder="e.g. +63 917 555 0101">
+      </label>
+      <p class="subtitle">Renters need both before they can ask to lease a unit. You can add them then.</p>
 
       <label class="field">
         <span>Username</span>

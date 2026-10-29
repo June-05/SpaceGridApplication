@@ -263,6 +263,15 @@ body { font-family: 'Plus Jakarta Sans', sans-serif; }
 <input name="months" type="number" min="1" max="60" value="6" required class="mt-1 w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium text-slate-800 normal-case">
 </label>
 </div>
+<div class="grid grid-cols-2 gap-3">
+<label class="text-[11px] font-bold text-slate-400 uppercase">Your email
+<input name="email" type="email" autocomplete="email" required placeholder="name@example.com" class="mt-1 w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium text-slate-800 normal-case">
+</label>
+<label class="text-[11px] font-bold text-slate-400 uppercase">Your phone
+<input name="phone" type="tel" autocomplete="tel" required placeholder="+63 917 555 0101" class="mt-1 w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium text-slate-800 normal-case">
+</label>
+</div>
+<p id="contactHint" class="hidden text-[11px] text-slate-500 -mt-1">The owner needs a way to reach you. This is saved to your account.</p>
 <label class="block text-[11px] font-bold text-slate-400 uppercase">Message to the owner (optional)
 <textarea name="message" rows="2" maxlength="500" class="mt-1 w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium text-slate-800 normal-case"></textarea>
 </label>

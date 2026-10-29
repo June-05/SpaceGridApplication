@@ -379,6 +379,48 @@ Phase 4 of the UI plan. Front-end only: no Java, SQL or API change. Answers "exp
 
 ---
 
+## 2026-10-29 · Email and phone on accounts (design change)
+
+Phase 5 of the UI plan. Decided with the owner: both are **optional at registration**, but a **renter needs both before sending a lease request**; the lease form fills the tenant's contact from the picked account. Landlords can see the contact details of renters they search for in the lease form (owner approved this).
+
+### Why
+The lease form asked the landlord to type each tenant's email and phone by hand, and a request told the landlord nothing about how to reach the renter.
+
+### Database (`database/spacegrid_db.sql`: re-run it by hand, or run these lines on an existing `spacegrid_db`)
+```sql
+ALTER TABLE users
+    ADD COLUMN email VARCHAR(100) NULL AFTER full_name,
+    ADD COLUMN phone VARCHAR(30)  NULL AFTER email;
+```
+The sample data gives the two landlords and Ana and Paolo an email and phone; **Liza has none**, so you can see the "add your contact" step.
+
+### Changed classes
+- `User`: `email`, `phone` (+ getters, so they appear in the JSON of `/api/auth/me` and `/api/renters`); `hasContact()`; `updateContact(email, phone)`; static `cleanEmail` / `cleanPhone` (blank = not given; an email like `a@b.co` up to 100 characters; a phone of 10+ digits, spaces, dashes or brackets with an optional +, up to 30 characters; otherwise ValidationException). The constructors take the two new values.
+- `JdbcUserDao`: reads and writes both columns (`update` too).
+- `AuthService`: `register(..., email, phone, role)`; new `updateContact(user, email, phone)`.
+- `LeaseRequestService.createRequest`: refuses with "Add your email and phone number first, so the owner can reach you." when the renter has no `hasContact()`.
+
+### Endpoints
+- `POST /api/auth/register` accepts optional `email`, `phone`.
+- `PUT /api/auth/me/contact` (new, any logged-in user): form fields `email`, `phone` (blank removes one); 400 on invalid text.
+- `GET /api/auth/me` and `GET /api/renters` now include `email`, `phone`.
+
+### Pages
+- `register.html` / `register.js`: optional Email and Phone fields.
+- `homepage.html` / `homepage.js`: the request form has Email and Phone (filled from the account, required). If they changed, they are saved first with `PUT /api/auth/me/contact`, then the request is sent.
+- `lease-form.js`: picking an account (and "Create lease" from an approved request) fills the empty email and phone fields from it; anything the landlord already typed is kept.
+
+### How it was checked
+- Live API on a scratch DB (port 8099): register with and without contact; bad email / bad phone → 400; `PUT /me/contact` (bad → 400, no login → 401); a renter without contact → request refused (400), after saving the contact → request created (200); `/api/renters` shows contact to a landlord and is 403 for a renter; no `passwordHash` in the JSON.
+- jsdom: `contact-test.js` (14 checks) and all earlier suites.
+
+### Not done yet / follow-ups
+- Class diagram and ERD (`.drawio`): add `email`, `phone` to User / users.
+- No page yet to edit your contact details outside the request form.
+- Next in the plan: Phase 6 (Units map/list), Phase 7 (renter pages in Tailwind).
+
+---
+
 ## PROPOSED (not built) · Commercial ready, permits, bigger grid with zoom
 
 Status: **decided, not implemented.** Nothing below exists in the code yet. When a part is built, move it into a dated section above and update the docs listed at the end.

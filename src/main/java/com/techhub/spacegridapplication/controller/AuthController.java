@@ -9,6 +9,7 @@ import jakarta.servlet.http.HttpSession;
 
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -29,14 +30,16 @@ public class AuthController {
         this.sessionManager = sessionManager;
     }
 
-    /** Form fields: username, password, fullName, role (LANDLORD or RENTER). */
+    /** Form fields: username, password, fullName, role (LANDLORD or RENTER); email and phone are optional. */
     @PostMapping("/register")
     public User register(
             @RequestParam String username,
             @RequestParam String password,
             @RequestParam String fullName,
-            @RequestParam Role role) {
-        return authService.register(username, password, fullName, role);   // not logged in yet: register.js logs in next
+            @RequestParam Role role,
+            @RequestParam(required = false) String email,
+            @RequestParam(required = false) String phone) {
+        return authService.register(username, password, fullName, email, phone, role);   // not logged in yet: register.js logs in next
     }
 
     /** Form fields: username, password. On success, store the user in the session. */
@@ -50,6 +53,15 @@ public class AuthController {
     @PostMapping("/logout")
     public void logout(HttpSession session) {
         sessionManager.logout(session);
+    }
+
+    /** Form fields email, phone (blank removes one). A renter needs both before sending a lease request. */
+    @PutMapping("/me/contact")
+    public User updateContact(
+            @RequestParam(required = false) String email,
+            @RequestParam(required = false) String phone,
+            HttpSession session) {
+        return authService.updateContact(sessionManager.currentUser(session), email, phone);
     }
 
     /** The logged-in user (401 if nobody). auth.js calls this on every protected page. */

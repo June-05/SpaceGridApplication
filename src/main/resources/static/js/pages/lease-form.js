@@ -70,10 +70,17 @@ async function searchRenters() {
     .map((r) => `<option value="${format.escape(r.username)}">${format.escape(r.fullName)}</option>`).join('');
 }
 
-/** Picking an account fills the full name (the landlord can still change it). */
+/** Picking an account fills the full name, email and phone (the landlord can still change them). */
 function pickRenter() {
   const renter = renters.find((r) => r.username === $('renterUsername').value.trim());
-  if (renter && !$('tenantName').value.trim()) $('tenantName').value = renter.fullName;
+  if (renter) fillContact(renter);
+}
+
+/** Only empty fields are filled, so something the landlord already typed is kept. */
+function fillContact(renter) {
+  if (!$('tenantName').value.trim()) $('tenantName').value = renter.fullName;
+  if (!$('tenantEmail').value.trim() && renter.email) $('tenantEmail').value = renter.email;
+  if (!$('tenantPhone').value.trim() && renter.phone) $('tenantPhone').value = renter.phone;
 }
 
 // ---------------------------------------------------------------- property and unit
@@ -113,7 +120,7 @@ async function startFromRequest(requestId, properties) {
     .find((r) => r.id === request.renterId);
   if (renter) {
     $('renterUsername').value = renter.username;
-    $('tenantName').value = renter.fullName;
+    fillContact(renter);
   }
   await selectUnit(request.unitId, properties);
   $('startDate').value = request.desiredStart;

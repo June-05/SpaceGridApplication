@@ -31,6 +31,8 @@ public class JdbcUserDao implements UserDao {
                     rs.getString("username"),
                     rs.getString("password_hash"),
                     rs.getString("full_name"),
+                    rs.getString("email"),
+                    rs.getString("phone"),
                     Role.valueOf(rs.getString("role")));
         };
     }
@@ -46,23 +48,25 @@ public class JdbcUserDao implements UserDao {
         KeyHolder keys = new GeneratedKeyHolder();
         jdbcTemplate.update(connection -> {
             PreparedStatement ps = connection.prepareStatement(
-                    "INSERT INTO users (username, password_hash, full_name, role) VALUES (?, ?, ?, ?)",
+                    "INSERT INTO users (username, password_hash, full_name, email, phone, role) VALUES (?, ?, ?, ?, ?, ?)",
                     Statement.RETURN_GENERATED_KEYS);
             ps.setString(1, entity.getUsername());
             ps.setString(2, entity.getPasswordHash());
             ps.setString(3, entity.getFullName());
-            ps.setString(4, entity.getRole().name());
+            ps.setString(4, entity.getEmail());
+            ps.setString(5, entity.getPhone());
+            ps.setString(6, entity.getRole().name());
             return ps;
         }, keys);
         entity.assignId(keys.getKey().intValue());
         return entity;
     }
 
-    /** The username and role never change; the name and password can. */
+    /** The username and role never change; the name, contact details and password can. */
     @Override
     public void update(User entity) {
-        jdbcTemplate.update("UPDATE users SET password_hash = ?, full_name = ? WHERE id = ?",
-                entity.getPasswordHash(), entity.getFullName(), entity.getId());
+        jdbcTemplate.update("UPDATE users SET password_hash = ?, full_name = ?, email = ?, phone = ? WHERE id = ?",
+                entity.getPasswordHash(), entity.getFullName(), entity.getEmail(), entity.getPhone(), entity.getId());
     }
 
     @Override
