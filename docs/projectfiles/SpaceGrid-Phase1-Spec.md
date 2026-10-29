@@ -1,6 +1,6 @@
 # SpaceGrid · Phase 1: Final Class Specification
 
-Java 17 · Spring Boot · JdbcTemplate · MySQL · HTML/JS frontend. Base package: `com.techhub.spacegridapplication`. Companion diagrams: `projectfiles/SpaceGrid-UML-Diagrams.drawio` (package diagram, class diagrams per package, payment sequence; replaces the old Phase 1 class diagram, rebuilt from the code on 2026-10-29; PNG copies in `projectfiles/diagrams/`).
+Java 17 · Spring Boot · JdbcTemplate · MySQL · HTML/JS frontend. Base package: `com.techhub.spacegridapplication`. Companion diagrams: `SpaceGrid-UML-Diagrams.drawio` (package diagram, class diagrams per package, payment sequence; replaces the old Phase 1 class diagram, rebuilt from the code on 2026-10-29; PNG copies in `diagrams/`).
 
 ## 1. Design decisions
 

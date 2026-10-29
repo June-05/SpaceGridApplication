@@ -126,8 +126,8 @@ Everything except the tests works end to end against the real database. After pu
 
 **Done (2026-10-29): the PR #7 (`457066d`) renter-redesign problems were fixed in Phase 7 with the owner's OK:** the renter dashboard and pay pages were rebuilt (names escaped, `requireLogin` without try/catch, the real `amountDue`), `base.css`'s `.btn` is white again (`--btnbg` removed), and the unused `css/renter-css/` files were deleted.
 
-## Reference docs (in `docs/`)
-- `SpaceGrid-Phase1-Spec.md` + `projectfiles/SpaceGrid-UML-Diagrams.drawio` (17 pages: package, class diagrams per package, sequence "renter pays rent"; built from the code, 2026-10-29): every class, field, method and endpoint.
+## Reference docs (in `docs/projectfiles/`; the setup guide is `docs/instructions.md`)
+- `SpaceGrid-Phase1-Spec.md` + `SpaceGrid-UML-Diagrams.drawio` (17 pages: package, class diagrams per package, sequence "renter pays rent"; built from the code, 2026-10-29): every class, field, method and endpoint.
 - `SpaceGrid-Phase2-ERD.drawio` (schema in `database/spacegrid_db.sql`).
 - `SpaceGrid-Phase3-FileStructure.md`: the page list with each page's endpoints.
 - `HOW-TO-CONNECT.md`: matching pages to controllers (`@RequestParam` vs `@RequestBody`, date/enum formats).

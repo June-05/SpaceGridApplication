@@ -17,7 +17,7 @@ This project is the **structure only**, generated from the Phase 1–3 specifica
 | Tests | Test classes with the planned test names, `@Disabled` until the code exists |
 
 Guides:
-- **`docs/HOW-TO-CONNECT.md`**: how the pages call the controllers (form vs JSON, value formats, JSON shapes, errors, login)
+- **`docs/projectfiles/HOW-TO-CONNECT.md`**: how the pages call the controllers (form vs JSON, value formats, JSON shapes, errors, login)
 - Each HTML file's comment block lists its endpoints; each page script lists its exact `api.*` calls.
 
 ## Run it
@@ -49,6 +49,6 @@ The app starts even though the methods are empty. Calling an endpoint that isn't
 2. `exception` (`getHttpStatus`, `GlobalExceptionHandler`), `security`, `payment`
 3. `dao.jdbc` implementations (RowMappers + SQL)
 4. `service`
-5. `controller`: test each endpoint in the browser (see `docs/HOW-TO-CONNECT.md` §10)
+5. `controller`: test each endpoint in the browser (see `docs/projectfiles/HOW-TO-CONNECT.md` §10)
 6. Pages: login/register → landlord pages → lease pages → renter pages
 7. Tests: remove `@Disabled` and write them
