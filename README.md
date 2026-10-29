@@ -227,8 +227,7 @@ for the pages (Tailwind and Font Awesome come from CDNs).
    Alternative without Workbench (command line):
 
    ```bash
-   C:
-mppmysqlbin\mysql.exe -u root < database/spacegrid_db.sql
+   C:\xampp\mysql\bin\mysql.exe -u root < database/spacegrid_db.sql
    ```
 
    macOS/Linux: `mysql -u root < database/spacegrid_db.sql`. phpMyAdmin's Import tab also works (see [docs/instructions.md](docs/instructions.md)).
