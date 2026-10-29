@@ -5,9 +5,10 @@
  *    and GET /api/lease-requests for the "Pending Requests" count.
  * 2. Payment status per lease, from its statement (GET /api/leases/{id}/statement):
  *    any OVERDUE period → Overdue; else any DUE → Pending; else Paid.
- * 3. Contract status = lease.currentState (UPCOMING, ACTIVE, EXPIRING_SOON, EXPIRED, ENDED, TERMINATED, RENEWED).
+ * 3. Lease Status = lease.currentState (UPCOMING, ACTIVE, EXPIRING_SOON, EXPIRED = "Ending today", ENDED, TERMINATED, RENEWED).
+ *    Filter "Ended automatically" = ENDED with endedAutomatically (LeaseExpiryJob closed it after its end date).
  * 4. Row actions: details modal (with the contract PDF from GET /api/leases/{id}/files),
- *    renew → lease-form.html?renew={id}, terminate → POST /api/leases/{id}/terminate. Full page: /lease.html?id=
+ *    renew → lease-form.html?renew={id}, terminate (dialog with a reason) → POST /api/leases/{id}/terminate { reason }. Full page: /lease.html?id=
  */
 const $ = (id) => document.getElementById(id);
 
@@ -34,7 +35,7 @@ let currentPage = 1;
 
 const badge = (text, style) =>
   `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${style}">${text}</span>`;
-const stateBadge = (state) => badge(format.label(state), STATE_STYLE[state]);
+const stateBadge = (state) => badge(state === 'EXPIRED' ? 'Ending today' : format.label(state), STATE_STYLE[state]);
 const paymentBadge = (status) => badge(PAYMENT_STYLE[status][0], PAYMENT_STYLE[status][1]);
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -46,6 +47,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   ['statusFilter', 'paymentFilter', 'sortBy'].forEach((id) => $(id).addEventListener('change', applyFilters));
   $('prevPage').addEventListener('click', () => { currentPage--; renderTable(); });
   $('nextPage').addEventListener('click', () => { currentPage++; renderTable(); });
+  $('terminateForm').addEventListener('submit', submitTerminate);
   await loadLeases();
 });
 
@@ -83,7 +85,7 @@ function applyFilters() {
   const sortBy = $('sortBy').value;
   filteredLeases = leases.filter((l) =>
     (!search || `${l.tenantName} ${l.renterUsername} ${l.propertyName} ${l.unitName}`.toLowerCase().includes(search))
-    && (state === 'all' || l.currentState === state)
+    && (state === 'all' || l.currentState === state || (state === 'ENDED_AUTO' && l.currentState === 'ENDED' && l.endedAutomatically))
     && (payment === 'all' || l.paymentStatus === payment));
   filteredLeases.sort((a, b) => {
     if (sortBy === 'expiring') return String(a.endDate).localeCompare(String(b.endDate));
@@ -175,6 +177,8 @@ async function viewLease(id) {
   $('modalRent').textContent = format.peso(lease.monthlyRent);
   $('modalPaymentTerms').textContent = TERMS_LABEL[lease.paymentTerms];
   $('modalStatus').innerHTML = stateBadge(lease.currentState);
+  $('modalStatusNote').textContent = lease.currentState === 'TERMINATED' ? `Reason: ${lease.terminationReason || 'not given'}`
+    : lease.endedAutomatically ? `Ended automatically on ${format.date(lease.closedOn)}` : '';
   $('modalPayment').innerHTML = paymentBadge(lease.paymentStatus);
   $('modalLeaseLink').href = `/lease.html?id=${lease.id}`;
 
@@ -196,14 +200,35 @@ function closeLeaseModal() {
   $('leaseModal').classList.add('hidden');
 }
 
-/** Early end: the lease becomes TERMINATED and the unit AVAILABLE again. */
-async function terminateLease(id) {
+/** Early end: opens the dialog; the reason is required (the renter sees it). */
+let terminatingId = null;
+function terminateLease(id) {
   const lease = leases.find((l) => l.id === id);
-  if (!confirm(`Terminate the lease of ${lease.tenantName} on ${lease.unitName} today? The unit becomes available again.`)) return;
+  terminatingId = id;
+  $('terminateTitle').textContent = `Terminate the lease of ${lease.tenantName} on ${lease.unitName} today?`;
+  $('terminateReason').value = '';
+  $('terminateError').textContent = '';
+  $('terminateDialog').classList.remove('hidden');
+  $('terminateReason').focus();
+}
+
+function closeTerminate() {
+  $('terminateDialog').classList.add('hidden');
+}
+
+/** The lease becomes TERMINATED (with the reason) and the unit AVAILABLE again. */
+async function submitTerminate(e) {
+  e.preventDefault();
+  const reason = $('terminateReason').value.trim();
+  if (!reason) {
+    $('terminateError').textContent = 'Write a reason. The renter will see it.';
+    return;
+  }
   try {
-    await api.form('POST', `/api/leases/${id}/terminate`);
+    await api.form('POST', `/api/leases/${terminatingId}/terminate`, { reason });
+    closeTerminate();
     await loadLeases();
   } catch (err) {
-    alert(err.message);
+    $('terminateError').textContent = err.message;
   }
 }

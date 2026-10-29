@@ -109,9 +109,10 @@ public class LeaseController {
         leaseService.endLease(id, landlord);
     }
 
+    /** Early end. Form field reason is required (max 255 characters); the renter sees it on the lease page. */
     @PostMapping("/leases/{id}/terminate")
-    public void terminate(@PathVariable int id, HttpSession session) {
+    public void terminate(@PathVariable int id, @RequestParam(required = false) String reason, HttpSession session) {
         User landlord = sessionManager.requireRole(session, Role.LANDLORD);
-        leaseService.terminateLease(id, landlord);
+        leaseService.terminateLease(id, landlord, reason);
     }
 }

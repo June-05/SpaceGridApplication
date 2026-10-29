@@ -298,6 +298,69 @@ Every landlord page had its own top bar, and the renter pages had a different on
 
 ---
 
+## 2026-10-29 · Lease lifecycle: auto-expiry, termination reason, lease page redesign (design change)
+
+Phase 3 of the UI plan. Decided with the owner: expired leases end **automatically** and both sides are told what to do next; terminating asks for a **reason** the renter can see; "Contract Status" is renamed **"Lease Status"**.
+
+### Why
+A lease past its end date stayed ACTIVE (shown "Expired (not ended yet)") until the landlord pressed End, so the unit stayed OCCUPIED and off the homepage. A terminated renter didn't know why.
+
+### Database (`database/spacegrid_db.sql`: re-run it by hand, or run these lines on an existing `spacegrid_db`)
+```sql
+ALTER TABLE lease_contracts
+    ADD COLUMN termination_reason VARCHAR(255) NULL AFTER closed_on,
+    ADD COLUMN ended_automatically BOOLEAN NOT NULL DEFAULT FALSE AFTER termination_reason,
+    ADD CONSTRAINT ck_lease_contracts_reason CHECK (termination_reason IS NULL OR status = 'TERMINATED'),
+    ADD CONSTRAINT ck_lease_contracts_auto   CHECK (ended_automatically = FALSE OR status = 'ENDED');
+CREATE OR REPLACE VIEW lease_details AS
+SELECT  l.id, l.rentable_unit_id, l.renter_id, l.previous_lease_id,
+        l.start_date, l.end_date, l.monthly_rent, l.payment_terms,
+        l.tenant_name, l.tenant_email, l.tenant_phone,
+        l.status, l.closed_on, l.termination_reason, l.ended_automatically, l.created_at,
+        z.name AS unit_name, p.id AS property_id, p.name AS property_name, p.landlord_id AS landlord_id,
+        u.full_name AS renter_name, u.username AS renter_username,
+        (SELECT MIN(f.id) FROM uploaded_files f
+         WHERE f.unit_id = l.rentable_unit_id AND f.file_kind = 'UNIT_PHOTO') AS unit_photo_id
+FROM lease_contracts l
+JOIN grid_zones z ON z.id = l.rentable_unit_id
+JOIN properties p ON p.id = z.property_id
+JOIN users u ON u.id = l.renter_id;
+```
+
+### New classes
+- `service/LeaseExpiryJob` (`@Component`): calls `LeaseService.expireLeases(today)` once on startup (`ApplicationReadyEvent`, since the app isn't always running at midnight) and daily at 00:05 (`@Scheduled`). `@EnableScheduling` added to `SpaceGridApplication`.
+
+### Changed classes
+- `LeaseContract`: `terminationReason`, `endedAutomatically` (+ getters, so they're in the JSON); `terminate(today, reason)` (reason required, max 255); new `expire()` (ACTIVE → ENDED, `closedOn` = end date so billing stops there, `endedAutomatically` = true).
+- `LeaseContractDao` / `JdbcLeaseContractDao`: reads/writes the two columns; new `findActiveEndedBefore(day)`.
+- `LeaseService`: `terminateLease(id, landlord, reason)`; new `expireLeases(today)` (ends them and frees each unit).
+- `LeaseState.EXPIRED` label is now "Ending today" (only between midnight and the job).
+
+### Endpoints
+- `POST /api/leases/{id}/terminate` now needs the form field `reason` (400 if missing or blank).
+- `GET /api/leases…` JSON gains `terminationReason`, `endedAutomatically`.
+- Payments are unchanged: a renter can still pay unpaid months of an ended or terminated lease.
+
+### Pages
+- `lease.html` + `lease.js` rebuilt in Tailwind with the shared bar (`css/renter-css/lease.css` no longer used by it): Lease Status badge with a one-line meaning, a timeline (start → last 30 days → end, today's marker, how it closed), and a "What you can do" card per state and role (landlord: Renew / Terminate with reason / End now when past the end date / Lease again; renter: pay the oldest unpaid month / Request this space again / Browse spaces; renewed → link to the new lease). The contract upload is labelled "Signed copy (PDF)".
+- `landlord/leases.html` + `leases.js`: "Lease Status" label; filter "Ended automatically" replaces "Expired (not ended yet)"; terminate opens a reason dialog; the details modal shows the reason or "Ended automatically on …".
+- `lease-form.js`: `?again={leaseId}` fills in renter, contact, unit and payment terms of an ended lease (an ordinary new lease; warns if the unit was taken).
+- `nav.js` bell: also lists leases closed in the last 14 days (landlord: ended automatically; renter: ended or terminated, with the reason), until that lease's page is opened (`localStorage.seenLeaseNotices`).
+- `property-grid.js`: unit details say "closes automatically" for a lease past its end date.
+
+### How it was checked
+- Live API on a scratch DB (port 8099): a lease 3 days past its end date was ENDED on startup (`closed_on` = end date, `ended_automatically` = 1) and its unit became AVAILABLE; terminate without / with a blank reason → 400, with a reason → TERMINATED and the reason in the renter's JSON; the renter could still pay an overdue month after termination.
+- jsdom: `lease-page-test.js` (35 checks), `again-test.js` (4), `nav-test.js`, `role-test.js`, `landlord-pages-test.js`, plotter suites (101 + 41 + 28).
+
+### Fix: approved requests after their lease is created (UI only)
+`requests.html` kept showing "Create lease" on an approved request even after the lease existed. `requests.js` now also loads `GET /api/leases` and links each APPROVED request to a lease with the same renter and unit created after the approval (oldest first, each lease used once). Those show a "Lease created" badge and "View lease" instead, for both roles. No database link was added (owner chose the front-end match). Checked with `requests-lease-test.js` (6 checks).
+
+### Not done yet / follow-ups
+- Class diagram and ERD (`.drawio`): add `terminationReason`, `endedAutomatically`, `expire()`, `LeaseExpiryJob`.
+- Phase 4: printable contract page (`contract.html?id=`).
+
+---
+
 ## PROPOSED (not built) · Commercial ready, permits, bigger grid with zoom
 
 Status: **decided, not implemented.** Nothing below exists in the code yet. When a part is built, move it into a dated section above and update the docs listed at the end.

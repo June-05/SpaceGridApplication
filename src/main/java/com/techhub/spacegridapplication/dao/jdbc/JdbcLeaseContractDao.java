@@ -12,6 +12,7 @@ import org.springframework.stereotype.Repository;
 import java.sql.Date;
 import java.sql.PreparedStatement;
 import java.sql.Statement;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
@@ -41,6 +42,8 @@ public class JdbcLeaseContractDao implements LeaseContractDao {
                     rs.getObject("previous_lease_id", Integer.class),
                     LeaseStatus.valueOf(rs.getString("status")),
                     closedOn == null ? null : closedOn.toLocalDate(),
+                    rs.getString("termination_reason"),
+                    rs.getBoolean("ended_automatically"),
                     rs.getString("unit_name"),
                     rs.getString("property_name"),
                     rs.getObject("property_id", Integer.class),
@@ -82,12 +85,17 @@ public class JdbcLeaseContractDao implements LeaseContractDao {
         return entity;
     }
 
-    /** Only the status and closed_on change after a lease is created (its terms are final). */
+    /** Only how it closed changes after a lease is created (its terms are final). */
     @Override
     public void update(LeaseContract entity) {
-        jdbcTemplate.update("UPDATE lease_contracts SET status = ?, closed_on = ? WHERE id = ?",
+        jdbcTemplate.update("""
+                UPDATE lease_contracts SET status = ?, closed_on = ?, termination_reason = ?, ended_automatically = ?
+                WHERE id = ?
+                """,
                 entity.getStatus().name(),
                 entity.getClosedOn() == null ? null : Date.valueOf(entity.getClosedOn()),
+                entity.getTerminationReason(),
+                entity.isEndedAutomatically(),
                 entity.getId());
     }
 
@@ -121,6 +129,13 @@ public class JdbcLeaseContractDao implements LeaseContractDao {
     public Optional<LeaseContract> findActiveByUnitId(int unitId) {
         return jdbcTemplate.query("SELECT * FROM lease_details WHERE rentable_unit_id = ? AND status = 'ACTIVE'",
                 rowMapper, unitId).stream().findFirst();
+    }
+
+    /** ACTIVE leases whose end date is before the given day (LeaseExpiryJob ends them). */
+    @Override
+    public List<LeaseContract> findActiveEndedBefore(LocalDate day) {
+        return jdbcTemplate.query("SELECT * FROM lease_details WHERE status = 'ACTIVE' AND end_date < ? ORDER BY id",
+                rowMapper, Date.valueOf(day));
     }
 
     @Override

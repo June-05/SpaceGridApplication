@@ -726,7 +726,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         lease.textContent = 'No current lease.';
       } else {
         const when = l.currentState === 'UPCOMING' ? `Starts ${format.date(l.startDate)}`
-          : l.currentState === 'EXPIRED' ? `Ended ${format.date(l.endDate)}: end or renew it`
+          : l.currentState === 'EXPIRED' ? `Ended ${format.date(l.endDate)}: closes automatically`
           : `${plural(l.daysRemaining, 'day')} left`;
         const dl = document.createElement('dl');
         dl.className = 'details-grid';

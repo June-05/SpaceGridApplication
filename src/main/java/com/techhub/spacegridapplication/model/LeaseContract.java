@@ -22,6 +22,7 @@ import java.util.List;
 public class LeaseContract extends BaseEntity {
 
     public static final int EXPIRING_SOON_DAYS = 30;
+    public static final int REASON_MAX_LENGTH = 255;
 
     private final int unitId;
     private final int renterId;
@@ -35,6 +36,8 @@ public class LeaseContract extends BaseEntity {
     private final String tenantPhone;
     private LeaseStatus status;
     private LocalDate closedOn;                 // date it actually ended / was terminated / renewed
+    private String terminationReason;           // why the landlord terminated it (TERMINATED only)
+    private boolean endedAutomatically;         // ENDED by LeaseExpiryJob after the end date
 
     // read-only display fields: filled by JdbcLeaseContractDao from the lease_details view, never saved
     private String unitName;
@@ -77,7 +80,8 @@ public class LeaseContract extends BaseEntity {
     public LeaseContract(int id, LocalDateTime createdAt, int unitId, int renterId, LocalDate startDate,
                          LocalDate endDate, BigDecimal monthlyRent, PaymentTerms paymentTerms, String tenantName,
                          String tenantEmail, String tenantPhone, Integer previousLeaseId, LeaseStatus status,
-                         LocalDate closedOn, String unitName, String propertyName, Integer propertyId,
+                         LocalDate closedOn, String terminationReason, boolean endedAutomatically,
+                         String unitName, String propertyName, Integer propertyId,
                          String renterName, String renterUsername, Integer unitPhotoId) {
         super(id, createdAt);
         this.unitId = unitId;
@@ -92,6 +96,8 @@ public class LeaseContract extends BaseEntity {
         this.previousLeaseId = previousLeaseId;
         this.status = status;
         this.closedOn = closedOn;
+        this.terminationReason = terminationReason;
+        this.endedAutomatically = endedAutomatically;
         this.unitName = unitName;
         this.propertyName = propertyName;
         this.propertyId = propertyId;
@@ -112,6 +118,8 @@ public class LeaseContract extends BaseEntity {
     public Integer getPreviousLeaseId() { return previousLeaseId; }
     public LeaseStatus getStatus() { return status; }
     public LocalDate getClosedOn() { return closedOn; }
+    public String getTerminationReason() { return terminationReason; }
+    public boolean isEndedAutomatically() { return endedAutomatically; }
     public String getUnitName() { return unitName; }
     public String getPropertyName() { return propertyName; }
     public Integer getPropertyId() { return propertyId; }
@@ -133,7 +141,7 @@ public class LeaseContract extends BaseEntity {
             return LeaseState.UPCOMING;
         }
         if (endDate.isBefore(today)) {
-            return LeaseState.EXPIRED;                    // still ACTIVE: the landlord should end or renew it
+            return LeaseState.EXPIRED;                    // still ACTIVE until LeaseExpiryJob runs (startup / 00:05)
         }
         return daysRemaining(today) <= EXPIRING_SOON_DAYS ? LeaseState.EXPIRING_SOON : LeaseState.ACTIVE;
     }
@@ -222,11 +230,26 @@ public class LeaseContract extends BaseEntity {
         this.closedOn = today;
     }
 
-    /** Early end: ACTIVE -> TERMINATED. */
-    public void terminate(LocalDate today) {
+    /** Automatic end (LeaseExpiryJob), the day after endDate: ACTIVE -> ENDED, closedOn = endDate (billing stops there). */
+    public void expire() {
+        requireActive("ended");
+        this.status = LeaseStatus.ENDED;
+        this.closedOn = endDate;
+        this.endedAutomatically = true;
+    }
+
+    /** Early end: ACTIVE -> TERMINATED. The reason is required; the renter sees it. */
+    public void terminate(LocalDate today, String reason) {
+        if (reason == null || reason.isBlank()) {
+            throw new ValidationException("Give a reason for terminating the lease (the renter will see it).");
+        }
+        if (reason.trim().length() > REASON_MAX_LENGTH) {
+            throw new ValidationException("The reason can be at most " + REASON_MAX_LENGTH + " characters.");
+        }
         requireActive("terminated");
         this.status = LeaseStatus.TERMINATED;
         this.closedOn = today;
+        this.terminationReason = reason.trim();
     }
 
     /** Used by LeaseService.renewLease: ACTIVE -> RENEWED, closedOn = the day before the new lease starts. */

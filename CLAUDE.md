@@ -79,9 +79,11 @@ value objects, with no SQL or web code.
   - Every lease is linked to a renter **account** (`renterUsername`, picked in the lease form from `GET /api/renters?search=`) and also stores the contact details typed in the form: `tenantName` (required; defaults to the account's name), `tenantEmail`, `tenantPhone`.
   - `PaymentTerms`: MONTHLY_ADVANCE (default), MONTHLY_ARREARS, QUARTERLY_ADVANCE, SEMI_ANNUAL_ADVANCE, ANNUAL_ADVANCE. No security deposit.
   - Create: unit → OCCUPIED (also for a lease that starts later). End: only from the end date on (before that: terminate). End / Terminate: sets `closedOn`, unit → AVAILABLE.
-  - **Renew:** the old lease becomes RENEWED (`closedOn` = the day before the new start). The new lease gets `previousLeaseId`. Done in one transaction.
-  - Displayed state is calculated: UPCOMING, ACTIVE, EXPIRING_SOON (30 days or fewer), EXPIRED, ENDED, TERMINATED, RENEWED.
-  - No amendments, no notifications.
+  - **Terminate needs a reason** (`termination_reason`, max 255, shown to the renter).
+  - **Auto-expiry:** `LeaseExpiryJob` (on startup and daily at 00:05) ends every ACTIVE lease whose end date has passed: ENDED, `closedOn` = end date, `ended_automatically` = TRUE, unit → AVAILABLE. Unpaid months stay payable.
+  - **Renew:** the old lease becomes RENEWED (`closedOn` = the day before the new start). The new lease gets `previousLeaseId`. Done in one transaction. "Lease again" (`lease-form.html?again=`) after a lease ended is an ordinary new lease.
+  - **Lease Status** (on screen; was "Contract status") is calculated: UPCOMING, ACTIVE, EXPIRING_SOON (30 days or fewer), EXPIRED (shown "Ending today", until the job runs), ENDED, TERMINATED, RENEWED.
+  - No amendments. Notifications are only the top bar's bell (`nav.js`): pending / decided requests and recently closed leases.
 - **Payments:**
   - Billing months run from the start month to `closedOn`/`endDate`. They are grouped into **billing periods** by the payment terms (1, 3, 6 or 12 months; the last one can be shorter). A period is named after its first month (`RentDue.billingMonth`, `payments.billing_month`) and costs rent × its months (`RentDue.months`).
   - The due day is the lease's start day, or the month's last day if shorter: in the period's first month (in advance) or in the month after it (in arrears).

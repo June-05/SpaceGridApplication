@@ -111,7 +111,7 @@
                         <option value="ACTIVE">Active</option>
                         <option value="UPCOMING">Upcoming</option>
                         <option value="EXPIRING_SOON">Expiring soon</option>
-                        <option value="EXPIRED">Expired (not ended yet)</option>
+                        <option value="ENDED_AUTO">Ended automatically</option>
                         <option value="ENDED">Ended</option>
                         <option value="TERMINATED">Terminated</option>
                         <option value="RENEWED">Renewed</option>
@@ -143,7 +143,7 @@
                             <th class="text-left px-6 py-3.5 text-xs font-bold text-slate-600 uppercase tracking-wider">Lease Term</th>
                             <th class="text-left px-6 py-3.5 text-xs font-bold text-slate-600 uppercase tracking-wider">Monthly Rate</th>
                             <th class="text-left px-6 py-3.5 text-xs font-bold text-slate-600 uppercase tracking-wider">Payment Status</th>
-                            <th class="text-left px-6 py-3.5 text-xs font-bold text-slate-600 uppercase tracking-wider">Contract Status</th>
+                            <th class="text-left px-6 py-3.5 text-xs font-bold text-slate-600 uppercase tracking-wider">Lease Status</th>
                             <th class="text-right px-6 py-3.5 text-xs font-bold text-slate-600 uppercase tracking-wider">Actions</th>
                         </tr>
                     </thead>
@@ -225,8 +225,9 @@
                         <p id="modalPaymentTerms" class="text-sm text-slate-700"></p>
                     </div>
                     <div>
-                        <p class="text-xs font-bold text-slate-400 uppercase mb-1">Contract Status</p>
+                        <p class="text-xs font-bold text-slate-400 uppercase mb-1">Lease Status</p>
                         <p id="modalStatus" class="text-sm"></p>
+                        <p id="modalStatusNote" class="text-xs text-slate-500 mt-1"></p>
                     </div>
                     <div>
                         <p class="text-xs font-bold text-slate-400 uppercase mb-1">Payment Status</p>
@@ -240,6 +241,25 @@
                 </div>
             </div>
         </div>
+    </div>
+
+    <!-- Terminate dialog (leases.js): the reason is required and shown to the renter -->
+    <div id="terminateDialog" class="hidden fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4">
+        <form id="terminateForm" class="bg-white rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+            <div>
+                <h2 id="terminateTitle" class="text-lg font-extrabold text-slate-900">Terminate this lease today?</h2>
+                <p class="text-xs text-slate-500 mt-1">The lease ends today and the unit becomes available again. The renter will see your reason. Unpaid months stay on their statement.</p>
+            </div>
+            <label class="block">
+                <span class="text-xs font-bold text-slate-700">Reason</span>
+                <textarea id="terminateReason" maxlength="255" rows="3" class="mt-1 w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-indigo-600" placeholder="e.g. The unit needs major repairs."></textarea>
+            </label>
+            <p id="terminateError" class="text-xs font-semibold text-rose-600"></p>
+            <div class="flex justify-end gap-2">
+                <button type="button" onclick="closeTerminate()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold">Keep the lease</button>
+                <button type="submit" class="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold">Terminate</button>
+            </div>
+        </form>
     </div>
 
     <script src="/js/common/format.js"></script>

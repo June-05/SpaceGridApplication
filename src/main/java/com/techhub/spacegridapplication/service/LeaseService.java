@@ -105,13 +105,28 @@ public class LeaseService {
         freeUnit(lease.getUnitId());
     }
 
-    /** Early end; unit -> AVAILABLE. */
+    /** Early end with a reason the renter will see; unit -> AVAILABLE. */
     @Transactional
-    public void terminateLease(int leaseId, User landlord) {
+    public void terminateLease(int leaseId, User landlord, String reason) {
         LeaseContract lease = getLeaseFor(leaseId, landlord);
-        lease.terminate(LocalDate.now());
+        lease.terminate(LocalDate.now(), reason);
         leaseDao.update(lease);
         freeUnit(lease.getUnitId());
+    }
+
+    /**
+     * Automatic end (LeaseExpiryJob): every ACTIVE lease whose end date is before today becomes ENDED
+     * (closedOn = its end date, endedAutomatically) and its unit AVAILABLE. Returns how many were ended.
+     */
+    @Transactional
+    public int expireLeases(LocalDate today) {
+        List<LeaseContract> due = leaseDao.findActiveEndedBefore(today);
+        for (LeaseContract lease : due) {
+            lease.expire();
+            leaseDao.update(lease);
+            freeUnit(lease.getUnitId());
+        }
+        return due.size();
     }
 
     public List<LeaseContract> getLeasesForLandlord(User landlord) {

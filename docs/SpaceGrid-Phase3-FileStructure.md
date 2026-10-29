@@ -95,6 +95,7 @@ SpaceGrid/
 │   │   ├── RentableUnitService.java
 │   │   ├── CommonAreaService.java
 │   │   ├── LeaseService.java
+│   │   ├── LeaseExpiryJob.java                 ends expired leases (startup + daily 00:05)
 │   │   ├── LeaseRequestService.java
 │   │   ├── PaymentService.java
 │   │   └── FileService.java            (uploads folder)

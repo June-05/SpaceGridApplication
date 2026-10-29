@@ -15,6 +15,9 @@
  *   renter   → requests decided (APPROVED / DECLINED) after the last one they looked at.
  *              "Looked at" = the newest decidedAt seen when requests.html was open (localStorage requestsSeenAt).
  *              It is kept in this browser only, so clearing site data brings the badge back.
+ * Lease notices (GET /api/leases): leases closed in the last 14 days whose lease.html wasn't opened since
+ * (lease.js adds the id to localStorage seenLeaseNotices):
+ *   landlord → ended automatically (LeaseExpiryJob)   renter → ended or terminated (with the reason)
  * It refreshes when the page loads and every 60 seconds.
  *
  * "Last property": units.html / leases.html / the plotter / the property form remember their property id
@@ -34,6 +37,7 @@
   ];
   const POLL_MS = 60000;
   const NEWEST_SHOWN = 5;
+  const LEASE_NOTICE_DAYS = 14;              // a closed lease is announced for 2 weeks
 
   const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (c) =>
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -102,7 +106,7 @@
   }
 
   /** The requests the bell should tell the user about, newest first. */
-  function bellItems(user, requests) {
+  function requestItems(user, requests) {
     if (user.role === 'LANDLORD') {
       return requests.filter((r) => r.status === 'PENDING')
         .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
@@ -112,7 +116,20 @@
       .sort((a, b) => String(b.decidedAt).localeCompare(String(a.decidedAt)));
   }
 
-  function itemHtml(user, r) {
+  /**
+   * Leases that closed in the last LEASE_NOTICE_DAYS days and whose page wasn't opened since.
+   * Landlord: ended automatically (decide what to do with the unit). Renter: ended or terminated.
+   */
+  function leaseItems(user, leases) {
+    let seen = [];
+    try { seen = JSON.parse(store.get('seenLeaseNotices') || '[]'); } catch (e) { /* ignore */ }
+    const since = new Date(Date.now() - LEASE_NOTICE_DAYS * 86400000).toISOString().slice(0, 10);
+    return leases.filter((l) => l.closedOn && String(l.closedOn) >= since && !seen.includes(l.id)
+        && (user.role === 'LANDLORD' ? (l.status === 'ENDED' && l.endedAutomatically) : (l.status === 'ENDED' || l.status === 'TERMINATED')))
+      .sort((a, b) => String(b.closedOn).localeCompare(String(a.closedOn)));
+  }
+
+  function requestHtml(user, r) {
     const where = `${esc(r.propertyName)} · ${esc(r.unitName)}`;
     const title = user.role === 'LANDLORD'
       ? `${esc(r.renterName)} wants to lease`
@@ -123,25 +140,42 @@
         <p class="text-xs text-slate-600 truncate">${where}</p></a>`;
   }
 
-  function paintBell(user, items) {
+  function leaseHtml(user, l) {
+    const where = `${esc(l.propertyName)} · ${esc(l.unitName)}`;
+    const terminated = l.status === 'TERMINATED';
+    const title = user.role === 'LANDLORD' ? 'Lease ended automatically'
+      : terminated ? 'Your lease was terminated' : 'Your lease has ended';
+    const next = user.role === 'LANDLORD' ? `${esc(l.tenantName)} · lease it again or let the unit be listed`
+      : terminated ? `Reason: ${esc(l.terminationReason || 'not given')}` : 'Pay anything left, or request a space again';
+    return `<a href="/lease.html?id=${l.id}" class="block px-4 py-3 hover:bg-slate-50 border-b border-slate-100">
+        <p class="text-xs font-bold ${terminated ? 'text-rose-600' : 'text-slate-800'}">${title}</p>
+        <p class="text-xs text-slate-600 truncate">${where}</p>
+        <p class="text-[11px] text-slate-500 truncate">${next}</p></a>`;
+  }
+
+  function paintBell(user, requests, leases) {
+    const count = requests.length + leases.length;
     const badge = document.getElementById('navBadge');
-    badge.textContent = items.length > 99 ? '99+' : String(items.length);
-    badge.classList.toggle('hidden', items.length === 0);
+    badge.textContent = count > 99 ? '99+' : String(count);
+    badge.classList.toggle('hidden', count === 0);
     const landlord = user.role === 'LANDLORD';
-    const head = landlord ? 'Pending lease requests' : 'Decisions on your requests';
-    const body = items.length
-      ? items.slice(0, NEWEST_SHOWN).map((r) => itemHtml(user, r)).join('')
+    const head = (text) => `<p class="px-4 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100">${text}</p>`;
+    let html = '';
+    if (leases.length) {
+      html += head(landlord ? 'Leases that ended' : 'Your leases') + leases.slice(0, NEWEST_SHOWN).map((l) => leaseHtml(user, l)).join('');
+    }
+    html += head(landlord ? 'Pending lease requests' : 'Decisions on your requests');
+    html += requests.length
+      ? requests.slice(0, NEWEST_SHOWN).map((r) => requestHtml(user, r)).join('')
       : `<p class="px-4 py-5 text-xs text-slate-500">${landlord ? 'No requests waiting for you.' : 'Nothing new.'}</p>`;
-    document.getElementById('navBellPanel').innerHTML =
-      `<p class="px-4 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100">${head}</p>${body}`
+    document.getElementById('navBellPanel').innerHTML = html
       + `<a href="/requests.html" class="block px-4 py-2.5 text-center text-xs font-bold text-indigo-600 hover:bg-indigo-50">${landlord ? 'See all requests' : 'See my requests'}</a>`;
   }
 
   async function refreshBell(user, page) {
     try {
-      const requests = await api.get('/api/lease-requests');
-      const items = bellItems(user, requests);
-      paintBell(user, items);
+      const [requests, leases] = await Promise.all([api.get('/api/lease-requests'), api.get('/api/leases')]);
+      paintBell(user, requestItems(user, requests), leaseItems(user, leases));
       if (user.role === 'RENTER' && page === 'requests') {          // looking at them now → mark as seen
         const newest = requests.map((r) => String(r.decidedAt || '')).sort().pop();
         if (newest) store.set('requestsSeenAt', newest);

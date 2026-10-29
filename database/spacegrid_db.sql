@@ -185,6 +185,8 @@ CREATE TABLE lease_contracts (
     tenant_phone       VARCHAR(30)   NULL,
     status             VARCHAR(20)   NOT NULL DEFAULT 'ACTIVE',
     closed_on          DATE          NULL,                 -- date it actually ended / was terminated / renewed
+    termination_reason VARCHAR(255)  NULL,                 -- why the landlord terminated it (shown to the renter)
+    ended_automatically BOOLEAN      NOT NULL DEFAULT FALSE,   -- TRUE = ended by LeaseExpiryJob after its end date
     created_at         DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
     active_unit_id     INT AS (IF(status = 'ACTIVE', rentable_unit_id, NULL)) STORED,
     CONSTRAINT pk_lease_contracts PRIMARY KEY (id),
@@ -202,7 +204,9 @@ CREATE TABLE lease_contracts (
     CONSTRAINT ck_lease_contracts_terms  CHECK (payment_terms IN
         ('MONTHLY_ADVANCE', 'MONTHLY_ARREARS', 'QUARTERLY_ADVANCE', 'SEMI_ANNUAL_ADVANCE', 'ANNUAL_ADVANCE')),
     CONSTRAINT ck_lease_contracts_closed CHECK (
-        (status = 'ACTIVE' AND closed_on IS NULL) OR (status <> 'ACTIVE' AND closed_on IS NOT NULL))
+        (status = 'ACTIVE' AND closed_on IS NULL) OR (status <> 'ACTIVE' AND closed_on IS NOT NULL)),
+    CONSTRAINT ck_lease_contracts_reason CHECK (termination_reason IS NULL OR status = 'TERMINATED'),
+    CONSTRAINT ck_lease_contracts_auto   CHECK (ended_automatically = FALSE OR status = 'ENDED')
 ) ENGINE = InnoDB;
 
 -- ---------------------------------------------------------------------
@@ -281,7 +285,7 @@ CREATE VIEW lease_details AS
 SELECT  l.id, l.rentable_unit_id, l.renter_id, l.previous_lease_id,
         l.start_date, l.end_date, l.monthly_rent, l.payment_terms,
         l.tenant_name, l.tenant_email, l.tenant_phone,
-        l.status, l.closed_on, l.created_at,
+        l.status, l.closed_on, l.termination_reason, l.ended_automatically, l.created_at,
         z.name        AS unit_name,
         p.id          AS property_id,
         p.name        AS property_name,

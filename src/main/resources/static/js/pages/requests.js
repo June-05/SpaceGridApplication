@@ -13,6 +13,9 @@
  * 4. The top bar and the Log Out button come from nav.js. A landlord opens on the Pending filter.
  * 5. A landlord's APPROVED request shows "Create lease", which opens the lease form:
  *      /landlord/lease-form.html?requestId={id}   (lease-form.js can use it to fill in the renter and the dates)
+ * 6. Once that lease exists, the request shows "Lease created" + "View lease" instead (both roles).
+ *    Nothing in the database links a lease to its request, so it is matched here (see linkLeases):
+ *    same renter and unit, lease created after the approval; each lease is used for one request only.
  */
 document.addEventListener('DOMContentLoaded', async () => {
   const user = await auth.requireLogin();
@@ -22,6 +25,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const error = document.getElementById('error');
   const empty = document.getElementById('empty');
   let all = [];                                  // every request, as loaded
+  let leaseOf = new Map();                       // request id → the lease created from it
   let filter = 'all';                            // 'all' or 'PENDING'
 
   document.getElementById('heading').textContent = isLandlord ? 'Requests for my properties' : 'My lease requests';
@@ -52,10 +56,36 @@ document.addEventListener('DOMContentLoaded', async () => {
            <button class="${BTN} bg-white hover:bg-slate-50 text-slate-700 border border-slate-200" data-action="decline" data-id="${req.id}" type="button">Decline</button>`
         : `<button class="${BTN} bg-white hover:bg-rose-50 text-rose-600 border border-rose-200" data-action="cancel" data-id="${req.id}" type="button">Cancel request</button>`;
     }
+    const lease = leaseOf.get(req.id);
+    if (lease) {
+      return `<a class="${BTN} bg-white hover:bg-slate-50 text-slate-700 border border-slate-200" href="/lease.html?id=${lease.id}">View lease</a>`;
+    }
     if (isLandlord && req.status === 'APPROVED' && !req.unitRemoved) {
       return `<a class="${BTN} bg-indigo-600 hover:bg-indigo-700 text-white" href="/landlord/lease-form.html?requestId=${req.id}">Create lease</a>`;
     }
     return '';
+  }
+
+  /**
+   * Request → lease created from it: same renter and unit, created after the approval.
+   * Oldest approvals take the oldest leases first, and a lease is used once, so two approvals
+   * of the same unit and renter with only one lease mark only one request.
+   */
+  function linkLeases(requests, leases) {
+    const map = new Map();
+    const used = new Set();
+    const approved = requests.filter((r) => r.status === 'APPROVED' && r.unitId != null && r.decidedAt)
+      .sort((a, b) => String(a.decidedAt).localeCompare(String(b.decidedAt)));
+    const byAge = [...leases].sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)));
+    for (const req of approved) {
+      const lease = byAge.find((l) => !used.has(l.id) && l.unitId === req.unitId && l.renterId === req.renterId
+        && String(l.createdAt) >= String(req.decidedAt).slice(0, 19));
+      if (lease) {
+        used.add(lease.id);
+        map.set(req.id, lease);
+      }
+    }
+    return map;
   }
 
   function cardHtml(req) {
@@ -66,7 +96,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       <article class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-2">
         <div class="flex items-start justify-between gap-3">
           <h2 class="text-base font-bold text-slate-900">${esc(req.propertyName)} · ${esc(req.unitName)}</h2>
-          <span class="text-xs font-bold px-2.5 py-1 rounded-md ${BADGE[req.status] || BADGE.CANCELLED}">${esc(format.label(req.status))}</span>
+          ${leaseOf.has(req.id)
+            ? '<span class="text-xs font-bold px-2.5 py-1 rounded-md bg-indigo-100 text-indigo-800">Lease created</span>'
+            : `<span class="text-xs font-bold px-2.5 py-1 rounded-md ${BADGE[req.status] || BADGE.CANCELLED}">${esc(format.label(req.status))}</span>`}
         </div>
         ${who}
         ${req.unitRemoved
@@ -100,7 +132,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   async function load() {
     error.textContent = '';
     try {
-      all = await api.get('/api/lease-requests');
+      const [requests, leases] = await Promise.all([api.get('/api/lease-requests'), api.get('/api/leases')]);
+      all = requests;
+      leaseOf = linkLeases(requests, leases);
       // PENDING first (they need a decision), then newest first
       all.sort((a, b) => (a.status === 'PENDING' ? 0 : 1) - (b.status === 'PENDING' ? 0 : 1)
         || String(b.createdAt).localeCompare(String(a.createdAt)));

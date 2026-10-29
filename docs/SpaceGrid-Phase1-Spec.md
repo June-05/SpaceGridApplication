@@ -12,7 +12,7 @@ Java 17 · Spring Boot · JdbcTemplate · MySQL · HTML/JS frontend. Base packag
 - **Colors come from CSS classes.** Enums carry a `cssClass` and a `defaultColor`. The page puts the class on the spot and sets `--zone-color`; any class can be restyled in CSS (textures, icons).
 - **Leases can't be edited.** Terms are `final`. A change means end/terminate and create a new lease, or **Renew** (one step, linked by `previousLeaseId`).
 - **Payments are simulated.** The payment step sits behind `PaymentGateway`; `FakePaymentGateway` can later be swapped for a real provider without changing other classes.
-- **No lease amendments or notifications.** Lease states (Expiring soon, Expired) are calculated and shown on both lease screens instead.
+- **No lease amendments, and no email notifications.** Lease states (Expiring soon, Ending today) are calculated and shown on both lease screens; the top bar's bell lists pending/decided requests and recently ended or terminated leases.
 
 ## 2. Packages
 
@@ -371,6 +371,8 @@ Terms are final and can't be edited. To change them: end/terminate and create a 
 - tenantPhone: String {final}
 - status: LeaseStatus
 - closedOn: LocalDate
+- terminationReason: String                      // TERMINATED only; shown to the renter
+- endedAutomatically: boolean                    // ENDED by LeaseExpiryJob
 - unitName: String {readOnly}
 - propertyName: String {readOnly}
 - propertyId: Integer {readOnly}
@@ -391,7 +393,8 @@ Terms are final and can't be edited. To change them: end/terminate and create a 
 + amountForPeriod(periodStart: YearMonth): BigDecimal
 + dueDateFor(periodStart: YearMonth): LocalDate  // in advance: in the period's first month; in arrears: the month after
 + end(today: LocalDate): void
-+ terminate(today: LocalDate): void
++ terminate(today: LocalDate, reason: String): void   // reason required, max 255
++ expire(): void                                 // ACTIVE -> ENDED, closedOn = endDate, endedAutomatically
 + markRenewed(lastDay: LocalDate): void
 ```
 
@@ -863,7 +866,8 @@ Table `uploaded_files`. Files are never updated (upload a new one instead).
 + createLease(landlord: User, unitId: int, renterUsername: String, startDate: LocalDate, endDate: LocalDate, monthlyRent: BigDecimal, paymentTerms: PaymentTerms, tenantName: String, tenantEmail: String, tenantPhone: String): LeaseContract
 + renewLease(leaseId: int, landlord: User, newStartDate: LocalDate, newEndDate: LocalDate, newMonthlyRent: BigDecimal, paymentTerms: PaymentTerms): LeaseContract   // paymentTerms null = keep
 + endLease(leaseId: int, landlord: User): void            // only from the end date on
-+ terminateLease(leaseId: int, landlord: User): void
++ terminateLease(leaseId: int, landlord: User, reason: String): void
++ expireLeases(today: LocalDate): int            // LeaseExpiryJob: ends ACTIVE leases past their end date
 + getLeasesForLandlord(landlord: User): List<LeaseContract>
 + getLeasesForProperty(propertyId: int, landlord: User): List<LeaseContract>
 + getLeasesForRenter(renter: User): List<LeaseContract>
@@ -1014,7 +1018,7 @@ Saves uploads in the uploads folder (`spacegrid.upload-dir`) and checks who may 
 + create(unitId, renterUsername, startDate, endDate, monthlyRent, paymentTerms, tenantName, tenantEmail, tenantPhone): LeaseContract
 + renew(id, newStartDate, newEndDate, newMonthlyRent, paymentTerms): LeaseContract
 + end(id): void
-+ terminate(id): void
++ terminate(id, reason): void
 ```
 
 | Endpoint | Method |
@@ -1308,7 +1312,9 @@ Breaks a rule, e.g. username taken → 409
 - A unit can have only one ACTIVE lease. The chosen user must have the RENTER role.
 - Create: unit → OCCUPIED. End (normal) or Terminate (early): status changes, `closedOn` is set, unit → AVAILABLE.
 - Renew: the old lease becomes RENEWED with `closedOn` = the day before the new start date. A new ACTIVE lease is created with `previousLeaseId` and the new terms, and the unit stays OCCUPIED. All of this happens in one transaction. The new start date must be after the old start date and no later than the day after the old end date.
-- Displayed state (`getCurrentState`): UPCOMING (not started), ACTIVE, EXPIRING_SOON (30 days or fewer left), EXPIRED (end date passed but still ACTIVE, so the landlord should end or renew it), ENDED, TERMINATED, RENEWED.
+- Terminate requires a reason (max 255 characters), saved in `terminationReason` and shown to the renter.
+- Auto-expiry: `LeaseExpiryJob` runs on startup and daily at 00:05 and ends every ACTIVE lease whose end date has passed (ENDED, `closedOn` = end date, `endedAutomatically`), unit → AVAILABLE. Unpaid months can still be paid.
+- Displayed state (`getCurrentState`, shown as "Lease Status"): UPCOMING (not started), ACTIVE, EXPIRING_SOON (30 days or fewer left), EXPIRED (end date passed but the job hasn't run yet; shown "Ending today"), ENDED, TERMINATED, RENEWED.
 - Landlord view: all leases on their properties, with renter name, state, and end/terminate/renew actions. Renter view: own leases only, read-only, with days remaining and the rent statement.
 
 **Payments**

@@ -5,7 +5,7 @@ public enum LeaseState {
     UPCOMING("Upcoming", "state-upcoming"),
     ACTIVE("Active", "state-active"),
     EXPIRING_SOON("Expiring soon", "state-expiring-soon"),
-    EXPIRED("Expired", "state-expired"),
+    EXPIRED("Ending today", "state-expired"),         // past the end date, closed by LeaseExpiryJob shortly
     ENDED("Ended", "state-ended"),
     TERMINATED("Terminated", "state-terminated"),
     RENEWED("Renewed", "state-renewed");

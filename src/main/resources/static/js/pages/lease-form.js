@@ -6,6 +6,7 @@
  *   lease-form.html?unitId=3        new lease for that unit (from the Units page)
  *   lease-form.html?requestId=4     new lease from an approved lease request (renter, unit and dates filled in)
  *   lease-form.html?renew=3         renewal of lease 3 (same tenant and unit; new dates, rent, terms)
+ *   lease-form.html?again=3         new lease for lease 3's renter and unit after it ended (fields stay editable)
  *
  * 1. Renter account: typing calls GET /api/renters?search=; picking one fills the full name.
  * 2. Property → its AVAILABLE units (GET /api/properties/{id}/units); picking a unit fills in its rate.
@@ -54,6 +55,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     await startFromRequest(Number(query.get('requestId')), properties);
   } else if (query.get('unitId')) {
     await selectUnit(Number(query.get('unitId')), properties);
+  } else if (query.get('again')) {
+    await startAgain(Number(query.get('again')), properties);
   }
   calculateSummary();
 });
@@ -115,6 +118,24 @@ async function startFromRequest(requestId, properties) {
   await selectUnit(request.unitId, properties);
   $('startDate').value = request.desiredStart;
   $('endDate').value = request.suggestedEndDate;
+}
+
+/**
+ * "Lease again" from an ended lease (lease.html): same renter, contact and unit, filled in but still editable.
+ * It is an ordinary new lease (not a renewal), so the unit must be AVAILABLE again.
+ */
+async function startAgain(oldLeaseId, properties) {
+  const old = await api.get(`/api/leases/${oldLeaseId}`);
+  $('renterUsername').value = old.renterUsername;
+  $('tenantName').value = old.tenantName;
+  $('tenantEmail').value = old.tenantEmail || '';
+  $('tenantPhone').value = old.tenantPhone || '';
+  await selectUnit(old.unitId, properties);
+  if (Number($('unitSelect').value) !== old.unitId) {
+    $('formMessage').textContent = `${old.unitName} is not available any more, so pick another unit.`;
+    $('formMessage').classList.remove('hidden');
+  }
+  $('paymentTerms').value = old.paymentTerms;
 }
 
 /** Renewal: the tenant and unit stay the same, so those fields are locked. */
