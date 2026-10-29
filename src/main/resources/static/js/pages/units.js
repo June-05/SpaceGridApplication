@@ -49,6 +49,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('gridLink').href = `property-grid.html?id=${propertyId}`;
 
   $('mapEmptyLink').href = `property-grid.html?id=${propertyId}`;
+  $('mapGridLink').href = `property-grid.html?id=${propertyId}`;
 
   document.querySelectorAll('.filter-pill').forEach((pill) => pill.addEventListener('click', () => setFilter(pill)));
   $('unitSearch').addEventListener('input', (e) => { currentSearch = e.target.value.trim().toLowerCase(); render(); });

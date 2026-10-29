@@ -439,6 +439,35 @@ Phase 6 of the UI plan. Front-end only: no Java, SQL or API change. Answers "too
 
 ---
 
+## 2026-10-29 · Layout previews on the dashboard and homepage (design change: one public endpoint)
+
+Asked by the owner after Phase 6. Choices: the cover photo stays and the layout is a **small inset** on it (with no photo, the layout fills the image area); the homepage gets **card thumbnails and a bigger map** in the details window where a renter clicks a free unit to pick it.
+
+### New class
+- `model/GridPreview` (record): `gridRows`, `gridColumns`, `zones` (`id`, `name`, `rentable`, `enclosed`, `available`, `color`, `cssClasses`, `positions`), `edgesByType`; `GridPreview.from(Property)`. Only the layout and which units are free: no rates of taken units, no tenants, no landlord id; archived units are left out. The names match Property's JSON, so `gridRenderer.fromProperty()` reads both. (`cssClasses` still holds a unit's status class, so a taken unit's status — occupied / maintenance — can be seen.)
+
+### Changed classes
+- `PropertyService.getListingLayout(id)`: same rule as `getListing` (404 unless ACTIVE with a free unit), then `propertyDao.findById` → `GridPreview.from`.
+
+### Endpoints
+- `GET /api/browse/{id}/layout` (new, public like the other browse endpoints).
+
+### Pages (UI)
+- `grid-renderer.js`: new `thumbnail(container, layout, options)` (cell size fits the box's width and height; labels and thin lines drop out by themselves) and `hasSpots(layout)`.
+- `landlord/dashboard.html` / `landlord-dashboard.js`: each card shows the layout (from `GET /api/properties`, no new call): inset on the photo, or the whole image area, or "No layout yet". A **View/Edit Layout** button (or **Draw layout**) on it opens `property-grid.html?id=` without opening the card's modal.
+- `homepage.html` / `homepage.js`: card thumbnails, loaded only for the 6 cards on the current page and cached (free units bright, the rest dimmed; the inset sits bottom-left so it doesn't cover the Save heart). Details window: a "Layout" map above "Available units"; a renter clicks a free unit to pick it and the radio list follows; guests and landlords only see it. A missing layout just shows nothing.
+- `landlord/units.html`: the Map view has a **View/Edit Grid Layout** button in its header, and the empty map a **Draw the layout** button.
+
+### How it was checked
+- Live API on a scratch DB (port 8099): `/api/browse/1/layout` without login → 200 (4×6, Unit 103 free, three taken units, doors in `edgesByType`, archived Storage Room left out, no rate / landlord / tenant / status fields); a DRAFT property and a missing id → 404.
+- jsdom: `thumbnail-test.js` (21 checks, using the real layout JSON from that run) and all earlier suites (`units-map-test.js` updated for the new empty-map button).
+
+### Not done yet / follow-ups
+- Class diagram (`.drawio`): add `GridPreview`.
+- Next in the plan: Phase 7 (renter dashboard and pay pages rebuilt in Tailwind with the shared bar).
+
+---
+
 ## PROPOSED (not built) · Commercial ready, permits, bigger grid with zoom
 
 Status: **decided, not implemented.** Nothing below exists in the code yet. When a part is built, move it into a dated section above and update the docs listed at the end.

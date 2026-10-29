@@ -12,6 +12,7 @@ import com.techhub.spacegridapplication.model.Dimensions;
 import com.techhub.spacegridapplication.model.EdgeType;
 import com.techhub.spacegridapplication.model.GridEdge;
 import com.techhub.spacegridapplication.model.GridPosition;
+import com.techhub.spacegridapplication.model.GridPreview;
 import com.techhub.spacegridapplication.model.GridZone;
 import com.techhub.spacegridapplication.model.Orientation;
 import com.techhub.spacegridapplication.model.Property;
@@ -54,6 +55,14 @@ public class PropertyService {
     public PropertyListing getListing(int propertyId) {
         return propertyDao.findActiveListingById(propertyId)
                 .orElseThrow(() -> new NotFoundException("This space isn't available for rent right now."));
+    }
+
+    /** Public homepage layout preview. Same rule as getListing (NotFoundException unless it is listed). */
+    public GridPreview getListingLayout(int propertyId) {
+        getListing(propertyId);
+        Property property = propertyDao.findById(propertyId)
+                .orElseThrow(() -> new NotFoundException("This space isn't available for rent right now."));
+        return GridPreview.from(property);
     }
 
     /** search (name, address, city, region or "SG-PROP-<id>") and type are optional filters. Newest first. */

@@ -299,5 +299,23 @@ const gridRenderer = {
     }
     stage.appendChild(layer);
     container.replaceChildren(stage);
+  },
+
+  /**
+   * Small read-only preview (dashboard and homepage cards, the homepage details map): the cell size is picked so
+   * the whole grid fits the container's width AND height. Names and thin lines drop out by themselves when cells
+   * are small. options.highlightZoneIds / highlightZoneId work as in render(). A hidden container (size 0) uses
+   * options.fallbackWidth / fallbackHeight (default 120 x 80).
+   */
+  thumbnail(container, layout, options = {}) {
+    const width = container.clientWidth || options.fallbackWidth || 120;
+    const height = container.clientHeight || options.fallbackHeight || 80;
+    const cell = Math.max(2, Math.floor(Math.min(width / layout.cols, height / layout.rows)));
+    this.render(container, layout, { ...options, mode: 'view', cell });
+  },
+
+  /** True when at least one zone has spots on the grid (otherwise there is nothing to preview). */
+  hasSpots(layout) {
+    return layout.cells.size > 0;
   }
 };

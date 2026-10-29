@@ -226,6 +226,19 @@ reason: String            // why it can't be deleted (null when it can)
 ```
 Neither flag is true while the unit has an ACTIVE lease (or is already archived).
 
+#### `GridPreview`, Class · value object (record)
+
+A listed property's grid for the public homepage (`GET /api/browse/{id}/layout`): the layout and which units are free. No rates of taken units, no tenants, no landlord id; archived units are left out. Field names match Property's JSON, so `gridRenderer.fromProperty()` reads it.
+
+```
+- gridRows: int
+- gridColumns: int
+- zones: List<Zone>       // Zone(id, name, rentable, enclosed, available, color, cssClasses, positions)
+- edgesByType: Map<EdgeType, List<GridEdge>>
+
++ from(property: Property): GridPreview   {static}
+```
+
 #### `PropertyListing`, Class · value object (record)
 
 An ACTIVE property as shown on the public homepage, with only its AVAILABLE units. Nothing private.
@@ -802,6 +815,7 @@ Table `uploaded_files`. Files are never updated (upload a new one instead).
 
 + getListings(): List<PropertyListing>                  // public homepage, no login
 + getListing(propertyId: int): PropertyListing           // NotFoundException if not ACTIVE or nothing available
++ getListingLayout(propertyId: int): GridPreview         // same rule as getListing
 + getPropertiesForLandlord(landlord: User, search: String, type: PropertyType): List<Property>
 + getProperty(propertyId: int): Property                 // no owner check: only after the caller checked access
 + getOwnedProperty(propertyId: int, landlord: User): Property
@@ -1101,6 +1115,7 @@ Public: no `HttpSession`, no login. Used by `homepage.html`.
 |---|---|
 | `GET /api/browse` | `list` |
 | `GET /api/browse/{id}` | `get` |
+| `GET /api/browse/{id}/layout` | `layout` |
 
 #### `LeaseRequestController`, Class · controller
 

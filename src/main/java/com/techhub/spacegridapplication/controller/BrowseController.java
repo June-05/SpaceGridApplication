@@ -1,5 +1,6 @@
 package com.techhub.spacegridapplication.controller;
 
+import com.techhub.spacegridapplication.model.GridPreview;
 import com.techhub.spacegridapplication.model.PropertyListing;
 import com.techhub.spacegridapplication.service.PropertyService;
 
@@ -35,5 +36,11 @@ public class BrowseController {
     @GetMapping("/{id}")
     public PropertyListing get(@PathVariable int id) {
         return propertyService.getListing(id);
+    }
+
+    /** The listing's grid (thumbnail on the card, map in the details window): layout + which units are free. 404 like get. */
+    @GetMapping("/{id}/layout")
+    public GridPreview layout(@PathVariable int id) {
+        return propertyService.getListingLayout(id);
     }
 }

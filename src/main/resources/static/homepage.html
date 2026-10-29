@@ -19,9 +19,19 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <!-- Font Awesome for UI icons -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<!-- grid.css + zones.css draw the layout thumbnails (grid-renderer.js) -->
+<link rel="stylesheet" href="/css/grid.css">
+<link rel="stylesheet" href="/css/zones.css">
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 body { font-family: 'Plus Jakarta Sans', sans-serif; }
+/* layout thumbnails (grid-renderer.js thumbnail()): the grid is centered and can't be clicked */
+:root { --surface: #ffffff; --border: #d9dee5; }   /* used by grid.css */
+.grid-thumb { display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.grid-thumb .grid-stage { pointer-events: none; }
+#modalMap .cell.is-pickable { cursor: pointer; }
+#modalMap .cell.is-pickable:hover { filter: brightness(0.92); }
+#modalMap .cell.is-selected { box-shadow: inset 0 0 0 3px #4f46e5; }
 </style>
 </head>
 <body class="bg-[#f8fafc] text-slate-900 min-h-screen flex flex-col">
@@ -247,6 +257,12 @@ body { font-family: 'Plus Jakarta Sans', sans-serif; }
 <p id="modalOwner" class="text-sm font-semibold text-slate-700"></p>
 </div>
 </div>
+<!-- Layout of the property: free units are bright; a renter can click one to pick it -->
+<div id="modalMapSection" class="hidden">
+<p class="text-[11px] font-bold text-slate-400 uppercase mb-2">Layout</p>
+<div id="modalMap" class="grid-thumb h-56 bg-slate-50 border border-slate-100 rounded-xl p-2"></div>
+<p id="modalMapHint" class="text-[11px] text-slate-500 mt-1"></p>
+</div>
 <!-- The free units -->
 <div>
 <p class="text-[11px] font-bold text-slate-400 uppercase mb-2">Available units</p>
@@ -291,6 +307,7 @@ body { font-family: 'Plus Jakarta Sans', sans-serif; }
 <div id="toast" class="hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] bg-slate-900 text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow-lg"></div>
 
 <script src="/js/common/api.js"></script>
+<script src="/js/common/grid-renderer.js"></script>
 <script src="/js/pages/homepage.js"></script>
 </body>
 </html>

@@ -13,6 +13,9 @@
     <script>auth.requireLogin('LANDLORD');</script>
     <!-- Font Awesome for Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- grid.css + zones.css draw the layout thumbnails (grid-renderer.js) -->
+    <link rel="stylesheet" href="/css/grid.css">
+    <link rel="stylesheet" href="/css/zones.css">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
         body { font-family: 'Plus Jakarta Sans', sans-serif; }
@@ -22,6 +25,10 @@
         .border-space-purple { border-color: #4f46e5; }
         .ring-space-purple { --tw-ring-color: #4f46e5; }
         .shadow-xs { box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05); }
+        /* layout thumbnails (grid-renderer.js thumbnail()): the grid is centered and can't be clicked */
+        :root { --surface: #ffffff; --border: #d9dee5; }   /* used by grid.css */
+        .grid-thumb { display: flex; align-items: center; justify-content: center; overflow: hidden; }
+        .grid-thumb .grid-stage { pointer-events: none; }
     </style>
 </head>
 <body class="bg-[#f8fafc] text-slate-900 min-h-screen flex flex-col antialiased">
@@ -196,6 +203,7 @@
     </div>
 
     <script src="/js/common/format.js"></script>
+    <script src="/js/common/grid-renderer.js"></script>
     <script src="/js/pages/landlord-dashboard.js"></script>
 </body>
 </html>

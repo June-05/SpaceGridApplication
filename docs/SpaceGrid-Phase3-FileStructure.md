@@ -44,6 +44,7 @@ SpaceGrid/
 │   │   ├── PropertyType.java
 │   │   ├── PropertyStatus.java
 │   │   ├── PropertyListing.java        (homepage, record)
+│   │   ├── GridPreview.java            (homepage layout preview, record)
 │   │   ├── UnitListing.java            (homepage, record)
 │   │   ├── LeaseRequest.java
 │   │   ├── RequestStatus.java
@@ -253,11 +254,11 @@ Links start with `/` so they work from inside the `landlord/` and `renter/` fold
 | Page | Who | Purpose | Script | Grid? | Endpoints |
 |---|---|---|---|---|---|
 | `index.html` | everyone | Old welcome page, Login / Register / Browse buttons | none | | none |
-| `homepage.html` | everyone | **Front door (`/`).** Browse spaces with free blocks: search, type / min-blocks / power filters, sort, pagination, saved spaces, details window. Renters send a lease request there; guests are sent to log in. Uses Tailwind CDN, not `base.css` | `homepage.js` | | `GET /api/browse`, `GET /api/browse/{id}`, `GET /api/auth/me` (plain fetch), `POST /api/lease-requests`, `POST /api/auth/logout` |
+| `homepage.html` | everyone | **Front door (`/`).** Browse spaces with free blocks: search, type / min-blocks / power filters, sort, pagination, saved spaces, details window. Each card shows the layout (free units bright); the details window has a bigger map where a renter clicks a free unit to pick it. Renters send a lease request there; guests are sent to log in. Uses Tailwind CDN, not `base.css` | `homepage.js` | ✔ read-only | `GET /api/browse`, `GET /api/browse/{id}`, `GET /api/browse/{id}/layout`, `GET /api/auth/me` (plain fetch), `POST /api/lease-requests`, `POST /api/auth/logout` |
 | `requests.html` | both | Renter: own requests + Cancel. Landlord: incoming requests + Approve / Decline, "Create lease" on approved ones | `requests.js` | | `GET /api/lease-requests`, `POST …/{id}/approve`, `…/decline`, `…/cancel` |
 | `login.html` | everyone | Login, then redirect by role | `login.js` | | `POST /api/auth/login` |
 | `register.html` | everyone | Create an account (choose role), then logged in right away | `register.js` | | `POST /api/auth/register`, `POST /api/auth/login` |
-| `landlord/dashboard.html` | landlord | Property cards (cover photo, occupancy, income from active leases), search, type / occupancy / published filters; card → modal with Units, Grid, Edit, Leases, Publish / Archive | `landlord-dashboard.js` | | `GET /api/properties`, `GET /api/leases`, `POST /api/properties/{id}/publish`, `POST …/{id}/archive` |
+| `landlord/dashboard.html` | landlord | Property cards (cover photo with a layout inset, or the layout alone, plus a "View/Edit Layout" button; occupancy, income from active leases), search, type / occupancy / published filters; card → modal with Units, Grid, Edit, Leases, Publish / Archive | `landlord-dashboard.js` | ✔ read-only | `GET /api/properties`, `GET /api/leases`, `POST /api/properties/{id}/publish`, `POST …/{id}/archive` |
 | `landlord/property-form.html` | landlord | Add (no id) or edit (`?id=`) a property: street / city / region, type, description, default rate, area, amenities, photos and site plans (map pin is a placeholder); save draft / publish / archive | `property-form.js` | | `GET/POST/PUT /api/properties`, `POST …/{id}/publish`, `POST …/{id}/archive`, `GET/POST /api/properties/{id}/files`, `DELETE /api/files/{id}` |
 | `landlord/property-grid.html` | landlord | Grid plotter: resize, paint units and common areas, edit walls/doors/windows, add unit (rate starts at the default rate) or common area | `property-grid.js` | ✔ editable | `GET /api/properties/{id}`, `PUT …/{id}/grid`, `PUT …/{id}/edges`, `POST …/{id}/units`, `POST …/{id}/common-areas` |
 | `landlord/units.html` | landlord | `?propertyId=`: Map / List toggle. Map = the property's grid, read-only, units colored by status, filters dim the others, click a unit → Quick Edit. List = compact unit cards (name, status, rate, tenant). Quick Edit (status, "Rate for new leases" with a note about the current lease, unit photos); Create Lease / View Lease | `units.js` | ✔ read-only | `GET /api/properties`, `GET /api/properties/{id}`, `GET /api/properties/{id}/units`, `GET …/{id}/leases`, `PUT /api/units/{id}`, `POST /api/units/{id}/maintenance`, `GET/POST /api/units/{id}/files`, `DELETE /api/files/{id}` |

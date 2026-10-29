@@ -136,10 +136,21 @@
         <section id="unitMap" class="hidden bg-white border border-slate-200 rounded-2xl p-4 shadow-xs mb-4">
             <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
                 <p class="text-xs text-slate-500">Click a unit to edit it. To change the layout, use <span class="font-semibold text-slate-700">View/Edit Grid Layout</span>.</p>
-                <div id="mapLegend" class="flex flex-wrap items-center gap-3 text-xs text-slate-600"></div>
+                <div class="flex flex-wrap items-center gap-3">
+                    <div id="mapLegend" class="flex flex-wrap items-center gap-3 text-xs text-slate-600"></div>
+                    <a id="mapGridLink" href="property-grid.html" class="flex items-center gap-2 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow-sm shadow-indigo-200">
+                        <i class="fa-solid fa-grip text-xs"></i><span>View/Edit Grid Layout</span>
+                    </a>
+                </div>
             </div>
             <div id="mapHost" class="grid-host"></div>
-            <p id="mapEmpty" class="hidden py-10 text-center text-sm text-slate-500">This property has no units on its grid yet. Draw them in <a id="mapEmptyLink" href="property-grid.html" class="text-indigo-600 font-semibold">View/Edit Grid Layout</a>.</p>
+            <div id="mapEmpty" class="hidden py-10 text-center">
+                <i class="fa-solid fa-grip text-3xl text-slate-300 mb-3"></i>
+                <p class="text-sm text-slate-500 mb-4">This property has no units on its grid yet.</p>
+                <a id="mapEmptyLink" href="property-grid.html" class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow-sm shadow-indigo-200">
+                    <i class="fa-solid fa-pen-ruler text-xs"></i><span>Draw the layout</span>
+                </a>
+            </div>
         </section>
 
         <!-- List view: one compact card per unit -->

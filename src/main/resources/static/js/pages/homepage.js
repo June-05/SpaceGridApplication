@@ -12,6 +12,9 @@
  *    The renter needs an email and a phone on the account: the form shows both (filled from the account) and
  *    saves them first with PUT /api/auth/me/contact when they changed (the server also refuses a request without them).
  * 5. "Saved" spaces are only remembered in this browser (localStorage). They are not stored in the database.
+ * 5b. Layouts: GET /api/browse/{id}/layout (public; the grid and which units are free) is loaded only for the cards
+ *     on the current page (cached by id). Cards show it as a small inset on the photo (or the whole image area),
+ *     free units bright. The details window shows a bigger map; a renter clicks a free unit to pick it.
  * 6. /?space=ID opens that space's details window (used to come back after logging in).
  */
 const ITEMS_PER_PAGE = 6;
@@ -33,6 +36,8 @@ let me = null;                // the logged-in user, or null for a guest
 let savedIds = loadSaved();   // ids of the saved spaces
 let savedOnly = false;        // "Saved" button: show only the saved spaces
 let openListing = null;       // the space shown in the details window
+const layouts = new Map();    // property id → its layout (GET /api/browse/{id}/layout), or null when it failed
+let modalLayout = null;       // the layout drawn in the details window (cell → zone id, for clicks)
 let selectedUnitId = null;    // the unit picked in the details window
 
 const $ = (id) => document.getElementById(id);
@@ -275,10 +280,52 @@ function renderProperties() {
   const end = Math.min(start + ITEMS_PER_PAGE, total);
 
   $('propertiesGrid').innerHTML = filtered.slice(start, end).map(cardHtml).join('');
+  drawCardLayouts();
   $('showingStart').textContent = start + 1;
   $('showingEnd').textContent = end;
   $('showingTotal').textContent = total;
   renderPaginationControls(totalPages);
+}
+
+/** The layout of a listing (cached). null when it can't be loaded: the card then just has no thumbnail. */
+async function getLayout(id) {
+  if (!layouts.has(id)) {
+    try {
+      layouts.set(id, gridRenderer.fromProperty(await api.get(`/api/browse/${id}/layout`)));
+    } catch (err) {
+      layouts.set(id, null);
+    }
+  }
+  return layouts.get(id);
+}
+
+/** Free units of a layout (they stay bright; the rest is dimmed). */
+const freeIds = (layout) => new Set(layout.zones.filter((z) => z.available).map((z) => z.id));
+
+/** Draws the layout of every card on the current page (only these are loaded). */
+function drawCardLayouts() {
+  document.querySelectorAll('#propertiesGrid [data-thumb]').forEach(async (box) => {
+    const layout = await getLayout(Number(box.dataset.thumb));
+    if (!layout || !gridRenderer.hasSpots(layout) || !box.isConnected) return;
+    box.parentElement.classList.remove('hidden');
+    gridRenderer.thumbnail(box, layout, { highlightZoneIds: freeIds(layout), fallbackWidth: box.dataset.w, fallbackHeight: box.dataset.h });
+  });
+}
+
+/** The details window's map: free units bright, the picked one outlined; a renter can click a free unit. */
+function renderModalMap() {
+  const section = $('modalMapSection');
+  if (!modalLayout || !gridRenderer.hasSpots(modalLayout)) { section.classList.add('hidden'); return; }
+  section.classList.remove('hidden');
+  const free = freeIds(modalLayout);
+  const canPick = me && me.role === 'RENTER';
+  gridRenderer.thumbnail($('modalMap'), modalLayout, { highlightZoneIds: free, fallbackWidth: 420, fallbackHeight: 208 });
+  $('modalMap').querySelectorAll('.cell').forEach((cell) => {
+    const id = modalLayout.cells.get(gridRenderer.cellKey(Number(cell.dataset.row), Number(cell.dataset.col)));
+    if (canPick && free.has(id)) cell.classList.add('is-pickable');
+    if (id != null && id === selectedUnitId) cell.classList.add('is-selected');
+  });
+  $('modalMapHint').textContent = canPick ? 'Bright units are free. Click one to choose it.' : 'Bright units are free to rent.';
 }
 
 /** Few units left (3 or fewer) get the amber "Few Left" badge, the rest the green "Open" badge. */
@@ -289,7 +336,11 @@ function cardHtml(item) {
   return `
 <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition flex flex-col">
   <div class="relative h-48 w-full bg-black overflow-hidden flex items-center justify-center">
-    ${item.coverPhotoUrl ? `<img src="${item.coverPhotoUrl}" alt="" class="absolute inset-0 w-full h-full object-cover">` : '<i class="fa-solid fa-image text-3xl text-white/30"></i>'}
+    ${item.coverPhotoUrl
+      ? `<img src="${item.coverPhotoUrl}" alt="" class="absolute inset-0 w-full h-full object-cover">
+         <div data-layout-box="${item.id}" class="hidden absolute bottom-3 left-3 w-32 h-20 bg-white rounded-lg shadow-md p-1"><div data-thumb="${item.id}" data-w="120" data-h="72" class="grid-thumb w-full h-full"></div></div>`
+      : `<i class="fa-solid fa-image text-3xl text-white/30"></i>
+         <div data-layout-box="${item.id}" class="hidden absolute inset-0 bg-slate-100 p-3"><div data-thumb="${item.id}" data-w="320" data-h="168" class="grid-thumb w-full h-full"></div></div>`}
     <span class="absolute top-3 left-3 bg-white text-slate-900 font-bold text-[11px] px-2.5 py-1 rounded-md shadow-sm">${esc(TYPE_LABELS[item.propertyType])}</span>
     <span class="absolute top-3 right-3 bg-${color}-500 text-white font-semibold text-[11px] px-2.5 py-1 rounded-md flex items-center gap-1 shadow-sm">
       <span class="w-1.5 h-1.5 rounded-full bg-white ${fewLeft ? '' : 'animate-pulse'}"></span>${fewLeft ? 'Few Left' : 'Open'}
@@ -363,6 +414,13 @@ async function openDetails(id) {
   $('modalOwner').textContent = item.landlordName;
   renderModalUnits();
   renderRequestArea();
+  modalLayout = null;
+  $('modalMapSection').classList.add('hidden');
+  getLayout(item.id).then((layout) => {
+    if (openListing !== item) return;                  // another space was opened meanwhile
+    modalLayout = layout;
+    renderModalMap();
+  });
   updateModalSaveButton();
   $('detailsModal').classList.remove('hidden');
 }
@@ -516,7 +574,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (event.target.name === 'unit') {
       selectedUnitId = Number(event.target.value);
       renderModalUnits();
+      renderModalMap();
     }
+  });
+  // the details map: a renter clicks a free unit to pick it (same as the radio list)
+  $('modalMap').addEventListener('click', (event) => {
+    const cell = event.target.closest('.cell.is-pickable');
+    if (!cell || !modalLayout) return;
+    selectedUnitId = modalLayout.cells.get(gridRenderer.cellKey(Number(cell.dataset.row), Number(cell.dataset.col)));
+    renderModalUnits();
+    renderModalMap();
   });
   $('modalSaveBtn').addEventListener('click', () => {
     if (openListing) toggleSaved(openListing.id);

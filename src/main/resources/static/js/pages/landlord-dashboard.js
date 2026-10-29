@@ -4,6 +4,8 @@
  * 1. Load: GET /api/properties (each with its zones, so units can be counted) and GET /api/leases.
  *    Per property: units (not archived), leased = OCCUPIED units, occupancy %, monthly income = rent of its ACTIVE leases.
  * 2. Search, type checkboxes, minimum occupancy, "Published only" and sorting run in the browser; 6 cards per page.
+ *    Each card shows the property's layout (grid-renderer.js thumbnail): a small inset on the cover photo, or the
+ *    whole image area when there is no photo, with a "View/Edit Layout" button → property-grid.html?id=.
  * 3. Click a card → modal with links to units.html?propertyId=, property-grid.html?id=, property-form.html?id=,
  *    leases.html?propertyId=, and Publish / Archive (POST /api/properties/{id}/publish | /archive).
  */
@@ -134,6 +136,35 @@ function renderProperties() {
   $('paginationContainer').style.display = empty ? 'none' : 'flex';
   const start = (currentPage - 1) * ITEMS_PER_PAGE;
   grid.innerHTML = filtered.slice(start, start + ITEMS_PER_PAGE).map(cardHtml).join('');
+  drawThumbnails();
+}
+
+/** Fills every [data-thumb] box on the page with that property's layout. */
+function drawThumbnails() {
+  document.querySelectorAll('#propertiesGrid [data-thumb]').forEach((box) => {
+    const entry = portfolio.find((p) => p.property.id === Number(box.dataset.thumb));
+    if (!entry) return;
+    const layout = gridRenderer.fromProperty(entry.property);
+    if (gridRenderer.hasSpots(layout)) gridRenderer.thumbnail(box, layout, { fallbackWidth: box.dataset.w, fallbackHeight: box.dataset.h });
+  });
+}
+
+/** The layout part of a card's image area: inset on the photo, or full when there is no photo. */
+function layoutHtml(property) {
+  const drawn = property.zones.some((z) => (z.positions || []).length > 0);
+  const link = `property-grid.html?id=${property.id}`;
+  const button = `<a href="${link}" class="absolute bottom-2 left-2 z-10 inline-flex items-center gap-1 px-2 py-1 bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-bold rounded-md shadow-sm">
+      <i class="fa-solid fa-grip"></i>${drawn ? 'View/Edit Layout' : 'Draw layout'}</a>`;
+  if (property.coverPhotoUrl) {
+    return drawn
+      ? `<div class="absolute bottom-3 right-3 w-32 h-20 bg-white rounded-lg shadow-md p-1">
+           <div data-thumb="${property.id}" data-w="120" data-h="72" class="grid-thumb w-full h-full"></div>
+         </div>${button}`
+      : button;
+  }
+  return drawn
+    ? `<div data-thumb="${property.id}" data-w="300" data-h="120" class="grid-thumb absolute inset-0 p-3 bg-slate-100"></div>${button}`
+    : `<div class="absolute inset-0 flex flex-col items-center justify-center bg-slate-100 text-slate-400 text-xs font-semibold"><i class="fa-solid fa-grip text-2xl mb-1"></i>No layout yet</div>${button}`;
 }
 
 function cardHtml({ property, units, leased, occupancy, revenue }) {
@@ -143,14 +174,14 @@ function cardHtml({ property, units, leased, occupancy, revenue }) {
   return `
     <div data-property-id="${property.id}" class="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs hover:shadow-md transition cursor-pointer">
       <div class="h-36 bg-gradient-to-br from-slate-700 to-slate-900 relative" style="${photo}">
-        <div class="absolute inset-0 bg-black/30"></div>
-        <div class="absolute top-3 left-3">
+        ${property.coverPhotoUrl ? '<div class="absolute inset-0 bg-black/30"></div>' : ''}
+        ${layoutHtml(property)}
+        <div class="absolute top-3 left-3 z-10">
           <span class="bg-white/90 text-slate-900 text-xs font-bold px-2.5 py-1 rounded-md">${TYPE_LABELS[property.propertyType]}</span>
         </div>
-        <div class="absolute top-3 right-3">
+        <div class="absolute top-3 right-3 z-10">
           <span class="${statusColor} text-white text-xs font-semibold px-2.5 py-1 rounded-md">${statusText}</span>
         </div>
-        ${property.coverPhotoUrl ? '' : '<i class="fa-solid fa-image absolute inset-0 m-auto w-fit h-fit text-3xl text-white/30"></i>'}
       </div>
       <div class="p-4 space-y-3">
         <div>
