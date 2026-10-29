@@ -10,7 +10,7 @@ The short version is in the [README](../README.md#getting-started).
 | JDK | 17 or newer | The project is compiled for Java 17. A newer JDK (for example 22) also works. |
 | Maven **or** NetBeans | Maven 3.9+ / a NetBeans with Maven support | NetBeans includes its own Maven. |
 | XAMPP | any recent one | Provides MySQL (MariaDB). Only the **MySQL** module is needed, not Apache. |
-| MySQL Workbench | optional | A friendly way to run the SQL script. phpMyAdmin or the command line also work (step 3). |
+| MySQL Workbench | recommended | The easiest way to run the SQL script. If you don't have it, phpMyAdmin or the command line also work (step 3). |
 | Internet | first build only | Maven downloads the libraries. The homepage also needs internet every time (see Troubleshooting). |
 
 ## 2. Get the code
@@ -26,19 +26,19 @@ The app reads from a MySQL database called `spacegrid_db`. The file `database/sp
 sample data. **The script DROPS `spacegrid_db` and creates it again, so anything you saved in that database is lost.**
 
 1. Open the **XAMPP Control Panel** and click **Start** next to **MySQL**. It must turn green. (Port 3306.)
-2. Run the script with **one** of these:
+2. Run the script. **MySQL Workbench (option A) is the recommended way.** Options B and C are alternatives if you don't have Workbench.
 
-**A. MySQL Workbench**
+**A. MySQL Workbench (recommended)**
 1. Open a connection to `localhost` (user `root`, no password).
 2. *File > Open SQL Script...* and choose `database/spacegrid_db.sql`.
 3. Click the lightning icon (*Execute*). Wait until the output panel shows no red errors.
 
-**B. phpMyAdmin**
+**B. phpMyAdmin (alternative)**
 1. Open `http://localhost/phpmyadmin` (needs the Apache module of XAMPP running).
 2. Click the **Import** tab, choose `database/spacegrid_db.sql` and click **Import**.
    Do not pick a database first: the script creates it.
 
-**C. Command line** (Windows, XAMPP in the default folder):
+**C. Command line (alternative)** (Windows, XAMPP in the default folder):
 
 ```bash
 C:\xampp\mysql\bin\mysql.exe -u root < database/spacegrid_db.sql
