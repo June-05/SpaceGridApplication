@@ -85,7 +85,8 @@ function applyFilters() {
   const sortBy = $('sortBy').value;
   filteredLeases = leases.filter((l) =>
     (!search || `${l.tenantName} ${l.renterUsername} ${l.propertyName} ${l.unitName}`.toLowerCase().includes(search))
-    && (state === 'all' || l.currentState === state || (state === 'ENDED_AUTO' && l.currentState === 'ENDED' && l.endedAutomatically))
+    && (state === 'all' || l.currentState === state || (state === 'ENDED_AUTO' && l.currentState === 'ENDED' && l.endedAutomatically)
+      || (state === 'MOVE_OUT' && l.awaitingMoveOut))
     && (payment === 'all' || l.paymentStatus === payment));
   filteredLeases.sort((a, b) => {
     if (sortBy === 'expiring') return String(a.endDate).localeCompare(String(b.endDate));
@@ -179,6 +180,7 @@ async function viewLease(id) {
   $('modalStatus').innerHTML = stateBadge(lease.currentState);
   $('modalStatusNote').textContent = lease.currentState === 'TERMINATED' ? `Reason: ${lease.terminationReason || 'not given'}`
     : lease.endedAutomatically ? `Ended automatically on ${format.date(lease.closedOn)}` : '';
+  if (lease.awaitingMoveOut) $('modalStatusNote').textContent += ' · Waiting for the move-out confirmation (open Statement & Actions)';
   $('modalPayment').innerHTML = paymentBadge(lease.paymentStatus);
   $('modalLeaseLink').href = `/lease.html?id=${lease.id}`;
 

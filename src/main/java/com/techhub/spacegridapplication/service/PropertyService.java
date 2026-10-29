@@ -148,6 +148,10 @@ public class PropertyService {
                 throw new ConflictException(unit.getName() + " has an active lease. End or terminate it before "
                         + "archiving " + property.getName() + ".");
             }
+            if (leaseDao.findAwaitingMoveOutByUnitId(unit.getId()).isPresent()) {
+                throw new ConflictException(unit.getName() + " is waiting for its tenant to move out. Confirm the "
+                        + "move-out before archiving " + property.getName() + ".");
+            }
         }
         property.archive();
         propertyDao.update(property);

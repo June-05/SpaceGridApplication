@@ -211,6 +211,7 @@ What the plotter's View mode shows for a selected unit (`GET /api/units/{id}/det
 ```
 unit: RentableUnit
 currentLease: LeaseContract    // the ACTIVE lease (running or upcoming), or null
+waitingLease: LeaseContract    // an ENDED / TERMINATED lease waiting for the move-out confirmation, or null
 openRequests: int              // PENDING + APPROVED lease requests
 ```
 
@@ -390,6 +391,7 @@ Terms are final and can't be edited. To change them: end/terminate and create a 
 - closedOn: LocalDate
 - terminationReason: String                      // TERMINATED only; shown to the renter
 - endedAutomatically: boolean                    // ENDED by LeaseExpiryJob
+- releasedOn: LocalDate                          // move-out confirmed (or leased again to the same renter); null while waiting
 - unitName: String {readOnly}
 - propertyName: String {readOnly}
 - propertyId: Integer {readOnly}
@@ -412,6 +414,8 @@ Terms are final and can't be edited. To change them: end/terminate and create a 
 + end(today: LocalDate): void
 + terminate(today: LocalDate, reason: String): void   // reason required, max 255
 + expire(): void                                 // ACTIVE -> ENDED, closedOn = endDate, endedAutomatically
++ isAwaitingMoveOut(): boolean                   // ENDED / TERMINATED and releasedOn is null: still holds its unit
++ release(day: LocalDate): void                  // move-out confirmed; only while waiting (else ConflictException)
 + markRenewed(lastDay: LocalDate): void
 ```
 
@@ -886,7 +890,8 @@ Table `uploaded_files`. Files are never updated (upload a new one instead).
 + renewLease(leaseId: int, landlord: User, newStartDate: LocalDate, newEndDate: LocalDate, newMonthlyRent: BigDecimal, paymentTerms: PaymentTerms): LeaseContract   // paymentTerms null = keep
 + endLease(leaseId: int, landlord: User): void            // only from the end date on
 + terminateLease(leaseId: int, landlord: User, reason: String): void
-+ expireLeases(today: LocalDate): int            // LeaseExpiryJob: ends ACTIVE leases past their end date
++ expireLeases(today: LocalDate): int            // LeaseExpiryJob: ends ACTIVE leases past their end date (units stay OCCUPIED)
++ confirmMoveOut(leaseId: int, landlord: User): void   // releasedOn = today, unit -> AVAILABLE
 + getLeasesForLandlord(landlord: User): List<LeaseContract>
 + getLeasesForProperty(propertyId: int, landlord: User): List<LeaseContract>
 + getLeasesForRenter(renter: User): List<LeaseContract>
@@ -1053,6 +1058,7 @@ Saves uploads in the uploads folder (`spacegrid.upload-dir`) and checks who may 
 | `POST /api/leases/{id}/renew` | `renew` |
 | `POST /api/leases/{id}/end` | `end` |
 | `POST /api/leases/{id}/terminate` | `terminate` |
+| `POST /api/leases/{id}/move-out` | `moveOut` |
 
 #### `PaymentController`, Class · controller
 
@@ -1332,10 +1338,10 @@ Breaks a rule, e.g. username taken → 409
 
 - Terms are final: unit, renter, start date, end date, monthly rent. End date must be after start date.
 - A unit can have only one ACTIVE lease. The chosen user must have the RENTER role.
-- Create: unit → OCCUPIED. End (normal) or Terminate (early): status changes, `closedOn` is set, unit → AVAILABLE.
+- Create: unit → OCCUPIED. End (normal) or Terminate (early): status changes and `closedOn` is set; the unit stays OCCUPIED until the move-out is confirmed (`POST /api/leases/{id}/move-out`: `releasedOn` is set, unit → AVAILABLE). While a lease is waiting, a lease for a different renter is refused, the unit and its property can't be archived, and a new lease for the same renter counts as the confirmation.
 - Renew: the old lease becomes RENEWED with `closedOn` = the day before the new start date. A new ACTIVE lease is created with `previousLeaseId` and the new terms, and the unit stays OCCUPIED. All of this happens in one transaction. The new start date must be after the old start date and no later than the day after the old end date.
 - Terminate requires a reason (max 255 characters), saved in `terminationReason` and shown to the renter.
-- Auto-expiry: `LeaseExpiryJob` runs on startup and daily at 00:05 and ends every ACTIVE lease whose end date has passed (ENDED, `closedOn` = end date, `endedAutomatically`), unit → AVAILABLE. Unpaid months can still be paid.
+- Auto-expiry: `LeaseExpiryJob` runs on startup and daily at 00:05 and ends every ACTIVE lease whose end date has passed (ENDED, `closedOn` = end date, `endedAutomatically`); the unit stays OCCUPIED until the move-out is confirmed. Unpaid months can still be paid.
 - Displayed state (`getCurrentState`, shown as "Lease Status"): UPCOMING (not started), ACTIVE, EXPIRING_SOON (30 days or fewer left), EXPIRED (end date passed but the job hasn't run yet; shown "Ending today"), ENDED, TERMINATED, RENEWED.
 - Landlord view: all leases on their properties, with renter name, state, and end/terminate/renew actions. Renter view: own leases only, read-only, with days remaining and the rent statement.
 

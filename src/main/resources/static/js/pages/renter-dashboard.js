@@ -3,6 +3,8 @@
  *
  * 1. await auth.requireLogin('RENTER'), then GET /api/leases (own leases) and GET /api/lease-requests
  *    (PENDING ones → the amber "waiting for the owner" link). Per lease: GET /api/leases/{id}/statement.
+ *    A red banner appears when ended / terminated leases still have unpaid months ("You still owe ₱X ..."): it
+ *    links to the payment of the oldest of them.
  * 2. Tiles: active leases, next payment (earliest DUE / OVERDUE line of all leases), overdue months.
  * 3. Cards: "Current" (UPCOMING, ACTIVE, EXPIRING_SOON, EXPIRED) and "Past leases" (ENDED, TERMINATED, RENEWED).
  *    Image: the unit's photo (lease.imageUrl) or else the layout with this unit outlined
@@ -45,7 +47,19 @@ async function load() {
     return { lease, unpaid: statement.filter((s) => s.status !== 'PAID') };
   }));
   renderTiles();
+  renderOwed();
   renderCards();
+}
+
+/** Unpaid months on leases that already ended / were terminated. */
+function renderOwed() {
+  const closed = entries.filter((e) => ['ENDED', 'TERMINATED'].includes(e.lease.currentState) && e.unpaid.length > 0);
+  const owed = closed.reduce((sum, e) => sum + e.unpaid.reduce((s, line) => s + Number(line.amountDue), 0), 0);
+  $('owedCard').classList.toggle('hidden', closed.length === 0);
+  if (closed.length === 0) return;
+  $('owedCardText').textContent = `You still owe ${format.peso(owed)} on ${closed.length} ended ${closed.length === 1 ? 'lease' : 'leases'}.`;
+  const first = closed[0];
+  $('owedCard').href = `/renter/pay.html?leaseId=${first.lease.id}&month=${first.unpaid[0].billingMonth}`;
 }
 
 function renderTiles() {
@@ -72,8 +86,8 @@ function stateLine(lease) {
     case 'ACTIVE': return `${days} ${days === 1 ? 'day' : 'days'} left`;
     case 'EXPIRING_SOON': return `Ends in ${days} ${days === 1 ? 'day' : 'days'} — ask the owner to renew`;
     case 'EXPIRED': return 'The end date has passed; it closes automatically';
-    case 'ENDED': return `Ended on ${format.date(lease.closedOn)}`;
-    case 'TERMINATED': return `Terminated: ${lease.terminationReason || 'no reason given'}`;
+    case 'ENDED': return `Ended on ${format.date(lease.closedOn)}` + (lease.awaitingMoveOut ? ' — please move out; the owner will confirm' : '');
+    case 'TERMINATED': return `Terminated: ${lease.terminationReason || 'no reason given'}` + (lease.awaitingMoveOut ? ' — please move out; the owner will confirm' : '');
     case 'RENEWED': return `Renewed on ${format.date(lease.closedOn)}`;
     default: return '';
   }

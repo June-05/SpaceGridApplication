@@ -13,6 +13,9 @@
  *        renter:   Pay rent → /renter/pay.html?leaseId={id}&month={oldest unpaid}
  *      ENDED       landlord: Lease again → /landlord/lease-form.html?again={id} · renter: pay what is left, request again (/?space=)
  *      TERMINATED  both see the reason · renter: pay what is left, browse spaces
+ *    An ENDED / TERMINATED lease with awaitingMoveOut still holds its unit: the landlord's main button is
+ *    "Confirm moved out" → POST /api/leases/{id}/move-out (the unit becomes AVAILABLE). Unpaid months of a closed
+ *    lease show in a red banner for both roles, and "Lease again" asks before going on when something is owed.
  *      RENEWED     link to the renewal
  *    Upload the signed copy (landlord) → POST /api/leases/{id}/files.
  * 4. "Printable agreement" → /contract.html?id= (the generic contract template; the signed scan is the "Signed copy").
@@ -67,6 +70,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!button) return;
     if (button.dataset.do === 'terminate') openTerminate();
     if (button.dataset.do === 'end') endNow();
+    if (button.dataset.do === 'moveout') confirmMoveOut();
+  });
+  $('actions').addEventListener('click', (e) => {          // "Lease again" while the renter still owes money
+    const link = e.target.closest('a[data-confirm]');
+    if (link && !confirm(link.dataset.confirm)) e.preventDefault();
   });
   try {
     await load();
@@ -118,6 +126,7 @@ async function load() {
   $('contractUploadRow').classList.toggle('hidden', !isLandlord);
   $('contractLink').href = `/contract.html?id=${lease.id}`;
 
+  renderBalance(lease, unpaid);
   renderTimeline(lease, renewal);
   renderActions(lease, renewal, unpaid);
   renderStatement(statement, lease);
@@ -135,14 +144,37 @@ function statusText(lease, renewal) {
     case 'EXPIRING_SOON': return `Expiring soon — ends in ${days} ${dayWord}, on ${format.date(lease.endDate)}.`
       + (isLandlord ? ' Renew it now if the tenant is staying.' : ' Ask the owner to renew it if you want to stay.');
     case 'EXPIRED': return `The end date (${format.date(lease.endDate)}) has passed. It will close automatically.`;
-    case 'ENDED': return lease.endedAutomatically
-      ? `Ended automatically on ${format.date(lease.closedOn)} (its end date). The unit is available again.`
-      : `Ended on ${format.date(lease.closedOn)}.`;
-    case 'TERMINATED': return `Terminated early on ${format.date(lease.closedOn)}. Reason: ${lease.terminationReason || 'not given'}`;
+    case 'ENDED': return (lease.endedAutomatically
+      ? `Ended automatically on ${format.date(lease.closedOn)} (its end date).`
+      : `Ended on ${format.date(lease.closedOn)}.`) + moveOutText(lease);
+    case 'TERMINATED': return `Terminated early on ${format.date(lease.closedOn)}. Reason: ${lease.terminationReason || 'not given'}` + moveOutText(lease);
     case 'RENEWED': return `Renewed: this lease ran until ${format.date(lease.closedOn)}`
       + (renewal ? ` and continues as a new lease from ${format.date(renewal.startDate)}.` : '.');
     default: return '';
   }
+}
+
+/** What happens to the unit after a lease closed: waiting for the move-out, or the move-out is confirmed. */
+function moveOutText(lease) {
+  if (lease.awaitingMoveOut) {
+    return isLandlord
+      ? ' The unit stays occupied until you confirm the renter has moved out.'
+      : ' Please leave the unit and return it. The owner will confirm your move-out.';
+  }
+  return lease.releasedOn ? ` Move-out confirmed on ${format.date(lease.releasedOn)}.` : '';
+}
+
+/** Red banner: unpaid months on a closed lease (they stay payable). */
+function renderBalance(lease, unpaid) {
+  const closed = lease.currentState === 'ENDED' || lease.currentState === 'TERMINATED';
+  const owed = unpaid.reduce((sum, s) => sum + Number(s.amountDue), 0);
+  const banner = $('balanceBanner');
+  banner.classList.toggle('hidden', !closed || unpaid.length === 0);
+  if (!closed || unpaid.length === 0) return;
+  const months = `${unpaid.length} ${unpaid.length === 1 ? 'month' : 'months'}`;
+  banner.textContent = isLandlord
+    ? `Unpaid balance: ${format.peso(owed)} (${months}). The renter can still pay it from their lease page.`
+    : `You still owe ${format.peso(owed)} (${months}) on this lease. You can pay it below.`;
 }
 
 /** Bar from start to end; the last 30 days are amber; the dark part is the time that has passed. */
@@ -205,16 +237,23 @@ function renderActions(lease, renewal, unpaid) {
   } else {
     // ENDED or TERMINATED
     if (isLandlord) {
-      if (state === 'ENDED') parts.push(`<a class="${BTN_MAIN}" href="/landlord/lease-form.html?again=${lease.id}"><i class="fa-solid fa-file-signature"></i>Lease again to ${format.escape(lease.tenantName)}</a>`);
+      if (lease.awaitingMoveOut) parts.push(`<button type="button" data-do="moveout" class="${BTN_MAIN}"><i class="fa-solid fa-box-open"></i>Confirm moved out</button>`);
+      if (state === 'ENDED') {
+        const owed = unpaid.reduce((sum, s) => sum + Number(s.amountDue), 0);
+        const ask = unpaid.length ? ` data-confirm="${format.escape(`${lease.tenantName} still owes ${format.peso(owed)} on this lease. Lease again anyway?`)}"` : '';
+        parts.push(`<a class="${lease.awaitingMoveOut ? BTN_PLAIN : BTN_MAIN}" href="/landlord/lease-form.html?again=${lease.id}"${ask}><i class="fa-solid fa-file-signature"></i>Lease again to ${format.escape(lease.tenantName)}</a>`);
+      }
       parts.push(`<a class="${BTN_PLAIN}" href="/landlord/units.html?propertyId=${lease.propertyId}"><i class="fa-solid fa-cubes"></i>See the units</a>`);
-      note = (unpaid.length ? `${unpaid.length} billed ${unpaid.length === 1 ? 'month is' : 'months are'} still unpaid; the renter can still pay them. ` : '')
+      note = (lease.awaitingMoveOut ? 'The unit stays occupied, and can\'t be leased to someone else, until you confirm the move-out. Leasing it again to the same renter counts as confirmed. ' : '')
+        + (unpaid.length ? `${unpaid.length} billed ${unpaid.length === 1 ? 'month is' : 'months are'} still unpaid; the renter can still pay them. ` : '')
         + 'Renew and Terminate are only for leases that are still running.';
     } else {
       if (payLink) parts.push(payLink);
-      if (state === 'ENDED') parts.push(`<a class="${BTN_PLAIN}" href="/?space=${lease.propertyId}"><i class="fa-solid fa-repeat"></i>Request this space again</a>`);
+      if (state === 'ENDED' && !lease.awaitingMoveOut) parts.push(`<a class="${BTN_PLAIN}" href="/?space=${lease.propertyId}"><i class="fa-solid fa-repeat"></i>Request this space again</a>`);
       parts.push(`<a class="${BTN_PLAIN}" href="/"><i class="fa-solid fa-magnifying-glass"></i>Browse spaces</a>`);
-      note = unpaid.length ? `This lease is closed, but ${unpaid.length} billed ${unpaid.length === 1 ? 'month is' : 'months are'} still unpaid.`
-        : 'This lease is closed and fully paid.';
+      note = (lease.awaitingMoveOut ? 'The owner has not confirmed your move-out yet. ' : '')
+        + (unpaid.length ? `This lease is closed, but ${unpaid.length} billed ${unpaid.length === 1 ? 'month is' : 'months are'} still unpaid.`
+          : 'This lease is closed and fully paid.');
     }
   }
   $('actions').innerHTML = parts.join('');
@@ -285,6 +324,17 @@ async function submitTerminate(e) {
     await load();
   } catch (err) {
     $('terminateError').textContent = err.message;
+  }
+}
+
+/** The renter has left: the unit becomes available again. */
+async function confirmMoveOut() {
+  if (!confirm('Confirm that the renter has moved out? The unit becomes available to rent again.')) return;
+  try {
+    await api.form('POST', `/api/leases/${leaseId}/move-out`);
+    await load();
+  } catch (err) {
+    $('actionError').textContent = err.message;
   }
 }
 

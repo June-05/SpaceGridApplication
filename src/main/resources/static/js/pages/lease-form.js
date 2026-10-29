@@ -100,11 +100,11 @@ function fillRate() {
   calculateSummary();
 }
 
-async function selectUnit(unitId, properties) {
+async function selectUnit(unitId, properties, keepOccupied) {
   for (const p of properties) {
     if (p.zones.some((z) => z.id === unitId)) {
       $('propertySelect').value = p.id;
-      await loadUnits(p.id);
+      await loadUnits(p.id, keepOccupied ? unitId : undefined);
       $('unitSelect').value = unitId;
       fillRate();
       return;
@@ -129,7 +129,9 @@ async function startFromRequest(requestId, properties) {
 
 /**
  * "Lease again" from an ended lease (lease.html): same renter, contact and unit, filled in but still editable.
- * It is an ordinary new lease (not a renewal), so the unit must be AVAILABLE again.
+ * It is an ordinary new lease (not a renewal). The unit must be AVAILABLE, or still held by this same renter's
+ * ended lease (awaitingMoveOut): signing again counts as their move-out. If they still owe money, an amber
+ * notice says how much (the landlord decides).
  */
 async function startAgain(oldLeaseId, properties) {
   const old = await api.get(`/api/leases/${oldLeaseId}`);
@@ -137,7 +139,20 @@ async function startAgain(oldLeaseId, properties) {
   $('tenantName').value = old.tenantName;
   $('tenantEmail').value = old.tenantEmail || '';
   $('tenantPhone').value = old.tenantPhone || '';
-  await selectUnit(old.unitId, properties);
+  await selectUnit(old.unitId, properties, old.awaitingMoveOut);
+  const notes = [];
+  try {
+    const unpaid = (await api.get(`/api/leases/${old.id}/statement`)).filter((s) => s.status !== 'PAID');
+    if (unpaid.length) {
+      const owed = unpaid.reduce((sum, s) => sum + Number(s.amountDue), 0);
+      notes.push(`${old.tenantName} still owes ${format.peso(owed)} (${unpaid.length} unpaid ${unpaid.length === 1 ? 'month' : 'months'}) on the previous lease.`);
+    }
+  } catch (err) { /* the notice is optional */ }
+  if (old.awaitingMoveOut) notes.push(`${old.unitName} is still held by this renter's ended lease. Creating this lease counts as their move-out confirmation.`);
+  if (notes.length) {
+    $('againNotice').textContent = notes.join(' ');
+    $('againNotice').classList.remove('hidden');
+  }
   if (Number($('unitSelect').value) !== old.unitId) {
     $('formMessage').textContent = `${old.unitName} is not available any more, so pick another unit.`;
     $('formMessage').classList.remove('hidden');

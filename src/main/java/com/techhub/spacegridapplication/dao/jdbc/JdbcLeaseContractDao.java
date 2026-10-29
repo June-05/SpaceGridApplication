@@ -44,6 +44,7 @@ public class JdbcLeaseContractDao implements LeaseContractDao {
                     closedOn == null ? null : closedOn.toLocalDate(),
                     rs.getString("termination_reason"),
                     rs.getBoolean("ended_automatically"),
+                    rs.getDate("released_on") == null ? null : rs.getDate("released_on").toLocalDate(),
                     rs.getString("unit_name"),
                     rs.getString("property_name"),
                     rs.getObject("property_id", Integer.class),
@@ -89,13 +90,14 @@ public class JdbcLeaseContractDao implements LeaseContractDao {
     @Override
     public void update(LeaseContract entity) {
         jdbcTemplate.update("""
-                UPDATE lease_contracts SET status = ?, closed_on = ?, termination_reason = ?, ended_automatically = ?
+                UPDATE lease_contracts SET status = ?, closed_on = ?, termination_reason = ?, ended_automatically = ?, released_on = ?
                 WHERE id = ?
                 """,
                 entity.getStatus().name(),
                 entity.getClosedOn() == null ? null : Date.valueOf(entity.getClosedOn()),
                 entity.getTerminationReason(),
                 entity.isEndedAutomatically(),
+                entity.getReleasedOn() == null ? null : Date.valueOf(entity.getReleasedOn()),
                 entity.getId());
     }
 
@@ -129,6 +131,16 @@ public class JdbcLeaseContractDao implements LeaseContractDao {
     public Optional<LeaseContract> findActiveByUnitId(int unitId) {
         return jdbcTemplate.query("SELECT * FROM lease_details WHERE rentable_unit_id = ? AND status = 'ACTIVE'",
                 rowMapper, unitId).stream().findFirst();
+    }
+
+    /** At most one: a new lease on the unit is refused (or releases it) while an earlier one is waiting. */
+    @Override
+    public Optional<LeaseContract> findAwaitingMoveOutByUnitId(int unitId) {
+        return jdbcTemplate.query("""
+                SELECT * FROM lease_details
+                WHERE rentable_unit_id = ? AND status IN ('ENDED', 'TERMINATED') AND released_on IS NULL
+                ORDER BY closed_on DESC, id DESC
+                """, rowMapper, unitId).stream().findFirst();
     }
 
     /** ACTIVE leases whose end date is before the given day (LeaseExpiryJob ends them). */

@@ -15,6 +15,9 @@ List<LeaseContract> findByPropertyId(int propertyId);
 
 Optional<LeaseContract> findActiveByUnitId(int unitId);
 
+/** The ENDED / TERMINATED lease that still holds this unit (renter not confirmed as moved out), if any. */
+Optional<LeaseContract> findAwaitingMoveOutByUnitId(int unitId);
+
 /** ACTIVE leases whose end date is before the given day (LeaseExpiryJob ends them). */
 List<LeaseContract> findActiveEndedBefore(LocalDate day);
 

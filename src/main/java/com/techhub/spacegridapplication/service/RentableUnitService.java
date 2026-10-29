@@ -7,6 +7,7 @@ import com.techhub.spacegridapplication.exception.ConflictException;
 import com.techhub.spacegridapplication.exception.NotFoundException;
 import com.techhub.spacegridapplication.model.Dimensions;
 import com.techhub.spacegridapplication.model.FileKind;
+import com.techhub.spacegridapplication.model.LeaseContract;
 import com.techhub.spacegridapplication.model.Property;
 import com.techhub.spacegridapplication.model.RentableUnit;
 import com.techhub.spacegridapplication.model.UnitDetails;
@@ -98,6 +99,7 @@ public class RentableUnitService {
     /**
      * What may happen to a unit taken off the grid:
      *   ACTIVE lease (running or upcoming) → nothing, end or terminate it first
+     *   ended / terminated lease waiting for the move-out → nothing, confirm the move-out first
      *   past leases only                   → archive (keeps the lease and payment history)
      *   never leased                       → delete for good
      * Open lease requests (PENDING / APPROVED) are declined either way.
@@ -111,6 +113,11 @@ public class RentableUnitService {
         if (leaseDao.findActiveByUnitId(unitId).isPresent()) {
             return new UnitRemovalCheck(false, false, open,
                     unit.getName() + " has an active lease. End or terminate it first.");
+        }
+        LeaseContract waiting = leaseDao.findAwaitingMoveOutByUnitId(unitId).orElse(null);
+        if (waiting != null) {
+            return new UnitRemovalCheck(false, false, open, unit.getName() + " is waiting for " + waiting.getTenantName()
+                    + " to move out. Confirm the move-out first.");
         }
         if (leaseDao.existsByUnitId(unitId)) {
             return new UnitRemovalCheck(false, true, open, unit.getName()
@@ -155,6 +162,7 @@ public class RentableUnitService {
     public UnitDetails getUnitDetails(int unitId, User landlord) {
         RentableUnit unit = getOwnedUnit(unitId, landlord);
         return new UnitDetails(unit, leaseDao.findActiveByUnitId(unitId).orElse(null),
+                leaseDao.findAwaitingMoveOutByUnitId(unitId).orElse(null),
                 leaseRequestDao.countOpenByUnitId(unitId));
     }
 

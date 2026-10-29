@@ -722,7 +722,14 @@ document.addEventListener('DOMContentLoaded', async () => {
       req.textContent = '—';
     } else {
       const l = info.data.currentLease;
-      if (!l) {
+      const w = info.data.waitingLease;
+      if (!l && w) {
+        lease.append(`Waiting for ${w.renterName} to move out (lease ${w.status === 'TERMINATED' ? 'terminated' : 'ended'} ${format.date(w.closedOn)}). `);
+        const wl = document.createElement('a');
+        wl.href = `/lease.html?id=${w.id}`;
+        wl.textContent = 'Open the lease';
+        lease.appendChild(wl);
+      } else if (!l) {
         lease.textContent = 'No current lease.';
       } else {
         const when = l.currentState === 'UPCOMING' ? `Starts ${format.date(l.startDate)}`

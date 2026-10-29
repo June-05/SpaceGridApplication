@@ -38,6 +38,9 @@
     <!-- What the status means, in one line (e.g. "Ended automatically on Oct 26, 2026") -->
     <div id="statusLine" class="px-5 py-4 rounded-2xl border text-sm font-semibold"></div>
 
+    <!-- Unpaid months on a closed lease (they stay payable) -->
+    <div id="balanceBanner" class="hidden px-5 py-4 rounded-2xl border border-rose-200 bg-rose-50 text-rose-800 text-sm font-semibold" role="alert"></div>
+
     <!-- Timeline: start → expiring soon → end, with today's marker -->
     <section class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
       <h2 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-5">Timeline</h2>

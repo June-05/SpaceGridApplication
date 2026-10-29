@@ -7,6 +7,8 @@
  *      Map  = the property's grid, read-only (grid-renderer.js). The status/search filters dim the other units.
  *             Clicking a unit opens Quick Edit. Shown first when units are placed on the grid.
  *      List = one compact card per unit (name, status, rate, tenant); clicking a card opens Quick Edit.
+ *    A unit whose ENDED / TERMINATED lease is waiting for the move-out shows "Move-out pending" and a
+ *    "Confirm moved out" button (POST /api/leases/{id}/move-out); the unit then becomes vacant.
  * 3. Quick Edit: status AVAILABLE <-> UNDER_MAINTENANCE (POST /api/units/{id}/maintenance),
  *    "Rate for new leases" (PUT /api/units/{id} with the unit's other fields unchanged; a running lease keeps
  *    its own rent, and the note under the field says so), and unit photos (GET/POST /api/units/{id}/files,
@@ -23,6 +25,7 @@ const STATUS_STYLE = {
 let propertyId = null;
 let units = [];
 let activeLeases = {};       // unit id → its ACTIVE lease
+let waitingLeases = {};      // unit id → its ENDED / TERMINATED lease whose renter hasn't been confirmed as moved out
 let currentFilter = 'all';
 let currentSearch = '';
 let editing = null;          // unit open in the Quick Edit modal
@@ -58,6 +61,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (button) setView(button.dataset.view, true);
   });
   $('blockGrid').addEventListener('click', (e) => {
+    const moveOut = e.target.closest('[data-moveout]');
+    if (moveOut) { confirmMoveOut(Number(moveOut.dataset.moveout)); return; }
     const card = e.target.closest('[data-unit-id]');
     if (card && !e.target.closest('a, button')) openEditModal(Number(card.dataset.unitId));
   });
@@ -105,6 +110,8 @@ async function loadUnits() {
   property = prop;
   activeLeases = {};
   leases.filter((l) => l.status === 'ACTIVE').forEach((l) => { activeLeases[l.unitId] = l; });
+  waitingLeases = {};
+  leases.filter((l) => l.awaitingMoveOut).forEach((l) => { waitingLeases[l.unitId] = l; });
   updateStats();
   render();
 }
@@ -156,9 +163,12 @@ function renderList() {
   const shown = shownUnits();
   $('emptyState').classList.toggle('hidden', shown.length > 0);
   $('blockGrid').innerHTML = shown.map((unit) => {
-    const [label, color] = STATUS_STYLE[unit.status];
+    const waiting = waitingLeases[unit.id];
+    const [label, color] = waiting ? ['Move-out pending', 'bg-amber-100 text-amber-700'] : STATUS_STYLE[unit.status];
     const lease = activeLeases[unit.id];
-    const link = lease
+    const link = waiting
+      ? `<button type="button" data-moveout="${waiting.id}" class="text-xs font-semibold text-amber-700 hover:underline">Confirm moved out</button>`
+      : lease
       ? `<a href="/lease.html?id=${lease.id}" class="text-xs font-semibold text-emerald-700 hover:underline">View lease</a>`
       : unit.status === 'AVAILABLE'
         ? `<a href="lease-form.html?unitId=${unit.id}" class="text-xs font-semibold text-indigo-600 hover:underline">Create lease</a>`
@@ -174,7 +184,8 @@ function renderList() {
         </div>
         <p class="mt-3 text-base font-extrabold text-indigo-600">${format.peso(unit.rentalRate)}<span class="text-[11px] font-medium text-slate-400"> / mo</span></p>
         <div class="mt-2 flex items-center justify-between gap-2 text-xs">
-          <span class="truncate ${lease ? 'text-slate-700' : 'text-slate-400'}">${lease ? '<i class="fa-solid fa-user mr-1 text-slate-400"></i>' + format.escape(lease.tenantName) : 'No tenant'}</span>
+          <span class="truncate ${lease || waiting ? 'text-slate-700' : 'text-slate-400'}">${lease ? '<i class="fa-solid fa-user mr-1 text-slate-400"></i>' + format.escape(lease.tenantName)
+            : waiting ? '<i class="fa-solid fa-box-open mr-1 text-amber-500"></i>' + format.escape(waiting.tenantName) + ' · leaving' : 'No tenant'}</span>
           ${link}
         </div>
       </div>`;
@@ -226,7 +237,11 @@ async function openEditModal(id) {
   $('modalRentNote').textContent = lease
     ? `${lease.tenantName}'s current lease stays at ${format.peso(lease.monthlyRent)} / month until ${format.date(lease.endDate)}. A new rate only applies to new leases (and renewals you create).`
     : 'This is the rent filled in when you create the next lease for this unit.';
-  $('modalTenant').innerHTML = lease
+  const waiting = waitingLeases[id];
+  $('modalTenant').innerHTML = waiting
+    ? `${format.escape(waiting.tenantName)} · lease ${waiting.status === 'TERMINATED' ? 'terminated' : 'ended'} ${format.date(waiting.closedOn)}, waiting for the move-out · <a class="text-indigo-600 font-semibold" href="/lease.html?id=${waiting.id}">View lease</a>
+       <button type="button" onclick="confirmMoveOut(${waiting.id})" class="mt-2 block px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-lg">Confirm moved out</button>`
+    : lease
     ? `${format.escape(lease.tenantName)} (${format.escape(lease.renterUsername)}) · <a class="text-indigo-600 font-semibold" href="/lease.html?id=${lease.id}">View lease</a>`
     : editing.status === 'AVAILABLE'
       ? `None · <a class="text-indigo-600 font-semibold" href="lease-form.html?unitId=${id}">Create a lease</a>`
@@ -234,6 +249,19 @@ async function openEditModal(id) {
   $('modalError').classList.add('hidden');
   $('editModal').classList.remove('hidden');
   await loadPhotos();
+}
+
+/** The renter has left: the unit becomes available to rent again. */
+async function confirmMoveOut(leaseId) {
+  const lease = Object.values(waitingLeases).find((l) => l.id === leaseId);
+  if (!confirm(`Confirm that ${lease ? lease.tenantName : 'the renter'} has moved out? The unit becomes available to rent again.`)) return;
+  try {
+    await api.form('POST', `/api/leases/${leaseId}/move-out`);
+    if (editing) closeEditModal();
+    await loadUnits();
+  } catch (err) {
+    alert(err.message);
+  }
 }
 
 function closeEditModal() {

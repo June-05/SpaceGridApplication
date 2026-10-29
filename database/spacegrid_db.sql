@@ -188,6 +188,7 @@ CREATE TABLE lease_contracts (
     status             VARCHAR(20)   NOT NULL DEFAULT 'ACTIVE',
     closed_on          DATE          NULL,                 -- date it actually ended / was terminated / renewed
     termination_reason VARCHAR(255)  NULL,                 -- why the landlord terminated it (shown to the renter)
+    released_on        DATE          NULL,                 -- when the landlord confirmed the move-out (or leased the unit again to the same renter); until then an ENDED / TERMINATED lease still holds its unit
     ended_automatically BOOLEAN      NOT NULL DEFAULT FALSE,   -- TRUE = ended by LeaseExpiryJob after its end date
     created_at         DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
     active_unit_id     INT AS (IF(status = 'ACTIVE', rentable_unit_id, NULL)) STORED,
@@ -208,7 +209,8 @@ CREATE TABLE lease_contracts (
     CONSTRAINT ck_lease_contracts_closed CHECK (
         (status = 'ACTIVE' AND closed_on IS NULL) OR (status <> 'ACTIVE' AND closed_on IS NOT NULL)),
     CONSTRAINT ck_lease_contracts_reason CHECK (termination_reason IS NULL OR status = 'TERMINATED'),
-    CONSTRAINT ck_lease_contracts_auto   CHECK (ended_automatically = FALSE OR status = 'ENDED')
+    CONSTRAINT ck_lease_contracts_auto   CHECK (ended_automatically = FALSE OR status = 'ENDED'),
+    CONSTRAINT ck_lease_contracts_released CHECK (released_on IS NULL OR status IN ('ENDED', 'TERMINATED'))
 ) ENGINE = InnoDB;
 
 -- ---------------------------------------------------------------------
@@ -287,7 +289,7 @@ CREATE VIEW lease_details AS
 SELECT  l.id, l.rentable_unit_id, l.renter_id, l.previous_lease_id,
         l.start_date, l.end_date, l.monthly_rent, l.payment_terms,
         l.tenant_name, l.tenant_email, l.tenant_phone,
-        l.status, l.closed_on, l.termination_reason, l.ended_automatically, l.created_at,
+        l.status, l.closed_on, l.termination_reason, l.ended_automatically, l.released_on, l.created_at,
         z.name        AS unit_name,
         p.id          AS property_id,
         p.name        AS property_name,
@@ -498,12 +500,12 @@ INSERT INTO edge_overrides (property_id, row_idx, col_idx, orientation, edge_typ
 -- Lease 3 is a renewal of lease 2 (rent went up); lease 3 ends 2026-11-15 -> EXPIRING_SOON.
 -- Lease 4 is the old lease of the archived Storage Room (kept as history).
 INSERT INTO lease_contracts (id, rentable_unit_id, renter_id, previous_lease_id, start_date, end_date,
-                             monthly_rent, payment_terms, tenant_name, tenant_email, tenant_phone, status, closed_on) VALUES
-    (1, 1, 3, NULL, '2026-06-01', '2027-05-31', 12000.00, 'MONTHLY_ADVANCE', 'Ana Cruz', 'ana.cruz@example.com', '+63 917 555 0101', 'ACTIVE', NULL),
-    (2, 2, 4, NULL, '2025-05-01', '2026-04-30', 12000.00, 'MONTHLY_ADVANCE', 'Paolo Garcia', 'paolo.garcia@example.com', '+63 917 555 0102', 'RENEWED', '2026-04-30'),
-    (3, 2, 4, 2, '2026-05-01', '2026-11-15', 12500.00, 'MONTHLY_ADVANCE', 'Paolo Garcia', 'paolo.garcia@example.com', '+63 917 555 0102', 'ACTIVE', NULL),
-    (4, 8, 5, NULL, '2025-01-01', '2025-12-31', 7000.00, 'MONTHLY_ADVANCE', 'Liza Mendoza', 'liza.mendoza@example.com', NULL, 'ENDED', '2025-12-31'),
-    (5, 11, 5, NULL, '2026-08-01', '2027-07-31', 6000.00, 'MONTHLY_ADVANCE', 'Liza Mendoza', 'liza.mendoza@example.com', '+63 917 555 0103', 'ACTIVE', NULL);
+                             monthly_rent, payment_terms, tenant_name, tenant_email, tenant_phone, status, closed_on, released_on) VALUES
+    (1, 1, 3, NULL, '2026-06-01', '2027-05-31', 12000.00, 'MONTHLY_ADVANCE', 'Ana Cruz', 'ana.cruz@example.com', '+63 917 555 0101', 'ACTIVE', NULL, NULL),
+    (2, 2, 4, NULL, '2025-05-01', '2026-04-30', 12000.00, 'MONTHLY_ADVANCE', 'Paolo Garcia', 'paolo.garcia@example.com', '+63 917 555 0102', 'RENEWED', '2026-04-30', NULL),
+    (3, 2, 4, 2, '2026-05-01', '2026-11-15', 12500.00, 'MONTHLY_ADVANCE', 'Paolo Garcia', 'paolo.garcia@example.com', '+63 917 555 0102', 'ACTIVE', NULL, NULL),
+    (4, 8, 5, NULL, '2025-01-01', '2025-12-31', 7000.00, 'MONTHLY_ADVANCE', 'Liza Mendoza', 'liza.mendoza@example.com', NULL, 'ENDED', '2025-12-31', '2025-12-31'),
+    (5, 11, 5, NULL, '2026-08-01', '2027-07-31', 6000.00, 'MONTHLY_ADVANCE', 'Liza Mendoza', 'liza.mendoza@example.com', '+63 917 555 0103', 'ACTIVE', NULL, NULL);
 
 -- Lease 1: one FAILED card attempt in September, November paid ahead.
 -- Lease 3: October not paid yet -> OVERDUE on the statement.

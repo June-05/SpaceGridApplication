@@ -57,7 +57,16 @@ public class LeaseService {
             String tenantPhone) {
         RentableUnit unit = getOwnedUnit(unitId, landlord);
         User renter = findRenter(renterUsername);
-        unit.markOccupied();                                  // only from AVAILABLE
+        LeaseContract waiting = leaseDao.findAwaitingMoveOutByUnitId(unitId).orElse(null);
+        if (waiting == null) {
+            unit.markOccupied();                              // only from AVAILABLE
+        } else if (waiting.getRenterId() == renter.getId()) {
+            waiting.release(LocalDate.now());                 // the same renter signs again: they are staying
+            leaseDao.update(waiting);
+        } else {
+            throw new ConflictException(unit.getName() + " is waiting for " + waiting.getTenantName()
+                    + " to move out. Confirm the move-out first, then lease it to someone else.");
+        }
         String name = (tenantName == null || tenantName.isBlank()) ? renter.getFullName() : tenantName;
         LeaseContract lease = new LeaseContract(unit.getId(), renter.getId(), startDate, endDate, monthlyRent,
                 paymentTerms, name, tenantEmail, tenantPhone, null);
@@ -91,7 +100,7 @@ public class LeaseService {
         return reload(renewal.getId());
     }
 
-    /** Normal end, from the end date on (use terminate before that); unit -> AVAILABLE. */
+    /** Normal end, from the end date on (use terminate before that). The unit stays OCCUPIED until confirmMoveOut. */
     @Transactional
     public void endLease(int leaseId, User landlord) {
         LeaseContract lease = getLeaseFor(leaseId, landlord);
@@ -102,21 +111,29 @@ public class LeaseService {
         }
         lease.end(today);
         leaseDao.update(lease);
-        freeUnit(lease.getUnitId());
     }
 
-    /** Early end with a reason the renter will see; unit -> AVAILABLE. */
+    /** Early end with a reason the renter will see. The unit stays OCCUPIED until confirmMoveOut. */
     @Transactional
     public void terminateLease(int leaseId, User landlord, String reason) {
         LeaseContract lease = getLeaseFor(leaseId, landlord);
         lease.terminate(LocalDate.now(), reason);
+        leaseDao.update(lease);
+    }
+
+    /** The renter has left: an ENDED / TERMINATED lease releases its unit (OCCUPIED -> AVAILABLE). */
+    @Transactional
+    public void confirmMoveOut(int leaseId, User landlord) {
+        LeaseContract lease = getLeaseFor(leaseId, landlord);
+        lease.release(LocalDate.now());
         leaseDao.update(lease);
         freeUnit(lease.getUnitId());
     }
 
     /**
      * Automatic end (LeaseExpiryJob): every ACTIVE lease whose end date is before today becomes ENDED
-     * (closedOn = its end date, endedAutomatically) and its unit AVAILABLE. Returns how many were ended.
+     * (closedOn = its end date, endedAutomatically). Its unit stays OCCUPIED until the landlord confirms the
+     * move-out (confirmMoveOut). Returns how many were ended.
      */
     @Transactional
     public int expireLeases(LocalDate today) {
@@ -124,7 +141,6 @@ public class LeaseService {
         for (LeaseContract lease : due) {
             lease.expire();
             leaseDao.update(lease);
-            freeUnit(lease.getUnitId());
         }
         return due.size();
     }
@@ -185,7 +201,7 @@ public class LeaseService {
         return unit;
     }
 
-    /** After a lease ends: OCCUPIED -> AVAILABLE (an archived unit stays archived). */
+    /** After the move-out is confirmed: OCCUPIED -> AVAILABLE (an archived unit stays archived). */
     private void freeUnit(int unitId) {
         unitDao.findById(unitId).ifPresent(unit -> {
             if (!unit.isArchived()) {

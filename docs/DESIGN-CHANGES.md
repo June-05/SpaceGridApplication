@@ -573,3 +573,58 @@ A (zoom) → B (flags) → C (permits). C also touches `lease-form.js`, which is
 
 ### Docs to update when built
 `CLAUDE.md` (business rules, size cap, upload exception), `SpaceGrid-Phase1-Spec.md` (new classes, endpoints, `MAX_GRID_SIZE`, counts), `SpaceGrid-Phase3-FileStructure.md` (files and pages), `HOW-TO-CONNECT.md` (multipart example, JSON shapes), `spacegrid_db.sql`, and the `.drawio` class diagram and ERD (already behind).
+
+---
+
+## 2026-10-29 · Ended leases wait for the move-out; unpaid-balance warnings (design change)
+
+Decided with the owner (A + C from the "what happens when a lease ends?" discussion). In real life an ended contract doesn't make the renter leave or cancel what they owe, so the unit must not become free just because the date passed.
+
+### Rules
+- A lease that **ends automatically, is ended by the landlord, or is terminated** no longer frees its unit. The unit stays OCCUPIED and the lease shows "waiting for move-out" until the landlord presses **Confirm moved out**, which frees the unit (and lists it on the homepage again).
+- While a lease waits: leasing the unit to a **different** renter is refused (409); the unit can't be archived and neither can its property; the renter's "Request this space again" is hidden. "Lease again" to the **same** renter is allowed and counts as the move-out (they are staying).
+- **Unpaid months** stay payable (unchanged). New warnings (UI only): a red banner on the lease page for both roles, a question before "Lease again" when money is owed, an amber notice with the amount on the lease form, and a red "You still owe ₱X on N ended leases" banner on the renter's dashboard.
+
+### Database (`database/spacegrid_db.sql`: re-run it by hand, or run these lines on an existing `spacegrid_db`)
+```sql
+ALTER TABLE lease_contracts
+    ADD COLUMN released_on DATE NULL AFTER termination_reason,
+    ADD CONSTRAINT ck_lease_contracts_released CHECK (released_on IS NULL OR status IN ('ENDED', 'TERMINATED'));
+UPDATE lease_contracts SET released_on = closed_on WHERE status IN ('ENDED', 'TERMINATED');   -- already-closed leases are not waiting
+CREATE OR REPLACE VIEW lease_details AS
+SELECT  l.id, l.rentable_unit_id, l.renter_id, l.previous_lease_id,
+        l.start_date, l.end_date, l.monthly_rent, l.payment_terms,
+        l.tenant_name, l.tenant_email, l.tenant_phone,
+        l.status, l.closed_on, l.termination_reason, l.ended_automatically, l.released_on, l.created_at,
+        z.name AS unit_name, p.id AS property_id, p.name AS property_name, p.landlord_id AS landlord_id,
+        u.full_name AS renter_name, u.username AS renter_username,
+        (SELECT MIN(f.id) FROM uploaded_files f
+         WHERE f.unit_id = l.rentable_unit_id AND f.file_kind = 'UNIT_PHOTO') AS unit_photo_id
+FROM lease_contracts l
+JOIN grid_zones z ON z.id = l.rentable_unit_id
+JOIN properties p ON p.id = z.property_id
+JOIN users u ON u.id = l.renter_id;
+```
+**Units already freed by the earlier rule stay free.** A unit whose lease ended before you run this and is still marked OCCUPIED would need its status fixed by hand; normally there are none.
+
+### Changed classes
+- `LeaseContract`: `releasedOn` (+ getter), `isAwaitingMoveOut()` (JSON `awaitingMoveOut`), `release(day)`.
+- `LeaseContractDao` / `JdbcLeaseContractDao`: reads and writes `released_on`; new `findAwaitingMoveOutByUnitId`.
+- `LeaseService`: `endLease`, `terminateLease` and `expireLeases` no longer call `freeUnit`; new `confirmMoveOut(id, landlord)`; `createLease` refuses a different renter while the unit is held and releases the old lease for the same renter.
+- `RentableUnitService`: `removalCheck` (so archive) refuses while a lease waits; `UnitDetails` gets `waitingLease`. `PropertyService.archiveProperty` refuses too.
+
+### Endpoints
+- `POST /api/leases/{id}/move-out` (new, landlord): 409 if nothing is waiting. `GET /api/leases…` JSON gains `releasedOn`, `awaitingMoveOut`; `GET /api/units/{id}/details` gains `waitingLease`.
+
+### Pages
+- `lease.html` / `lease.js`: status text, **Confirm moved out** button (main button while waiting), balance banner, "Lease again" asks first when money is owed.
+- `lease-form.js` (`?again=`): the held unit stays selectable for the same renter; amber notice with the amount owed and the move-out remark.
+- `units.js`: a waiting unit shows "Move-out pending", the leaving tenant and a **Confirm moved out** button (card and Quick Edit). `property-grid.js`: the details card says who the unit is waiting for. `leases.html`: filter "Waiting for move-out". `nav.js` bell texts. `renter-dashboard`: owed banner and "please move out" lines.
+
+### How it was checked
+- Live API on a scratch DB (port 8099): the auto-expired lease kept its unit OCCUPIED and off the homepage; a different renter's lease and archiving the unit → 409; a renter can't confirm (403); the landlord's confirmation freed the unit and listed it again; a second confirmation → 409; a terminated lease also held its unit; the same renter's new lease was accepted and released the old one.
+- jsdom: `moveout-test.js` (22 checks) plus all earlier suites.
+
+### Not done yet / follow-ups
+- A holdover (renter stays and keeps paying monthly) is not modelled; the landlord uses "Lease again".
+- Class diagram and ERD (`.drawio`): add `releasedOn`, `isAwaitingMoveOut`, `release`, `confirmMoveOut`, `UnitDetails.waitingLease`.

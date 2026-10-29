@@ -148,8 +148,8 @@
     const terminated = l.status === 'TERMINATED';
     const title = user.role === 'LANDLORD' ? 'Lease ended automatically'
       : terminated ? 'Your lease was terminated' : 'Your lease has ended';
-    const next = user.role === 'LANDLORD' ? `${esc(l.tenantName)} · lease it again or let the unit be listed`
-      : terminated ? `Reason: ${esc(l.terminationReason || 'not given')}` : 'Pay anything left, or request a space again';
+    const next = user.role === 'LANDLORD' ? `${esc(l.tenantName)} · confirm the move-out, or lease it again`
+      : terminated ? `Reason: ${esc(l.terminationReason || 'not given')}` : 'Please move out, and pay anything still unpaid';
     return `<a href="/lease.html?id=${l.id}" class="block px-4 py-3 hover:bg-slate-50 border-b border-slate-100">
         <p class="text-xs font-bold ${terminated ? 'text-rose-600' : 'text-slate-800'}">${title}</p>
         <p class="text-xs text-slate-600 truncate">${where}</p>

@@ -38,6 +38,7 @@ public class LeaseContract extends BaseEntity {
     private LocalDate closedOn;                 // date it actually ended / was terminated / renewed
     private String terminationReason;           // why the landlord terminated it (TERMINATED only)
     private boolean endedAutomatically;         // ENDED by LeaseExpiryJob after the end date
+    private LocalDate releasedOn;               // move-out confirmed (or leased again to the same renter); null while still waiting
 
     // read-only display fields: filled by JdbcLeaseContractDao from the lease_details view, never saved
     private String unitName;
@@ -80,7 +81,7 @@ public class LeaseContract extends BaseEntity {
     public LeaseContract(int id, LocalDateTime createdAt, int unitId, int renterId, LocalDate startDate,
                          LocalDate endDate, BigDecimal monthlyRent, PaymentTerms paymentTerms, String tenantName,
                          String tenantEmail, String tenantPhone, Integer previousLeaseId, LeaseStatus status,
-                         LocalDate closedOn, String terminationReason, boolean endedAutomatically,
+                         LocalDate closedOn, String terminationReason, boolean endedAutomatically, LocalDate releasedOn,
                          String unitName, String propertyName, Integer propertyId,
                          String renterName, String renterUsername, Integer unitPhotoId) {
         super(id, createdAt);
@@ -98,6 +99,7 @@ public class LeaseContract extends BaseEntity {
         this.closedOn = closedOn;
         this.terminationReason = terminationReason;
         this.endedAutomatically = endedAutomatically;
+        this.releasedOn = releasedOn;
         this.unitName = unitName;
         this.propertyName = propertyName;
         this.propertyId = propertyId;
@@ -120,6 +122,15 @@ public class LeaseContract extends BaseEntity {
     public LocalDate getClosedOn() { return closedOn; }
     public String getTerminationReason() { return terminationReason; }
     public boolean isEndedAutomatically() { return endedAutomatically; }
+    public LocalDate getReleasedOn() { return releasedOn; }
+
+    /**
+     * True while an ENDED / TERMINATED lease still holds its unit: the renter hasn't been confirmed as moved out.
+     * The unit stays OCCUPIED (and can't be leased to someone else) until release().
+     */
+    public boolean isAwaitingMoveOut() {
+        return (status == LeaseStatus.ENDED || status == LeaseStatus.TERMINATED) && releasedOn == null;
+    }
     public String getUnitName() { return unitName; }
     public String getPropertyName() { return propertyName; }
     public Integer getPropertyId() { return propertyId; }
@@ -250,6 +261,14 @@ public class LeaseContract extends BaseEntity {
         this.status = LeaseStatus.TERMINATED;
         this.closedOn = today;
         this.terminationReason = reason.trim();
+    }
+
+    /** The landlord confirms the renter moved out (or leases the unit again to the same renter). Only while waiting. */
+    public void release(LocalDate day) {
+        if (!isAwaitingMoveOut()) {
+            throw new ConflictException("This lease isn't waiting for a move-out confirmation.");
+        }
+        this.releasedOn = day;
     }
 
     /** Used by LeaseService.renewLease: ACTIVE -> RENEWED, closedOn = the day before the new lease starts. */
