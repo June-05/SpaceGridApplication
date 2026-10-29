@@ -154,6 +154,7 @@ SpaceGrid/
 │       │   ├── common/
 │       │   │   ├── api.js
 │       │   │   ├── auth.js
+│       │   │   ├── nav.js                              shared top bar + request bell
 │       │   │   ├── format.js
 │       │   │   ├── grid-renderer.js
 │       │   │   └── floating-panel.js                   draggable / minimizable panel (plotter)
@@ -273,6 +274,7 @@ Links start with `/` so they work from inside the `landlord/` and `renter/` fold
 | `css/zones.css` | **The file to edit to customize the look.** One rule per CSS class from the enums: `.zone-walkway`, `.zone-grass`, `.zone-bathroom`, …, `.status-available`, `.status-occupied`, …, `.edge-wall`, `.edge-door`, `.edge-window`, plus lease/due badges (`.state-expiring-soon`, `.due-overdue`, …). Default rule: `.zone { background: var(--zone-color); }` |
 | `js/common/api.js` | `fetch` wrapper: JSON in/out, shows `{"error": …}` messages, 401 → `/login.html` |
 | `js/common/auth.js` | `requireLogin(role)`: checks `/api/auth/me`, sends the wrong role away, fills the nav bar, logout button |
+| `js/common/nav.js` | Builds the shared top bar into `<header id="appNav" data-page="…">`: links per role, bell with request count, user menu, Log Out |
 | `js/common/format.js` | ₱ amounts, dates, "12 days left", badge HTML from a state's `cssClass` |
 | `js/common/grid-renderer.js` | Draws a property's zones and edges (automatic walls + overrides) from the property JSON. Editable mode for the plotter; read-only mode with one unit highlighted for `lease.html`. Also `applyEdgeTool` and `snapshot`/`restore` (undo). |
 | `css/plotter.css` | Plotter page only: full-window canvas, floating toolbar, Zones panel, popovers, shortcuts dialog |

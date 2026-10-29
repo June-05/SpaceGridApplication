@@ -24,17 +24,20 @@ let currentPage = 1;
 let openId = null;         // property shown in the modal
 
 document.addEventListener('DOMContentLoaded', async () => {
-  const user = await auth.requireLogin('LANDLORD');
-  showUser(user);
+  await auth.requireLogin('LANDLORD');          // the top bar (nav.js) shows the user name and the menu
   buildTypeFilters();
   setupControls();
+  loadPendingCard();
   await loadPortfolio();
 });
 
-function showUser(user) {
-  $('userFullName').textContent = user.fullName;
-  $('userShortName').textContent = user.fullName.split(' ')[0];
-  $('userInitials').textContent = user.fullName.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase();
+/** The amber "N lease requests are waiting" card above the list (hidden when nothing is pending). */
+async function loadPendingCard() {
+  try {
+    const pending = (await api.get('/api/lease-requests')).filter((r) => r.status === 'PENDING').length;
+    $('pendingCardText').textContent = `${pending} lease ${pending === 1 ? 'request is' : 'requests are'} waiting for your decision`;
+    $('pendingCard').classList.toggle('hidden', pending === 0);
+  } catch (err) { /* the card is optional */ }
 }
 
 /** One checkbox per property type (all ticked), with a count next to it. */
@@ -76,11 +79,6 @@ function setupControls() {
   $('sortSelect').addEventListener('change', applyFilters);
   $('activeToggle').addEventListener('change', applyFilters);
   $('typeFilters').addEventListener('change', applyFilters);
-
-  // user menu
-  $('userDropdownBtn').addEventListener('click', (e) => { e.stopPropagation(); $('userMenu').classList.toggle('hidden'); });
-  $('userMenu').addEventListener('click', (e) => e.stopPropagation());
-  document.addEventListener('click', () => $('userMenu').classList.add('hidden'));
 
   $('propertiesGrid').addEventListener('click', (e) => {
     const card = e.target.closest('[data-property-id]');

@@ -1976,7 +1976,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // ⋯ menu: "Edit property details" opens this property in the property form
-  if (Number.isInteger(propertyId) && propertyId > 0) $('menuPropertyForm').href = `/landlord/property-form.html?id=${propertyId}`;
+  if (Number.isInteger(propertyId) && propertyId > 0) {
+    $('menuPropertyForm').href = `/landlord/property-form.html?id=${propertyId}`;
+    $('menuUnits').href = `/landlord/units.html?propertyId=${propertyId}`;
+  }
 
   if (!Number.isInteger(propertyId) || propertyId < 1) {
     el.name.textContent = 'No property selected';

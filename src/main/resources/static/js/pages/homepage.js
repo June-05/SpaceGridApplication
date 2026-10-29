@@ -141,6 +141,17 @@ function renderUser() {
   link.href = home;
   $('workspaceText').textContent = me.role === 'LANDLORD' ? 'My workspace' : 'My leases';
   $('menuDashboard').href = home;
+  $('menuRequests').firstChild.textContent = me.role === 'LANDLORD' ? 'Lease Requests ' : 'My Requests ';
+  if (me.role === 'LANDLORD') showPendingCount();
+}
+
+/** Landlord: number of requests waiting for a decision, next to "Lease Requests" in the profile menu. */
+async function showPendingCount() {
+  try {
+    const pending = (await api.get('/api/lease-requests')).filter((r) => r.status === 'PENDING').length;
+    $('menuRequestsCount').textContent = pending;
+    $('menuRequestsCount').classList.toggle('hidden', pending === 0);
+  } catch (err) { /* the count is optional */ }
 }
 
 /* ---------- loading the listings ---------- */

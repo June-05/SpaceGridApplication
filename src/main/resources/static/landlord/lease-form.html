@@ -9,6 +9,7 @@
     <!-- Login check (auth.js): only landlords may open this page; anyone else is sent to their own page -->
     <script src="/js/common/api.js"></script>
     <script src="/js/common/auth.js"></script>
+    <script src="/js/common/nav.js"></script>
     <script>auth.requireLogin('LANDLORD');</script>
     <!-- Font Awesome for Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -24,24 +25,8 @@
     </style>
 </head>
 <body class="bg-[#f8fafc] text-slate-900 min-h-screen flex flex-col antialiased">
-    <!-- TOP NAVIGATION BAR -->
-    <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-xs">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between gap-6">
-            <div class="flex items-center gap-2 cursor-pointer flex-shrink-0" onclick="window.location.href='dashboard.html'">
-                <span class="text-2xl font-black tracking-tight text-slate-900">Space<span class="text-indigo-600">Grid</span></span>
-            </div>
-            <div class="flex items-center gap-3.5 flex-shrink-0">
-                <a href="leases.html" class="flex items-center gap-2 px-3.5 py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 rounded-xl text-xs font-semibold transition border border-slate-200">
-                    <i class="fa-solid fa-file-contract text-slate-500 text-xs"></i>
-                    <span>View All Leases</span>
-                </a>
-                <a href="dashboard.html" class="flex items-center gap-2 px-3.5 py-2 bg-indigo-50/80 hover:bg-indigo-100 text-indigo-600 rounded-xl text-xs font-semibold transition border border-indigo-100">
-                    <i class="fa-solid fa-gauge-high text-indigo-500 text-xs"></i>
-                    <span>Dashboard</span>
-                </a>
-            </div>
-        </div>
-    </header>
+    <!-- TOP NAVIGATION BAR: shared bar built by /js/common/nav.js -->
+    <header id="appNav" data-page="leases"></header>
 
     <!-- MAIN CONTAINER -->
     <main class="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8">

@@ -1,0 +1,177 @@
+/*
+ * nav.js — the shared top bar (same look and links on every logged-in page).
+ *
+ * In the page:
+ *   <header id="appNav" data-page="units"></header>
+ *   <script src="/js/common/api.js"></script><script src="/js/common/auth.js"></script><script src="/js/common/nav.js"></script>
+ * Needs Tailwind and Font Awesome on the page. data-page marks which link is highlighted:
+ *   landlord: dashboard | units | leases | requests      renter: browse | leases | requests
+ *   (any other value, e.g. "property", highlights nothing)
+ *
+ * What it builds: logo → role home · links for the role · bell with a number · user menu (name, Log Out).
+ *
+ * Bell (GET /api/lease-requests, which already returns the landlord's incoming or the renter's own requests):
+ *   landlord → number of PENDING requests; the list links to requests.html
+ *   renter   → requests decided (APPROVED / DECLINED) after the last one they looked at.
+ *              "Looked at" = the newest decidedAt seen when requests.html was open (localStorage requestsSeenAt).
+ *              It is kept in this browser only, so clearing site data brings the badge back.
+ * It refreshes when the page loads and every 60 seconds.
+ *
+ * "Last property": units.html / leases.html / the plotter / the property form remember their property id
+ * (localStorage lastPropertyId) so the Units and Leases links in the bar open the property you were on.
+ */
+(() => {
+  const LANDLORD_LINKS = [
+    { key: 'dashboard', label: 'Dashboard', icon: 'fa-gauge-high', href: '/landlord/dashboard.html' },
+    { key: 'units', label: 'Units', icon: 'fa-cubes', href: '/landlord/units.html', property: true },
+    { key: 'leases', label: 'Leases', icon: 'fa-file-contract', href: '/landlord/leases.html' },      // all properties; the page narrows by ?propertyId=
+    { key: 'requests', label: 'Requests', icon: 'fa-inbox', href: '/requests.html' }
+  ];
+  const RENTER_LINKS = [
+    { key: 'browse', label: 'Browse spaces', icon: 'fa-magnifying-glass', href: '/' },
+    { key: 'leases', label: 'My Leases', icon: 'fa-file-contract', href: '/renter/dashboard.html' },
+    { key: 'requests', label: 'My Requests', icon: 'fa-inbox', href: '/requests.html' }
+  ];
+  const POLL_MS = 60000;
+  const NEWEST_SHOWN = 5;
+
+  const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (c) =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const store = {                                      // localStorage can be blocked: never let it break the page
+    get(key) { try { return localStorage.getItem(key); } catch (e) { return null; } },
+    set(key, value) { try { localStorage.setItem(key, value); } catch (e) { /* ignore */ } }
+  };
+
+  /** Remember the property this page is about (units/leases use ?propertyId=, the plotter and the form use ?id=). */
+  function rememberProperty(page) {
+    const params = new URLSearchParams(location.search);
+    const id = (page === 'units' || page === 'leases') ? params.get('propertyId')
+      : (page === 'grid' || page === 'property') ? params.get('id') : null;
+    if (id && /^\d+$/.test(id)) store.set('lastPropertyId', id);
+  }
+
+  function linkHref(link) {
+    const last = store.get('lastPropertyId');
+    return link.property && last ? `${link.href}?propertyId=${last}` : link.href;
+  }
+
+  function linksHtml(links, page, mobile) {
+    return links.map((link) => {
+      const active = link.key === page;
+      const cls = mobile
+        ? `block px-4 py-2 text-xs font-semibold ${active ? 'text-indigo-700 bg-indigo-50' : 'text-slate-700 hover:bg-slate-50'}`
+        : `flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-semibold transition ${active ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-100'}`;
+      return `<a href="${linkHref(link)}" data-nav="${link.key}" class="${cls}"${active ? ' aria-current="page"' : ''}>`
+        + `<i class="fa-solid ${link.icon} ${mobile ? 'mr-2 text-slate-400' : 'text-xs'}"></i>${link.label}</a>`;
+    }).join('');
+  }
+
+  function render(el, user, page) {
+    const landlord = user.role === 'LANDLORD';
+    const links = landlord ? LANDLORD_LINKS : RENTER_LINKS;
+    const name = user.fullName || '';
+    const initials = name.split(' ').filter(Boolean).map((w) => w[0]).slice(0, 2).join('').toUpperCase() || '?';
+    el.className = 'bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm';
+    el.innerHTML = `
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+        <div class="flex items-center gap-6 min-w-0">
+          <a href="${auth.home(user)}" class="text-2xl font-black tracking-tight text-slate-900 flex-shrink-0">Space<span class="text-indigo-600">Grid</span></a>
+          <nav class="hidden md:flex items-center gap-1" aria-label="Main">${linksHtml(links, page, false)}</nav>
+        </div>
+        <div class="flex items-center gap-3 flex-shrink-0 relative">
+          <button id="navBell" type="button" aria-label="Notifications" class="relative w-9 h-9 rounded-full bg-slate-50 hover:bg-slate-100 text-slate-600 flex items-center justify-center transition">
+            <i class="fa-regular fa-bell"></i>
+            <span id="navBadge" class="hidden absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-rose-500 text-white text-[10px] font-bold flex items-center justify-center"></span>
+          </button>
+          <div id="navBellPanel" class="hidden absolute right-12 top-12 w-72 bg-white border border-slate-200 rounded-2xl shadow-xl z-50 overflow-hidden"></div>
+          <button id="navUserBtn" type="button" class="flex items-center gap-2.5 pl-3 border-l border-slate-200 select-none">
+            <span class="w-9 h-9 rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold flex items-center justify-center ring-2 ring-indigo-600/10">${esc(initials)}</span>
+            <span class="text-sm font-semibold text-slate-800 hidden lg:inline">${esc(name.split(' ')[0])}</span>
+            <i class="fa-solid fa-chevron-down text-xs text-slate-400"></i>
+          </button>
+          <div id="navUserMenu" class="hidden absolute right-0 top-12 w-56 bg-white border border-slate-200 rounded-2xl shadow-xl py-2 z-50">
+            <div class="px-4 py-2.5 border-b border-slate-100">
+              <p class="text-xs font-bold text-slate-900">${esc(name)}</p>
+              <p class="text-[11px] text-slate-400">${landlord ? 'Landlord' : 'Renter'}</p>
+            </div>
+            <div class="md:hidden border-b border-slate-100 py-1">${linksHtml(links, page, true)}</div>
+            <button id="navLogout" type="button" class="block w-full text-left px-4 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50"><i class="fa-solid fa-right-from-bracket mr-2 text-rose-400"></i>Log Out</button>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  /** The requests the bell should tell the user about, newest first. */
+  function bellItems(user, requests) {
+    if (user.role === 'LANDLORD') {
+      return requests.filter((r) => r.status === 'PENDING')
+        .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+    }
+    const seen = store.get('requestsSeenAt') || '';
+    return requests.filter((r) => (r.status === 'APPROVED' || r.status === 'DECLINED') && String(r.decidedAt || '') > seen)
+      .sort((a, b) => String(b.decidedAt).localeCompare(String(a.decidedAt)));
+  }
+
+  function itemHtml(user, r) {
+    const where = `${esc(r.propertyName)} · ${esc(r.unitName)}`;
+    const title = user.role === 'LANDLORD'
+      ? `${esc(r.renterName)} wants to lease`
+      : r.status === 'APPROVED' ? 'Request approved' : 'Request declined';
+    const color = user.role === 'LANDLORD' ? 'text-amber-600' : r.status === 'APPROVED' ? 'text-emerald-600' : 'text-rose-600';
+    return `<a href="/requests.html" class="block px-4 py-3 hover:bg-slate-50 border-b border-slate-100">
+        <p class="text-xs font-bold ${color}">${title}</p>
+        <p class="text-xs text-slate-600 truncate">${where}</p></a>`;
+  }
+
+  function paintBell(user, items) {
+    const badge = document.getElementById('navBadge');
+    badge.textContent = items.length > 99 ? '99+' : String(items.length);
+    badge.classList.toggle('hidden', items.length === 0);
+    const landlord = user.role === 'LANDLORD';
+    const head = landlord ? 'Pending lease requests' : 'Decisions on your requests';
+    const body = items.length
+      ? items.slice(0, NEWEST_SHOWN).map((r) => itemHtml(user, r)).join('')
+      : `<p class="px-4 py-5 text-xs text-slate-500">${landlord ? 'No requests waiting for you.' : 'Nothing new.'}</p>`;
+    document.getElementById('navBellPanel').innerHTML =
+      `<p class="px-4 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100">${head}</p>${body}`
+      + `<a href="/requests.html" class="block px-4 py-2.5 text-center text-xs font-bold text-indigo-600 hover:bg-indigo-50">${landlord ? 'See all requests' : 'See my requests'}</a>`;
+  }
+
+  async function refreshBell(user, page) {
+    try {
+      const requests = await api.get('/api/lease-requests');
+      const items = bellItems(user, requests);
+      paintBell(user, items);
+      if (user.role === 'RENTER' && page === 'requests') {          // looking at them now → mark as seen
+        const newest = requests.map((r) => String(r.decidedAt || '')).sort().pop();
+        if (newest) store.set('requestsSeenAt', newest);
+      }
+    } catch (err) { /* the bell is a convenience: stay quiet if the call fails */ }
+  }
+
+  function wireMenus(user, page) {
+    const bell = document.getElementById('navBellPanel');
+    const menu = document.getElementById('navUserMenu');
+    document.getElementById('navBell').addEventListener('click', (e) => { e.stopPropagation(); menu.classList.add('hidden'); bell.classList.toggle('hidden'); });
+    document.getElementById('navUserBtn').addEventListener('click', (e) => { e.stopPropagation(); bell.classList.add('hidden'); menu.classList.toggle('hidden'); });
+    bell.addEventListener('click', (e) => e.stopPropagation());
+    menu.addEventListener('click', (e) => e.stopPropagation());
+    document.addEventListener('click', () => { bell.classList.add('hidden'); menu.classList.add('hidden'); });
+    document.getElementById('navLogout').addEventListener('click', () => auth.logout());
+    refreshBell(user, page);
+    setInterval(() => refreshBell(user, page), POLL_MS);
+  }
+
+  async function start() {
+    const el = document.getElementById('appNav');
+    if (!el) return;
+    const page = el.dataset.page || '';
+    rememberProperty(page);
+    const user = await auth.requireLogin();          // not logged in → api.js sends them to /login.html
+    window.navUser = user;
+    render(el, user, page);
+    wireMenus(user, page);
+  }
+
+  document.addEventListener('DOMContentLoaded', start);
+})();

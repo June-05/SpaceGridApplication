@@ -3,41 +3,42 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Lease requests · SpaceGrid</title>
-  <link rel="stylesheet" href="/css/base.css">
-  <link rel="stylesheet" href="/css/zones.css">
-  <!-- Dedicated Requests Page Stylesheet -->
-  <link rel="stylesheet" href="/css/renter-css/request.css">
+  <title>Lease Requests - SpaceGrid</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+    body { font-family: 'Plus Jakarta Sans', sans-serif; }
+  </style>
 </head>
-<body class="dashboard-page">
-<header class="topbar">
-    <div class="titles">
-      <h1>SpaceGrid</h1>
-      <p id="subtitle" class="subtitle">Lease requests</p>
+<body class="bg-[#f8fafc] text-slate-900 min-h-screen flex flex-col antialiased">
+  <!-- Shared top bar (built by /js/common/nav.js). Landlords and renters both use this page. -->
+  <header id="appNav" data-page="requests"></header>
+
+  <main class="flex-1 max-w-4xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8">
+    <div class="mb-6">
+      <h1 id="heading" class="text-2xl font-extrabold text-slate-900 tracking-tight">Lease requests</h1>
+      <p id="subtitle" class="text-sm text-slate-500 mt-0.5"></p>
     </div>
-    <div class="topbar-actions">
-      <!-- Added btn-primary class here to match dashboard.html -->
-      <a href="/" class="btn btn-primary">Browse spaces</a>
-      <a id="dashboardLink" href="/renter/dashboard.html" class="btn">Dashboard</a>
-      <button id="btnLogout" class="btn" type="button">Log out</button>
+
+    <!-- Filter: shows pending first so the landlord sees what needs a decision -->
+    <div id="filters" class="flex items-center gap-2 mb-5 text-xs font-semibold">
+      <button type="button" data-filter="all" class="px-3.5 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-700">All</button>
+      <button type="button" data-filter="PENDING" class="px-3.5 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-700">Pending</button>
     </div>
-  </header>
 
-  <main class="container">
-    <section class="section-header">
-      <h2 id="heading">Lease requests</h2>
-    </section>
+    <p id="error" class="text-sm font-semibold text-rose-600 mb-4" aria-live="polite"></p>
+    <p id="empty" class="hidden py-12 text-center text-sm text-slate-500 bg-white border border-slate-200 rounded-2xl"></p>
 
-    <p id="error" class="error" aria-live="polite"></p>
-    <p id="empty" class="empty" hidden></p>
-
-    <div id="requests" class="card-grid"></div>
+    <div id="requests" class="space-y-4"></div>
   </main>
 
-  <div id="toast" class="toast" role="status"></div>
+  <div id="toast" role="status" class="hidden fixed bottom-6 left-1/2 -translate-x-1/2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white bg-slate-900 shadow-lg z-50"></div>
 
   <script src="/js/common/api.js"></script>
   <script src="/js/common/auth.js"></script>
+  <script src="/js/common/nav.js"></script>
   <script src="/js/common/format.js"></script>
   <script src="/js/pages/requests.js"></script>
 </body>

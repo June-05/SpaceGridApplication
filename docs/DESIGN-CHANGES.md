@@ -278,6 +278,26 @@ The teammate's landlord pages (dashboard, units, leases, lease form, property fo
 
 ---
 
+## 2026-10-29 · Shared top bar and request notifications (UI only, no design change)
+
+Phases 1–2 of the UI plan (see "Decisions" below). No Java, SQL or API change; it uses `GET /api/lease-requests`.
+
+### Why
+Every landlord page had its own top bar, and the renter pages had a different one, so the navigation kept changing. A landlord also had no way to notice a new lease request, and `requests.html` was only reachable from the homepage menu.
+
+### What changed
+- **`js/common/nav.js` (new):** a page has `<header id="appNav" data-page="units">`; the script builds the bar. Landlord: Dashboard · Units · Leases · Requests. Renter: Browse spaces · My Leases · My Requests. It adds a bell with a number badge and a user menu with Log Out. It remembers the last property (`localStorage.lastPropertyId`) so "Units" reopens the one you were on.
+- **Bell:** landlord = number of `PENDING` requests. Renter = requests decided (approved or declined) after the newest `decidedAt` they had seen (`localStorage.requestsSeenAt`, set when `requests.html` opens; per browser only). Refreshes every 60 seconds.
+- **Landlord pages** (`dashboard`, `units`, `leases`, `lease-form`, `property-form`): the old header is replaced by the shared bar. Their search boxes and main buttons (Add New Property, Create New Lease, property selector, View/Edit Grid Layout, the property form's Save / Publish / Archive) moved into the page, under the title, with the same element ids, so the page scripts still work. The dashboard also shows an amber "N lease requests are waiting" card.
+- **`requests.html` + `requests.js`:** rebuilt in Tailwind with the shared bar. A landlord opens on the *Pending* filter (pending first); after Approve the list switches to *All* so "Create lease" is visible. `css/renter-css/request.css` is no longer used by this page.
+- **Homepage and plotter:** the homepage profile menu says "Lease Requests" with a pending count for landlords. The plotter's ⋯ menu gains Units list, Leases and Lease requests.
+- Still on the old look until later phases: `renter/dashboard.html`, `renter/pay.html`, `lease.html`.
+
+### How it was checked
+`nav-test.js` (23 checks: links per role, active link, badges, escaping, seen/unseen logic, moved elements), `role-test.js`, `landlord-pages-test.js`, and the plotter suites (101 + 41 + 28).
+
+---
+
 ## PROPOSED (not built) · Commercial ready, permits, bigger grid with zoom
 
 Status: **decided, not implemented.** Nothing below exists in the code yet. When a part is built, move it into a dated section above and update the docs listed at the end.

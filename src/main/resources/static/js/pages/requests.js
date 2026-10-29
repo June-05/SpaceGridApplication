@@ -10,7 +10,8 @@
  *      renter,   PENDING  → POST /api/lease-requests/{id}/cancel
  *      landlord, PENDING  → POST /api/lease-requests/{id}/approve  or  /decline
  *    then the list is loaded again.
- * 4. A landlord's APPROVED request shows "Create lease", which opens the lease form:
+ * 4. The top bar and the Log Out button come from nav.js. A landlord opens on the Pending filter.
+ * 5. A landlord's APPROVED request shows "Create lease", which opens the lease form:
  *      /landlord/lease-form.html?requestId={id}   (lease-form.js can use it to fill in the renter and the dates)
  */
 document.addEventListener('DOMContentLoaded', async () => {
@@ -20,75 +21,99 @@ document.addEventListener('DOMContentLoaded', async () => {
   const list = document.getElementById('requests');
   const error = document.getElementById('error');
   const empty = document.getElementById('empty');
+  let all = [];                                  // every request, as loaded
+  let filter = 'all';                            // 'all' or 'PENDING'
 
-  document.getElementById('dashboardLink').href = auth.home(user);
-  document.getElementById('btnLogout').onclick = () => auth.logout();
-  document.getElementById('subtitle').textContent = isLandlord ? 'Landlord Workspace' : 'Renter Workspace';
   document.getElementById('heading').textContent = isLandlord ? 'Requests for my properties' : 'My lease requests';
+  document.getElementById('subtitle').textContent = isLandlord
+    ? 'Approve or decline renters who asked to lease your units. After approving, create the lease.'
+    : 'Your requests to lease a unit, and what the owner decided.';
 
-  /** Escape text before putting it into innerHTML (names and messages come from users). */
-  function esc(value) {
-    return String(value ?? '').replace(/[&<>"']/g, (c) =>
-      ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  }
+  const BADGE = {                                // request status → badge colors
+    PENDING: 'bg-amber-100 text-amber-800', APPROVED: 'bg-emerald-100 text-emerald-800',
+    DECLINED: 'bg-rose-100 text-rose-800', CANCELLED: 'bg-slate-100 text-slate-600'
+  };
+  const esc = format.escape;                     // names and messages come from users
 
   function showToast(text, isError) {
     const toast = document.getElementById('toast');
     toast.textContent = text;
-    toast.classList.toggle('is-error', Boolean(isError));
-    toast.classList.add('is-visible');
-    setTimeout(() => toast.classList.remove('is-visible'), 3000);
+    toast.classList.toggle('bg-rose-600', Boolean(isError));
+    toast.classList.toggle('bg-slate-900', !isError);
+    toast.classList.remove('hidden');
+    setTimeout(() => toast.classList.add('hidden'), 3000);
   }
 
+  const BTN = 'px-4 py-2 rounded-xl text-xs font-bold transition';
   function actionsHtml(req) {
     if (req.status === 'PENDING') {
       return isLandlord
-        ? `<button class="btn btn-primary" data-action="approve" data-id="${req.id}" type="button">Approve</button>
-           <button class="btn" data-action="decline" data-id="${req.id}" type="button">Decline</button>`
-        : `<button class="btn" data-action="cancel" data-id="${req.id}" type="button">Cancel request</button>`;
+        ? `<button class="${BTN} bg-indigo-600 hover:bg-indigo-700 text-white" data-action="approve" data-id="${req.id}" type="button">Approve</button>
+           <button class="${BTN} bg-white hover:bg-slate-50 text-slate-700 border border-slate-200" data-action="decline" data-id="${req.id}" type="button">Decline</button>`
+        : `<button class="${BTN} bg-white hover:bg-rose-50 text-rose-600 border border-rose-200" data-action="cancel" data-id="${req.id}" type="button">Cancel request</button>`;
     }
     if (isLandlord && req.status === 'APPROVED' && !req.unitRemoved) {
-      return `<a class="btn btn-primary" href="/landlord/lease-form.html?requestId=${req.id}">Create lease</a>`;
+      return `<a class="${BTN} bg-indigo-600 hover:bg-indigo-700 text-white" href="/landlord/lease-form.html?requestId=${req.id}">Create lease</a>`;
     }
     return '';
   }
 
   function cardHtml(req) {
-    const who = isLandlord ? `<p><strong>Renter:</strong> ${esc(req.renterName)}</p>` : '';
-    const note = req.message ? `<p class="request-message">“${esc(req.message)}”</p>` : '';
-    const decided = req.decidedAt ? `<p class="subtitle">${esc(format.label(req.status))} on ${format.date(req.decidedAt)}</p>` : '';
+    const who = isLandlord ? `<p class="text-sm text-slate-700"><span class="font-semibold">Renter:</span> ${esc(req.renterName)}</p>` : '';
+    const note = req.message ? `<p class="text-sm text-slate-600 italic">“${esc(req.message)}”</p>` : '';
+    const decided = req.decidedAt ? `<p class="text-xs text-slate-400">${esc(format.label(req.status))} on ${format.date(req.decidedAt)}</p>` : '';
     return `
-      <article class="card request-card">
-        <div class="lease-header">
-          <h2>${esc(req.propertyName)} · ${esc(req.unitName)}</h2>
-          ${format.badge('request-', req.status)}
+      <article class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-2">
+        <div class="flex items-start justify-between gap-3">
+          <h2 class="text-base font-bold text-slate-900">${esc(req.propertyName)} · ${esc(req.unitName)}</h2>
+          <span class="text-xs font-bold px-2.5 py-1 rounded-md ${BADGE[req.status] || BADGE.CANCELLED}">${esc(format.label(req.status))}</span>
         </div>
         ${who}
         ${req.unitRemoved
-          ? '<p class="subtitle">This unit was removed by the owner.</p>'
-          : `<p><strong>Rent:</strong> ${format.peso(req.monthlyRate)} / month</p>`}
-        <p><strong>Wants to start:</strong> ${format.date(req.desiredStart)} for ${req.months} ${req.months === 1 ? 'month' : 'months'}
+          ? '<p class="text-sm text-slate-500">This unit was removed by the owner.</p>'
+          : `<p class="text-sm text-slate-700"><span class="font-semibold">Rent:</span> ${format.peso(req.monthlyRate)} / month</p>`}
+        <p class="text-sm text-slate-700"><span class="font-semibold">Wants to start:</span> ${format.date(req.desiredStart)} for ${req.months} ${req.months === 1 ? 'month' : 'months'}
            (until ${format.date(req.suggestedEndDate)})</p>
         ${note}
-        <p class="subtitle">Requested on ${format.date(req.createdAt)}</p>
+        <p class="text-xs text-slate-400">Requested on ${format.date(req.createdAt)}</p>
         ${decided}
-        <div class="card-actions">${actionsHtml(req)}</div>
+        <div class="flex flex-wrap gap-2 pt-1">${actionsHtml(req)}</div>
       </article>`;
+  }
+
+  function render() {
+    const shown = filter === 'PENDING' ? all.filter((r) => r.status === 'PENDING') : all;
+    list.innerHTML = shown.map(cardHtml).join('');
+    empty.classList.toggle('hidden', shown.length > 0);
+    empty.textContent = filter === 'PENDING' ? 'Nothing is waiting for a decision.'
+      : isLandlord ? 'No one has asked to lease your units yet.'
+      : 'You have not requested any space yet. Browse the available spaces to find one.';
+    document.querySelectorAll('#filters [data-filter]').forEach((b) => {
+      const on = b.dataset.filter === filter;
+      b.classList.toggle('bg-indigo-600', on);
+      b.classList.toggle('text-white', on);
+      b.classList.toggle('bg-white', !on);
+      b.classList.toggle('text-slate-700', !on);
+    });
   }
 
   async function load() {
     error.textContent = '';
     try {
-      const requests = await api.get('/api/lease-requests');
-      list.innerHTML = requests.map(cardHtml).join('');
-      empty.hidden = requests.length > 0;
-      empty.textContent = isLandlord
-        ? 'No one has asked to lease your units yet.'
-        : 'You have not requested any space yet. Browse the available spaces to find one.';
+      all = await api.get('/api/lease-requests');
+      // PENDING first (they need a decision), then newest first
+      all.sort((a, b) => (a.status === 'PENDING' ? 0 : 1) - (b.status === 'PENDING' ? 0 : 1)
+        || String(b.createdAt).localeCompare(String(a.createdAt)));
+      render();
     } catch (err) {
       error.textContent = err.message;
     }
   }
+
+  document.getElementById('filters').addEventListener('click', (event) => {
+    const button = event.target.closest('[data-filter]');
+    if (button) { filter = button.dataset.filter; render(); }
+  });
 
   list.addEventListener('click', async (event) => {
     const button = event.target.closest('[data-action]');
@@ -96,12 +121,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     button.disabled = true;
     try {
       await api.form('POST', `/api/lease-requests/${button.dataset.id}/${button.dataset.action}`);
-      showToast('Done.');
+      showToast(button.dataset.action === 'approve' ? 'Approved. You can now create the lease.' : 'Done.');
+      if (button.dataset.action === 'approve') filter = 'all';      // so the "Create lease" button stays visible
     } catch (err) {
       showToast(err.message, true);          // e.g. "This unit is no longer available."
     }
     load();
   });
 
+  filter = isLandlord ? 'PENDING' : 'all';     // a landlord opens straight onto what needs a decision
   load();
 });
