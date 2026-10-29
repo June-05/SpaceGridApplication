@@ -15,7 +15,8 @@
  *      TERMINATED  both see the reason · renter: pay what is left, browse spaces
  *      RENEWED     link to the renewal
  *    Upload the signed copy (landlord) → POST /api/leases/{id}/files.
- * 4. Opening the page marks its lease notice as seen in the bell (localStorage seenLeaseNotices, see nav.js).
+ * 4. "Printable agreement" → /contract.html?id= (the generic contract template; the signed scan is the "Signed copy").
+ * 5. Opening the page marks its lease notice as seen in the bell (localStorage seenLeaseNotices, see nav.js).
  */
 const $ = (id) => document.getElementById(id);
 const leaseId = new URLSearchParams(location.search).get('id');
@@ -115,6 +116,7 @@ async function load() {
     ? `<a href="${files[0].url}" target="_blank" class="text-indigo-600 hover:underline">${format.escape(files[0].fileName)}</a>`
     : 'None uploaded';
   $('contractUploadRow').classList.toggle('hidden', !isLandlord);
+  $('contractLink').href = `/contract.html?id=${lease.id}`;
 
   renderTimeline(lease, renewal);
   renderActions(lease, renewal, unpaid);

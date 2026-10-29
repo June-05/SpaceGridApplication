@@ -357,7 +357,25 @@ JOIN users u ON u.id = l.renter_id;
 
 ### Not done yet / follow-ups
 - Class diagram and ERD (`.drawio`): add `terminationReason`, `endedAutomatically`, `expire()`, `LeaseExpiryJob`.
-- Phase 4: printable contract page (`contract.html?id=`).
+- Phase 4 (printable contract page) is built: see the next entry.
+
+---
+
+## 2026-10-29 · Printable lease agreement (UI only, no design change)
+
+Phase 4 of the UI plan. Front-end only: no Java, SQL or API change. Answers "export vs upload" from the owner's list: the system **produces** a generic agreement to print, and the landlord **uploads** the signed scan afterwards.
+
+### What changed
+- **`contract.html?id=` + `js/pages/contract.js` (new):** a generic lease agreement (decided with the owner: generic template for now) filled in from `GET /api/leases/{id}` and `GET /api/leases/{id}/property`: parties, premises and address, term, rent and payment terms (amount per period, in advance or arrears, due day), standard clauses (use, repairs, early end with a written reason, changes) and signature lines. Both the lease's landlord and its renter can open it. A closed lease shows a banner (Ended / Terminated early / Renewed on …). "Print / Save as PDF" uses the browser (`window.print()`); print CSS hides the top bar and buttons.
+- The landlord's name is not on the page: the API doesn't give it to the renter, so the Landlord signature line is blank (name and date written by hand).
+- **`lease.html`:** "Printable agreement" button in Details. "Contract" is now called "Signed copy" (upload label, leases modal "Open Signed Copy (PDF)", lease form section "Signed Copy (optional)").
+- Not legal advice; the page says so.
+
+### How it was checked
+`contract-test.js` (17 checks: template fields, escaping, quarterly and arrears wording, ordinal due day, renewal reference, closed-lease banner, print button and print CSS, link from lease.html) plus the earlier jsdom suites.
+
+### Not done yet / follow-ups
+- Next in the plan: Phase 5 (email and phone on accounts), then 6 (Units map/list) and 7 (renter pages in Tailwind).
 
 ---
 

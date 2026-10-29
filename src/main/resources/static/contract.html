@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lease Agreement - SpaceGrid</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+    body { font-family: 'Plus Jakarta Sans', sans-serif; }
+    .doc h2 { font-size: 0.8rem; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; margin: 1.4rem 0 .4rem; }
+    .doc p, .doc li { font-size: 0.9rem; line-height: 1.55; }
+    .sign-line { border-bottom: 1px solid #0f172a; height: 2.5rem; }
+    /* print / Save as PDF: only the document, on white, without the bar and buttons */
+    @media print {
+      #appNav, .no-print { display: none !important; }
+      body { background: #fff !important; }
+      .paper { box-shadow: none !important; border: 0 !important; margin: 0 !important; padding: 0 !important; max-width: none !important; }
+      .doc h2, .signatures { break-inside: avoid; }
+    }
+  </style>
+</head>
+<body class="bg-[#f8fafc] text-slate-900 min-h-screen flex flex-col antialiased">
+  <!-- Shared top bar (built by /js/common/nav.js); hidden when printing -->
+  <header id="appNav" data-page="leases"></header>
+
+  <main class="flex-1 max-w-3xl mx-auto w-full px-4 sm:px-6 py-8">
+    <div class="no-print flex flex-wrap items-center justify-between gap-3 mb-5">
+      <a id="backLink" href="/" class="text-xs font-semibold text-slate-500 hover:text-indigo-600 transition"><i class="fa-solid fa-arrow-left mr-1"></i>Back to the lease</a>
+      <button id="printBtn" type="button" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow-sm shadow-indigo-200">
+        <i class="fa-solid fa-print mr-1"></i>Print / Save as PDF
+      </button>
+    </div>
+    <p id="error" class="no-print text-sm font-semibold text-rose-600 mb-4"></p>
+    <p class="no-print text-xs text-slate-500 mb-3">This is a generic template filled in from the lease. After both sides sign the printed copy, the landlord can upload the scan as the "Signed copy" on the lease page.</p>
+
+    <article id="paper" class="paper hidden bg-white border border-slate-200 rounded-2xl shadow-sm p-8 sm:p-12 doc">
+      <header class="text-center mb-6">
+        <p class="text-xs font-bold tracking-widest text-slate-400">SPACEGRID</p>
+        <h1 class="text-2xl font-extrabold tracking-tight mt-1">LEASE AGREEMENT</h1>
+        <p id="refLine" class="text-xs text-slate-500 mt-1"></p>
+        <p id="statusLine" class="hidden mt-3 inline-block px-3 py-1 rounded-lg text-xs font-bold bg-slate-100 text-slate-700"></p>
+      </header>
+
+      <p>This Lease Agreement is made on <strong id="cDate"></strong> between:</p>
+      <h2>1. Parties</h2>
+      <ul class="list-disc pl-5 space-y-1">
+        <li><strong>Landlord</strong> (owner of <span id="cProperty"></span>), referred to as the "Landlord".</li>
+        <li><strong id="cTenant"></strong> (account <span id="cUsername"></span>), <span id="cContact"></span>, referred to as the "Tenant".</li>
+      </ul>
+
+      <h2>2. The premises</h2>
+      <p>The Landlord leases to the Tenant the unit <strong id="cUnit"></strong> in <strong id="cProperty2"></strong>, located at <span id="cAddress"></span> (the "Premises").</p>
+
+      <h2>3. Term</h2>
+      <p>The lease starts on <strong id="cStart"></strong> and ends on <strong id="cEnd"></strong> (<span id="cMonths"></span>). The lease ends by itself on its end date. Staying longer needs a renewal or a new agreement.</p>
+
+      <h2>4. Rent and payment</h2>
+      <p>The rent is <strong id="cRent"></strong> per month. It is paid <strong id="cTerms"></strong>: <span id="cPeriod"></span> The due day is the <strong id="cDueDay"></strong> of the month, following the start date. Payments are made through SpaceGrid and each one gets a reference number as a receipt.</p>
+
+      <h2>5. Use of the Premises</h2>
+      <p>The Tenant uses the Premises only for the purpose agreed with the Landlord, keeps them clean and in good condition, and does not sublease them or let others use them without the Landlord's written consent.</p>
+
+      <h2>6. Repairs and access</h2>
+      <p>The Tenant tells the Landlord about damage or needed repairs promptly. The Landlord may enter the Premises at reasonable times, with notice, to inspect or repair them.</p>
+
+      <h2>7. Ending the lease early</h2>
+      <p>The Landlord may end the lease before its end date by giving the Tenant a written reason, which the Tenant can read on SpaceGrid. Rent already billed for months before the end stays payable. When the lease ends, the Tenant returns the Premises in the condition received, apart from normal wear.</p>
+
+      <h2>8. Changes</h2>
+      <p>The terms above cannot be edited once the lease is created. Changes are made by renewing the lease or signing a new one.</p>
+
+      <h2>9. Notes</h2>
+      <p>This is a general template provided by SpaceGrid. It is not legal advice. The parties may agree to additional written terms.</p>
+
+      <section class="signatures mt-10 grid grid-cols-1 sm:grid-cols-2 gap-10">
+        <div>
+          <div class="sign-line"></div>
+          <p class="text-xs font-bold mt-1">Landlord</p>
+          <p class="text-xs text-slate-500">Name &amp; date</p>
+        </div>
+        <div>
+          <div class="sign-line"></div>
+          <p class="text-xs font-bold mt-1" id="sigTenant">Tenant</p>
+          <p class="text-xs text-slate-500">Signature &amp; date</p>
+        </div>
+      </section>
+    </article>
+  </main>
+
+  <script src="/js/common/api.js"></script>
+  <script src="/js/common/auth.js"></script>
+  <script src="/js/common/nav.js"></script>
+  <script src="/js/common/format.js"></script>
+  <script src="/js/pages/contract.js"></script>
+</body>
+</html>

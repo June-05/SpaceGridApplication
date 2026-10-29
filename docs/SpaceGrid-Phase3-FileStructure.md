@@ -136,6 +136,7 @@ SpaceGrid/
 │       ├── login.html
 │       ├── register.html
 │       ├── lease.html
+│       ├── contract.html               (printable lease agreement; browser Print / Save as PDF)
 │       ├── landlord/
 │       │   ├── dashboard.html
 │       │   ├── property-form.html
@@ -263,6 +264,7 @@ Links start with `/` so they work from inside the `landlord/` and `renter/` fold
 | `landlord/leases.html` | landlord | All leases (or `?propertyId=`) with contract state and payment status (Paid / Pending / Overdue), filters, details modal with the contract PDF; renew / terminate | `leases.js` | | `GET /api/leases`, `GET /api/properties/{id}/leases`, `GET /api/leases/{id}/statement`, `GET /api/leases/{id}/files`, `GET /api/lease-requests`, `POST /api/leases/{id}/terminate` |
 | `landlord/lease-form.html` | landlord | New lease (`?unitId=`, `?requestId=` prefill), or renew (`?renew=<leaseId>`): renter account + contact details, unit, dates, rent, payment terms, contract PDF | `lease-form.js` | | `GET /api/renters`, `GET /api/properties`, `GET …/{id}/units`, `POST /api/leases`, `POST /api/leases/{id}/renew`, `POST /api/leases/{id}/files` |
 | `lease.html` | both | Lease details, unit location on the grid, statement by billing period, payment history, contract. **Landlord:** End / Terminate / Renew, upload contract. **Renter:** "Pay" on the oldest unpaid period. | `lease.js` | ✔ read-only | `GET /api/leases/{id}`, `GET …/{id}/property`, `GET …/{id}/statement`, `GET …/{id}/payments`, `GET/POST …/{id}/files`, `POST …/{id}/end`, `POST …/{id}/terminate` |
+| `contract.html` | both | Generic lease agreement filled in from the lease (parties, premises, term, rent and payment terms, standard clauses, signature lines). "Print / Save as PDF" prints only the document. The signed scan is uploaded on `lease.html` as the "Signed copy". | `contract.js` | | `GET /api/leases/{id}`, `GET …/{id}/property` |
 | `renter/dashboard.html` | renter | My leases (unit photo), days remaining, next amount due | `renter-dashboard.js` | | `GET /api/leases`, `GET /api/leases/{id}/statement` |
 | `renter/pay.html` | renter | Simulated checkout for one period (`?leaseId=&month=`): method (GCash / Maya / Card), account number, confirm | `pay.js` | | `GET /api/leases/{id}/statement`, `POST /api/leases/{id}/payments` |
 

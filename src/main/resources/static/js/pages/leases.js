@@ -186,11 +186,11 @@ async function viewLease(id) {
   const link = $('modalContractLink');
   if (contract) {
     link.href = contract.url;
-    link.textContent = 'Open Contract (PDF)';
+    link.textContent = 'Open Signed Copy (PDF)';
     link.classList.remove('opacity-50', 'pointer-events-none');
   } else {
     link.removeAttribute('href');
-    link.textContent = 'No contract uploaded';
+    link.textContent = 'No signed copy yet';
     link.classList.add('opacity-50', 'pointer-events-none');
   }
   $('leaseModal').classList.remove('hidden');
